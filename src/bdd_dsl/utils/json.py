@@ -54,7 +54,7 @@ from bdd_dsl.utils.common import get_valid_var_name
 
 def load_metamodels() -> rdflib.Graph:
     graph = rdflib.Graph()
-    mm_files = glob.glob(join(META_MODELs_PATH, "*.json"))
+    mm_files = glob.glob(join(META_MODELs_PATH, "**", "*.json"), recursive=True)
     for mm_file in mm_files:
         graph.parse(mm_file, format="json-ld")
     return graph
