@@ -1,7 +1,7 @@
 {
     "@context": {
         "@base": "https://my.url/models/agents/brsu/",
-        "agn": "https://my.url/metamodels/agent#",
+        "agn": "https://hbrs-sesame.github.io/metamodels/agent#",
         "kinova": "https://www.kinovarobotics.com/product/"
     },
     "@graph": [

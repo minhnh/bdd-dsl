@@ -1,4 +1,4 @@
-from bdd_dsl.models.uri import URI_TRANS, URI_MM_BDD, URI_MM_CRDN, URI_MM_BT, URI_MM_PY
+from bdd_dsl.models.uri import URI_TRANS, URI_MM_BDD, URI_MM_EVENT, URI_MM_BT, URI_MM_PY
 
 # transformation concepts and relations
 Q_PREFIX_TRANS = "trans"
@@ -29,12 +29,12 @@ Q_IMPL_ARG_NAME = f"{Q_PREFIX_TRANS}:impl-arg-name"
 Q_IMPL_ARG_VALUE = f"{Q_PREFIX_TRANS}:impl-arg-value"
 
 # coordination concepts & relations
-Q_PREFIX_CRDN = "crdn"
-Q_CRDN_EVENT_LOOP = f"{Q_PREFIX_CRDN}:EventLoop"
-Q_CRDN_EVENT_LOOP_CONN = f"{Q_PREFIX_CRDN}:EventLoopConn"
-Q_CRDN_HAS_EL_CONN = f"{Q_PREFIX_CRDN}:event-loop-connection"
-Q_CRDN_OF_EL = f"{Q_PREFIX_CRDN}:event-loop"
-Q_CRDN_HAS_EVENT = f"{Q_PREFIX_CRDN}:has-event"
+Q_PREFIX_EVENT = "evt"
+Q_CRDN_EVENT_LOOP = f"{Q_PREFIX_EVENT}:EventLoop"
+Q_CRDN_EVENT_LOOP_CONN = f"{Q_PREFIX_EVENT}:EventLoopConn"
+Q_CRDN_HAS_EL_CONN = f"{Q_PREFIX_EVENT}:event-loop-connection"
+Q_CRDN_OF_EL = f"{Q_PREFIX_EVENT}:event-loop"
+Q_CRDN_HAS_EVENT = f"{Q_PREFIX_EVENT}:has-event"
 
 # behaviour tree concepts & relations
 Q_PREFIX_BT = "bt"
@@ -91,7 +91,7 @@ Q_BDD_REF_AGENT = f"{Q_PREFIX_BDD}:ref-agent"
 
 # Query for event loops from graph
 EVENT_LOOP_QUERY = f"""
-PREFIX {Q_PREFIX_CRDN}: <{URI_MM_CRDN}>
+PREFIX {Q_PREFIX_EVENT}: <{URI_MM_EVENT}>
 PREFIX {Q_PREFIX_TRANS}: <{URI_TRANS}>
 
 CONSTRUCT {{

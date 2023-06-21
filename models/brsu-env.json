@@ -1,7 +1,7 @@
 {
     "@context": {
         "@base": "https://my.url/models/environments/brsu/",
-        "env": "https://my.url/metamodels/environment#"
+        "env": "https://hbrs-sesame.github.io/metamodels/environment#"
     },
     "@graph": [
         { "@id": "box", "@type": "env:Object" },

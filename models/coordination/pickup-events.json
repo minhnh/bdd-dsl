@@ -1,32 +1,32 @@
 {
     "@context": {
         "@base": "https://my.url/models/coordination/",
-        "crdn": "https://my.url/metamodels/coordination#",
+        "evt": "https://hbrs-sesame.github.io/metamodels/coordination/event#",
 
-        "event-loop": { "@id": "crdn:event-loop", "@type": "@id" },
-        "has-event": { "@id": "crdn:has-event", "@type": "@id" }
+        "event-loop": { "@id": "evt:event-loop", "@type": "@id" },
+        "has-event": { "@id": "evt:has-event", "@type": "@id" }
     },
     "@graph": [
-        { "@id": "approach-start", "@type": "crdn:Event" },
-        { "@id": "approach-end", "@type": "crdn:Event" },
-        { "@id": "grasp-start", "@type": "crdn:Event" },
-        { "@id": "grasp-end", "@type": "crdn:Event" },
-        { "@id": "lift-start", "@type": "crdn:Event" },
-        { "@id": "lift-end", "@type": "crdn:Event" },
-        { "@id": "pickup-event-loop", "@type": "crdn:EventLoop" },
+        { "@id": "approach-start", "@type": "evt:Event" },
+        { "@id": "approach-end", "@type": "evt:Event" },
+        { "@id": "grasp-start", "@type": "evt:Event" },
+        { "@id": "grasp-end", "@type": "evt:Event" },
+        { "@id": "lift-start", "@type": "evt:Event" },
+        { "@id": "lift-end", "@type": "evt:Event" },
+        { "@id": "pickup-event-loop", "@type": "evt:EventLoop" },
         {
-            "@id": "single-arm-pickup-el", "@type": "crdn:EventLoopConn",
+            "@id": "single-arm-pickup-el", "@type": "evt:EventLoopConn",
             "event-loop": "pickup-event-loop",
             "has-event": [
                 "approach-start", "approach-end", "grasp-start", "grasp-end", "lift-start", "lift-end"
             ]
         },
-        { "@id": "approach-arm1-start", "@type": "crdn:Event" },
-        { "@id": "approach-arm1-end", "@type": "crdn:Event" },
-        { "@id": "approach-arm2-start", "@type": "crdn:Event" },
-        { "@id": "approach-arm2-end", "@type": "crdn:Event" },
+        { "@id": "approach-arm1-start", "@type": "evt:Event" },
+        { "@id": "approach-arm1-end", "@type": "evt:Event" },
+        { "@id": "approach-arm2-start", "@type": "evt:Event" },
+        { "@id": "approach-arm2-end", "@type": "evt:Event" },
         {
-            "@id": "dual-arm-pickup-el", "@type": "crdn:EventLoopConn",
+            "@id": "dual-arm-pickup-el", "@type": "evt:EventLoopConn",
             "event-loop": "pickup-event-loop",
             "has-event": [
                 "approach-arm1-start", "approach-arm1-end",

@@ -1,7 +1,7 @@
 from bdd_dsl.models.uri import (
     URI_TRANS,
     URI_MM_BDD,
-    URI_MM_CRDN,
+    URI_MM_EVENT,
     URI_MM_BT,
     URI_M_CRDN,
     URI_M_AC,
@@ -33,7 +33,7 @@ from bdd_dsl.models.queries import (
     Q_IMPL_CLASS,
     Q_IMPL_ARG_NAME,
     Q_IMPL_ARG_VALUE,
-    Q_PREFIX_CRDN,
+    Q_PREFIX_EVENT,
     Q_PREFIX_BT,
     Q_HAS_SUBTREE,
 )
@@ -71,7 +71,7 @@ FR_FLUENT_DATA = "fluent_data"
 EVENT_LOOP_FRAME = {
     "@context": {
         "@base": URI_M_CRDN,
-        Q_PREFIX_CRDN: URI_MM_CRDN,
+        Q_PREFIX_EVENT: URI_MM_EVENT,
         Q_PREFIX_TRANS: URI_TRANS,
         FR_DATA: "@graph",
         FR_NAME: "@id",
@@ -108,11 +108,11 @@ BDD_FRAME = {
     "@context": {
         "@base": URI_M_AC,
         Q_PREFIX_TRANS: URI_TRANS,
-        Q_PREFIX_CRDN: URI_MM_CRDN,
+        Q_PREFIX_EVENT: URI_MM_EVENT,
         Q_PREFIX_BDD: URI_MM_BDD,
         "env": URI_M_ENV,
         "agn": URI_M_AGENT,
-        f"{Q_PREFIX_CRDN}m": URI_M_CRDN,
+        f"{Q_PREFIX_EVENT}m": URI_M_CRDN,
         FR_DATA: "@graph",
         FR_NAME: "@id",
         FR_TYPE: "@type",

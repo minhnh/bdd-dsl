@@ -3,9 +3,9 @@
         "@base": "https://my.url/models/coordination/bt/",
         "crdn-m": "https://my.url/models/coordination/",
 
-        "py": "https://my.url/metamodels/languages/python#",
+        "py": "https://hbrs-sesame.github.io/metamodels/languages/python#",
 
-        "bt": "https://my.url/metamodels/coordination/behaviour-tree#",
+        "bt": "https://hbrs-sesame.github.io/metamodels/coordination/behaviour-tree#",
         "root": { "@id": "bt:root", "@type": "@id" },
         "uses-impl": { "@id": "bt:uses-implementation", "@type": "@id" },
         "of-action": { "@id": "bt:of-action", "@type": "@id" },
@@ -16,8 +16,8 @@
         "subroot": { "@id": "bt:subroot", "@type": "@id" },
         "of-subtree": { "@id": "bt:of-subtree", "@type": "@id" },
 
-        "crdn": "https://my.url/metamodels/coordination#",
-        "el-conn": { "@id": "crdn:event-loop-connection", "@type": "@id" }
+        "evt": "https://hbrs-sesame.github.io/metamodels/coordination/event#",
+        "el-conn": { "@id": "evt:event-loop-connection", "@type": "@id" }
     },
     "@graph": [
         { "@id": "approach-arm1", "@type": "bt:Action" },

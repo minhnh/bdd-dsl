@@ -8,7 +8,7 @@
         "hbrs-agents": "https://my.url/models/agents/brsu/",
         "hbrs-env": "https://my.url/models/environments/brsu/",
 
-        "bdd": "https://my.url/metamodels/acceptance-criteria/bdd#",
+        "bdd": "https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd#",
         "of-clause": { "@id": "bdd:of-clause", "@type": "@id" },
         "has-criteria": { "@id":"bdd:has-criteria", "@type": "@id" },
         "of-scenario":{ "@id": "bdd:of-scenario", "@type": "@id" },
@@ -16,8 +16,8 @@
         "of-variable": { "@id": "bdd:of-variable", "@type": "@id" },
         "has-variation": { "@id": "bdd:has-variation", "@type": "@id" },
 
-        "crdn": "https://my.url/metamodels/coordination#",
-        "has-event": { "@id": "crdn:has-event", "@type": "@id" }
+        "evt": "https://hbrs-sesame.github.io/metamodels/coordination/event#",
+        "has-event": { "@id": "evt:has-event", "@type": "@id" }
     },
 
     "@graph": [

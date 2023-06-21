@@ -1,0 +1,3 @@
+[submodule "src/bdd_dsl/metamodels"]
+	path = src/bdd_dsl/metamodels
+	url = https://github.com/hbrs-sesame/metamodels.git

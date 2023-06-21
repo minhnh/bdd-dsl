@@ -9,7 +9,7 @@ import py_trees as pt
 import rdflib
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
-from bdd_dsl.metamodels import META_MODELs_PATH
+from bdd_dsl import META_MODELs_PATH
 from bdd_dsl.models.queries import (
     EVENT_LOOP_QUERY,
     BEHAVIOUR_TREE_QUERY,

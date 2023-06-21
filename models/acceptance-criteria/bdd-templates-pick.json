@@ -2,7 +2,7 @@
     "@context": {
         "@base": "https://my.url/models/acceptance-criteria/bdd-templates/",
 
-        "bdd": "https://my.url/metamodels/acceptance-criteria/bdd#",
+        "bdd": "https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd#",
         "given": { "@id": "bdd:given", "@type": "@id" },
         "when": { "@id": "bdd:when", "@type": "@id" },
         "then": { "@id": "bdd:then", "@type": "@id" },
@@ -14,7 +14,7 @@
         "ref-object": { "@id": "bdd:ref-object", "@type": "@id" },
         "ref-agent": { "@id": "bdd:ref-agent", "@type": "@id" },
 
-        "bhv": "https://my.url/metamodels/behaviour#",
+        "bhv": "https://hbrs-sesame.github.io/metamodels/behaviour#",
         "of-behaviour":{ "@id": "bhv:of-behaviour", "@type": "@id" }
     },
     "@graph": [
