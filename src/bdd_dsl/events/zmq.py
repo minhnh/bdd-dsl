@@ -97,7 +97,11 @@ class ZmqEventServer(object):
             self._handle_e_produce(event_data)
 
         elif req_type == RequestType.CONSUME:
-            response[MessageKey.DATA] = self._handle_e_consume(event_id)
+            last_event_data = self._handle_e_consume(event_id)
+            if last_event_data is None:
+                response[MessageKey.STATUS] = ResponseType.NOT_TRIGGERED
+            else:
+                response[MessageKey.DATA] = last_event_data
 
         else:
             # unrecognized request type
@@ -148,4 +152,4 @@ class ZmqEventClient(EventHandler):
         )
         if resp[MessageKey.STATUS] == ResponseType.UNRECOGNIZED_EVENT:
             raise ValueError(f"consume: unrecognized event: {event_id}")
-        return resp[MessageKey.DATA]
+        return resp

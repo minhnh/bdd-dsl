@@ -1,6 +1,6 @@
 import glob
 from importlib import import_module
-from typing import List, Tuple, Type
+from typing import List, Tuple, Type, Union
 import itertools
 import json
 from os.path import join
@@ -78,6 +78,32 @@ def frame_model_with_file(model: dict, frame_file: str):
         frame_str = infile.read()
     frame_dict = json.loads(frame_str)
     return jsonld.frame(model, frame_dict)
+
+
+def get_el_conn_event_names(graph: rdflib.Graph, el_conn_id: str) -> Union[List[str], None]:
+    model = query_graph(graph, EVENT_LOOP_QUERY)
+    framed_model = jsonld.frame(model, EVENT_LOOP_FRAME)
+
+    # single match
+    if FR_DATA not in framed_model:
+        if FR_NAME not in framed_model or FR_EVENTS not in framed_model:
+            raise ValueError(
+                f"required fields '{FR_NAME}' or '{FR_EVENTS}' not in framed query result"
+            )
+        if framed_model[FR_NAME] != el_conn_id:
+            return None
+        return [event[FR_NAME] for event in framed_model[FR_EVENTS]]
+
+    # multiple match
+    for event_loop_data in framed_model[FR_DATA]:
+        el_name = event_loop_data[FR_NAME]
+        if el_conn_id != el_name:
+            continue
+
+        # first match
+        return [event[FR_NAME] for event in event_loop_data[FR_EVENTS]]
+
+    return None
 
 
 def create_event_handler_from_data(
@@ -175,20 +201,24 @@ def create_subtree_behaviours(
     return subtree_root
 
 
-def create_bt_el_from_data(
-    bt_root_data: dict, e_handler_cls: Type[EventHandler], e_handler_kwargs: dict
-) -> Tuple[EventHandler, pt.composites.Composite]:
-    bt_root_name = bt_root_data[FR_NAME]
-    if FR_EL not in bt_root_data:
-        raise ValueError(f"key '{FR_EL}' not in data of behaviour tree '{bt_root_name}'")
-    event_loop = create_event_handler_from_data(
-        bt_root_data[FR_EL], e_handler_cls, e_handler_kwargs
-    )
+def get_bt_event_data_from_graph(graph: rdflib.Graph, bt_root_name: str = None) -> List[tuple]:
+    bt_model = query_graph(graph, BEHAVIOUR_TREE_QUERY)
+    bt_model_framed = jsonld.frame(bt_model, BEHAVIOUR_TREE_FRAME)
 
-    # recursively create behaviour tree
-    bt_root_node = create_subtree_behaviours(bt_root_data[FR_SUBTREE], event_loop)
+    if FR_DATA not in bt_model_framed:
+        if bt_root_name is not None and bt_model_framed[FR_NAME] != bt_root_name:
+            return []
+        # single BT root
+        return [(bt_model_framed[FR_EL], bt_model_framed[FR_SUBTREE])]
 
-    return event_loop, bt_root_node
+    ehs_and_bts = []
+    for root_data in bt_model_framed[FR_DATA]:
+        root_name = root_data[FR_NAME]
+        if bt_root_name is not None and root_name != bt_root_name:
+            # not the requested tree
+            continue
+        ehs_and_bts.append((root_data[FR_EL], root_data[FR_SUBTREE]))
+    return ehs_and_bts
 
 
 def create_bt_from_graph(
@@ -197,22 +227,14 @@ def create_bt_from_graph(
     e_handler_cls: Type[EventHandler] = SimpleEventLoop,
     e_handler_kwargs: dict = {},
 ) -> List[Tuple]:
-    bt_model = query_graph(graph, BEHAVIOUR_TREE_QUERY)
-    bt_model_framed = jsonld.frame(bt_model, BEHAVIOUR_TREE_FRAME)
-
-    if FR_DATA not in bt_model_framed:
-        # single BT root
-        return [create_bt_el_from_data(bt_model_framed, e_handler_cls, e_handler_kwargs)]
+    e_data_and_bts = get_bt_event_data_from_graph(graph, bt_name)
 
     # multiple BT roots
     els_and_bts = []
-    for root_data in bt_model_framed[FR_DATA]:
-        root_name = root_data[FR_NAME]
-        if bt_name is not None and root_name != bt_name:
-            # not the requested tree
-            continue
-
-        els_and_bts.append(create_bt_el_from_data(root_data, e_handler_cls, e_handler_kwargs))
+    for e_data, subtree_data in e_data_and_bts:
+        event_handler = create_event_handler_from_data(e_data, e_handler_cls, e_handler_kwargs)
+        bt_root_node = create_subtree_behaviours(subtree_data, event_handler)
+        els_and_bts.append((event_handler, bt_root_node))
 
     return els_and_bts
 

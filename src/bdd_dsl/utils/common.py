@@ -1,4 +1,6 @@
 import re
+import signal
+from bdd_dsl.exception import GracefulExit
 
 
 FILENAME_REPLACEMENTS = {" ": "_", ":": "__", "/": "_"}
@@ -36,3 +38,12 @@ def get_valid_filename(name: str) -> str:
 
 def get_valid_var_name(name: str) -> str:
     return get_valid_name(name, VAR_NAME_REPLACEMENTS)
+
+
+def raise_graceful_exit_handler(signum, frame):
+    raise GracefulExit(signum)
+
+
+def register_termination_signals(handled_signals=[signal.SIGINT, signal.SIGTERM]):
+    for signum in handled_signals:
+        signal.signal(signum, raise_graceful_exit_handler)

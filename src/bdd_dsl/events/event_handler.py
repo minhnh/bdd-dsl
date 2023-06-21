@@ -7,6 +7,10 @@ class EventHandler(ABC):
         self.id = id
         self._events = events
 
+    @property
+    def event_names(self) -> List[str]:
+        return self._events
+
     @abstractmethod
     def has_event(self, event_id: str) -> bool:
         raise NotImplementedError()

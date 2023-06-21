@@ -23,7 +23,7 @@ PKG_ROOT = join(dirname(__file__), "..")
 MODELS_PATH = join(PKG_ROOT, "models")
 JINJA_TMPL_DIR = join(MODELS_PATH, "jinja")
 JINJA_FEATURE_TMPL = "feature.jinja"
-GENERATED_DIR = join(PKG_ROOT, "generated")
+GENERATED_DIR = join(PKG_ROOT, "examples", "generated")
 
 
 def prepare_gherkin_feature_data(us_data: dict):

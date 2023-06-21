@@ -1,12 +1,9 @@
 import time
 import numpy as np
-from typing import Type
 import robosuite as rs
-import rdflib
 import py_trees as pt
 from bdd_dsl.behaviours.actions import ActionWithEvents
-from bdd_dsl.utils.json import create_bt_from_graph
-from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
+from bdd_dsl.events.event_handler import EventHandler
 
 # from pprint import pprint
 
@@ -14,24 +11,16 @@ from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
 class SimulatedScenario(object):
     def __init__(
         self,
-        graph: rdflib.Graph,
-        e_handler_cls: Type[EventHandler] = SimpleEventLoop,
-        e_handler_kwargs: dict = {},
+        event_handler: EventHandler,
+        bt_root,
         **kwargs,
     ):
         self.env = None
         self.target_object = None
         self.rendering = kwargs.get("rendering", True)
 
-        bt_root_name = kwargs.get("bt_root_name", None)
-        els_and_bts = create_bt_from_graph(
-            graph, bt_root_name, e_handler_cls=e_handler_cls, e_handler_kwargs=e_handler_kwargs
-        )
-        if len(els_and_bts) != 1:
-            raise ValueError(
-                f"expected 1 result for behaviour tree '{bt_root_name}', got: {len(els_and_bts)}"
-            )
-        self.event_loop, self.selected_bt_root = els_and_bts[0]
+        self.event_loop = event_handler
+        self.selected_bt_root = bt_root
 
         self.env_name = kwargs.get("env_name", "PickPlace")
         self.robots = kwargs.get("robots", ["Kinova3"])
@@ -71,6 +60,7 @@ class SimulatedScenario(object):
     def step(self):
         self.behaviour_tree.tick()
 
+        done = False
         try:
             # actions = np.random.randn(self.env.robots[0].dof)  # sample random action
             actions = self.blackboard.actions
@@ -81,6 +71,10 @@ class SimulatedScenario(object):
             pass
         if self.rendering:
             self.env.render()  # render on display
+
+        if done:
+            self.interrupt()
+        return done
 
     def interrupt(self):
         self.behaviour_tree.interrupt()

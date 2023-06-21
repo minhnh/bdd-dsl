@@ -6,3 +6,8 @@ class ConstraintViolation(Exception):
 class BDDConstraintViolation(ConstraintViolation):
     def __init__(self, message):
         super().__init__("BDD", message)
+
+
+class GracefulExit(Exception):
+    def __init__(self, signum: int):
+        self.signum = signum
