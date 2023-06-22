@@ -3,8 +3,13 @@
 
 This repository provides tooling to support the specification and execution of acceptance tests for
 robotic scenarios using the [Behaviour-Driven Development (BDD)](https://dannorth.net/introducing-bdd/)
-methodology. For usage of the library, you can check out the [tutorial](docs/bdd-tutorial.md), or the
+methodology. Further documentation can be found below and on the
 [maintained GitHub page for the repository](https://hbrs-sesame.github.io/bdd-dsl/).
+
+## Content
+
+1. [Concepts and relations for specifying robotic scenarios](bdd-concepts.md)
+2. [Tutorial: Generating Gherkin features for a simple pickup task](bdd-tutorial-feature-gen.md)
 
 ## Acknowledgement
 
