@@ -15,13 +15,13 @@ of which is reported in [^nguyen2023rulebook].
 1. [Concepts and relations for specifying robotic scenarios](bdd-concepts.md)
 2. [Tutorial: Generating Gherkin features for a simple pickup task](bdd-tutorial-feature-gen.md)
 
+## Acknowledgement
+
+This work is partly funded by the [SESAME H2020 project](https://www.sesame-project.org/),
+under grant agreement No 101017258.
+
 ## References
 
 [^north2003bdd]: [D. North, "Behavior Modification: The evolution of behaviour-driven development", _Better Software_, 2006.](https://dannorth.net/introducing-bdd/)
 
 [^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven requirement specification for robotic competitions", [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/), May 2023.
-
-## Acknowledgement
-
-This work is partly funded by the [SESAME H2020 project](https://www.sesame-project.org/),
-under grant agreement No 101017258.
