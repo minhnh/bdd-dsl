@@ -1,1 +1,0 @@
-# Testing Robotics Acceptance Criteria with Behaviour-Driven Development
