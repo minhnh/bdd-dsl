@@ -73,17 +73,41 @@ Other important keywords:
 
 ### Agent
 
-|Prefix|
+| Prefix |
 |:-|
-|`{ agn: "https://hbrs-sesame.github.io/metamodels/agent#" }`|
+| `{ "agn": "https://hbrs-sesame.github.io/metamodels/agent#" }` |
+
+- `agn:Agent`
 
 ### Environment
+
+| Prefix |
+|:-|
+| `{ "env": "https://hbrs-sesame.github.io/metamodels/environment#" }` |
+
+- `env:Object`
+- `env:Workspace`
 
 ### Task
 
 > TODO: rename VariableConnection to TaskVariation
 
+### Coordination
+
+| Prefix |
+|:-|
+| `{ "evt": "https://hbrs-sesame.github.io/metamodels/coordination/event#" }` |
+
+- `evt:Event`
+
 ### BDD Scenario Templates and Variants
+
+|Prefix|
+|:-|
+| `{ "bdd": "https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd#" }` |
+
+- `bdd:Scenario`
+- `bdd:Scenario`
 
 ## References
 
