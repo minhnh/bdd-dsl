@@ -1,16 +1,22 @@
 # Tutorial: Generating Gherkin features for a simple pickup task
 
-This tutorial showcases how [concepts from our metamodels](bdd-concepts.md) can be used to model
-a template of a simple pickup scenario in the Behaviour-Driven Development (BDD) paradigm.
+This tutorial will first showcase how [concepts from our metamodels](bdd-concepts.md) can be used
+to model acceptance criteria of a simple pickup task as Behaviour-Driven Development (BDD)
+scenarios, as well as how variations of such scenarios can be introduced in the model. An example
+is then presented to show how to transform this model into a
+[Gherkin](https://cucumber.io/docs/gherkin/reference/) feature for integration with appropriate
+BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for the Python language.
+
+## Specifying BDD Acceptance Criteria for a Pickup Task
+
+This section assumes familiarity with BDD concepts. For a review please take a look at the
+[documentation for the BDD metamodel](bdd-concepts.md#bdd-review).
+
+### Modelling BDD scenarios
+
 Variations of both the scenario definition and acceptance criteria can then be introduced to this
 template for tailoring to different variants of the pickup task, e.g. for different robotic
-competitions. Finally, these scenario variants can then be used to generate
-[Gherkin](https://cucumber.io/docs/gherkin/reference/) feature files for integration with
-appropriate BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for the Python language.
-
-## Specifying the pickup BDD template
-
-### BDD clauses
+competitions.
 
 ### Scenario variables
 
@@ -21,15 +27,6 @@ appropriate BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for t
 ### Variation of criteria
 
 ## Generating Gherkin Feature files
-
-## Discussion
-
-Here, the idea of defining common "templates" for BDD scenarios of the same behaviour is inspired
-by the work by Alferez et al.[^alferez2019], in which the behaviours are different operations on
-data structures in a database. Variations of robotic scenarios, even for the simple pickup task
-currently in consideration, can be vastly more complex. This motivates the design of our metamodels
-to accommodate such complexity.
-TODO: rephrase end
 
 ## References
 
