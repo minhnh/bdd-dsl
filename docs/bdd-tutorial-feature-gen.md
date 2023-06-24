@@ -127,6 +127,14 @@ Composition of scenarios into user story
 
 ## Generating Gherkin Feature files
 
+### Transform
+
+Querying with [SPARQL](https://www.w3.org/TR/rdf-sparql-query/)
+
+Framing
+
+### Generating from Jinja Templates
+
 ## References
 
 [^alferez2019]: M. Alferez, F. Pastore, M. Sabetzadeh, et al., "Bridging the Gap between Requirements Modeling and Behavior-Driven Development," _22nd MODELS_, 2019, doi: [10.1109/MODELS.2019.00008](https://doi.org/10.1109/MODELS.2019.00008).
