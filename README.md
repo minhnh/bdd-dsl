@@ -8,8 +8,8 @@ methodology. Further documentation can be found below and on the
 
 ## Content
 
-1. [Concepts and relations for specifying robotic scenarios](bdd-concepts.md)
-2. [Tutorial: Generating Gherkin features for a simple pickup task](bdd-tutorial-feature-gen.md)
+1. [Concepts and relations for specifying robotic scenarios](docs/bdd-concepts.md)
+2. [Tutorial: Generating Gherkin features for a simple pickup task](docs/bdd-tutorial-feature-gen.md)
 
 ## Acknowledgement
 
