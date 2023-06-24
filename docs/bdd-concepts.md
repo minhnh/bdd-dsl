@@ -57,19 +57,11 @@ following files:
 | [`event.json`](https://hbrs-sesame.github.io/metamodels/coordination/event.json) | Metamodel for specifying event-driven coordination of robot behaviours |
 | [`bdd.json`](https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd.json) | Metamodel for specifying BDD templates and their variants |
 
-### JSON-LD Recap
-
-JSON-LD extends the JSON format for representing linked data. More details on this W3C standard
-can be found on the corresponding [online documentation](https://www.w3.org/TR/json-ld/). Models in
-JSON-LD are identified using International Resource Identifiers (IRI) with the `@id` keyword.
-For brevity, we also use [compact IRIs](https://www.w3.org/TR/json-ld/#compact-iris)
-(`:` separating prefix and suffix) when referring to metamodels concepts and relations below.
-Other important keywords:
-- `@context`
-- `@graph`
-- `@type`
-
-> **TODO**: refer to Sven's modelling tutorial or describe the basic keywords here?
+For an overview of main JSON-LD keywords used in our models, please take a look at our
+[modelling tutorial](https://github.com/comp-rob2b/modelling-tutorial#json-ld). More details on
+this standard can be found on the [official online documentation](https://www.w3.org/TR/json-ld/).
+For brevity, we use [compact IRIs](https://www.w3.org/TR/json-ld/#compact-iris) (using `:` to
+separate prefix and suffix) when referring to metamodels concepts and relations below.
 
 ### Agent
 

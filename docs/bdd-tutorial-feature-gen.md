@@ -16,7 +16,7 @@ BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for the Python la
 Figure 1 shows a partial example of how concepts and relations in our metamodels can be composed to
 create BDD templates and concrete scenario variants. For the motivation of the metamodel design and
 detailed descriptions of their concepts and relations, please take a look at
-[documentation for the relevant metamodels](bdd-concepts.md).
+[documentation for the relevant metamodels](bdd-concepts.md). We will now walk through
 
 ### Specifying Scenario Templates
 
@@ -125,7 +125,7 @@ Composition of scenarios into user story
 }
 ```
 
-## Generating Gherkin Feature files
+## Generating Gherkin Features from JSON-LD Models
 
 ### Transform
 
@@ -134,6 +134,8 @@ Querying with [SPARQL](https://www.w3.org/TR/rdf-sparql-query/)
 Framing
 
 ### Generating from Jinja Templates
+
+> TODO: include graphics
 
 ## References
 

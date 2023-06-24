@@ -1,0 +1,18 @@
+---
+---
+
+@import "jekyll-theme-minimal";
+
+/* Medium Devices, Desktops */
+@media only screen and (min-width : 992px) {
+
+.wrapper {
+    width:1060px;
+}
+
+section {
+    width:700px;
+}
+
+}
+
