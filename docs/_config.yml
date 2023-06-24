@@ -1,0 +1,11 @@
+remote_theme: pages-themes/minimal@v0.2.0
+plugins:
+- jekyll-remote-theme
+
+# General infos
+title: bdd-dsl
+logo: assets/img/sesame_logo_tagline.svg
+description: Metamodels and associated toolings for applying the Behaviour-Driven Development (BDD) process to test robotic scenarios.
+show_downloads: false
+google_analytics:
+theme: jekyll-theme-minimal
