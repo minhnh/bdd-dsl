@@ -20,13 +20,16 @@ class BDD(unittest.TestCase):
     def setUp(self):
         self.graph = load_metamodels()
         self.graph.parse(
-            join(MODELS_PATH, "acceptance-criteria", "bdd-templates-pick.json"), format="json-ld"
+            join(MODELS_PATH, "acceptance-criteria", "bdd", "templates", "pickup.json"),
+            format="json-ld",
         )
         self.graph.parse(
-            join(MODELS_PATH, "acceptance-criteria", "bdd-pick.json"), format="json-ld"
+            join(MODELS_PATH, "acceptance-criteria", "bdd", "pickup-variants.json"),
+            format="json-ld",
         )
-        self.graph.parse(join(MODELS_PATH, "brsu-robots.json"), format="json-ld")
-        self.graph.parse(join(MODELS_PATH, "brsu-env.json"), format="json-ld")
+        self.graph.parse(join(MODELS_PATH, "environments", "brsu.json"), format="json-ld")
+        self.graph.parse(join(MODELS_PATH, "environments", "avl.json"), format="json-ld")
+        self.graph.parse(join(MODELS_PATH, "agents", "brsu.json"), format="json-ld")
 
     def test_bdd(self):
         bdd_result = process_bdd_us_from_graph(self.graph)

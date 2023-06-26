@@ -20,10 +20,11 @@ class NominalCoordination(unittest.TestCase):
         self.event_loop_model_file = join(MODELS_PATH, "coordination", "pickup-events.json")
         self.graph.parse(self.event_loop_model_file, format="json-ld")
         self.graph.parse(
-            join(MODELS_PATH, "coordination", "pickup-behaviours.json"), format="json-ld"
+            join(MODELS_PATH, "coordination", "bt", "pickup-behaviours.json"), format="json-ld"
         )
         self.graph.parse(
-            join(MODELS_PATH, "coordination", "pickup-dual-arm-behaviours.json"), format="json-ld"
+            join(MODELS_PATH, "coordination", "bt", "pickup-dual-arm-behaviours.json"),
+            format="json-ld",
         )
 
     def test_event_loop(self):

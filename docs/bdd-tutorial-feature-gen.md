@@ -9,48 +9,49 @@ BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for the Python la
 
 ## Specifying BDD Acceptance Criteria for a Pickup Task
 
-| ![BDD Template and Variant Example](assests/../assets/img/bdd-concepts-example.png) |
+| ![BDD Template and Variant Example](assests/../assets/img/bdd-example-pickup.svg) |
 |:-:|
 | Figure 1: Partial example of a BDD scenario template and variant for the pickup task. |
 
-Figure 1 shows a partial example of how concepts and relations in our metamodels can be composed to
-create BDD templates and concrete scenario variants. For the motivation of the metamodel design and
-detailed descriptions of their concepts and relations, please take a look at
-[documentation for the relevant metamodels](bdd-concepts.md). We will now walk through
+As mentioned in the [description of our metamodels](bdd-concepts.md), our models are graphs
+represented using the JSON-LD schema. Figure 1 shows part of such a graph, which consists of a BDD
+scenario template and corresponding variants for a simple pickup task. The rest of this section will
+walk through the process of creating this example. The motivation of the metamodel design and
+detailed descriptions of their concepts and relations can be found on the
+[documentation for the relevant metamodels](bdd-concepts.md).
 
 ### Specifying Scenario Templates
 
-Base scenario
+First, we define the skeleton of the BDD scenario for the pickup task: a `bdd:Scenario` having one
+instance of each `bdd:GivenClause`, `bdd:WhenClause`, and `bdd:ThenClause` concepts.
 
 ```json
-{ "@id": "pick", "@type": "bhv:Behaviour" },
 { "@id": "pick-given", "@type": "bdd:GivenClause" },
 { "@id": "pick-when", "@type": "bdd:WhenClause" },
 { "@id": "pick-then", "@type": "bdd:ThenClause" },
 {
     "@id": "scenario-pick", "@type": "bdd:Scenario",
-    "of-behaviour": "pick",
-    "given": "pick-given",
-    "when": "pick-when",
-    "then": "pick-then"
-},
+    "bdd:given": "pick-given",
+    "bdd:when": "pick-when",
+    "bdd:then": "pick-then"
+}
 ```
 
-Scenario variables
+Next, we define `bdd:ScenarioVariable` nodes
 
 ```json
 {
     "@id": "pick-object", "@type": "bdd:ScenarioVariable",
-    "of-scenario": [ "scenario-pick", "scenario-approach", "scenario-lift" ]
+    "of-scenario": [ "scenario-pick" ]
 },
 {
     "@id": "pick-workspace", "@type": "bdd:ScenarioVariable",
-    "of-scenario": [ "scenario-pick", "scenario-approach", "scenario-lift" ]
+    "of-scenario": [ "scenario-pick" ]
 },
 {
     "@id": "pick-robot", "@type": "bdd:ScenarioVariable",
-    "of-scenario": [ "scenario-pick", "scenario-approach", "scenario-lift" ]
-},
+    "of-scenario": [ "scenario-pick" ]
+}
 ```
 
 Attaching fluent clauses
@@ -92,7 +93,7 @@ Variable connections / Task variation
     "@id": "robot-connection", "@type": "bdd:VariableConnection",
     "of-variable": "bdd-tmpl:pick-robot",
     "has-variation": [ "hbrs-agents:kinova1" ]
-},
+}
 ```
 
 Connection to event from coordination model

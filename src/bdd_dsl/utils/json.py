@@ -205,6 +205,10 @@ def get_bt_event_data_from_graph(graph: rdflib.Graph, bt_root_name: str = None) 
     bt_model = query_graph(graph, BEHAVIOUR_TREE_QUERY)
     bt_model_framed = jsonld.frame(bt_model, BEHAVIOUR_TREE_FRAME)
 
+    from pprint import pprint
+
+    pprint(bt_model_framed)
+
     if FR_DATA not in bt_model_framed:
         if bt_root_name is not None and bt_model_framed[FR_NAME] != bt_root_name:
             return []

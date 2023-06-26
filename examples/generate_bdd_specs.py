@@ -21,7 +21,7 @@ from bdd_dsl.utils.common import get_valid_filename
 
 PKG_ROOT = join(dirname(__file__), "..")
 MODELS_PATH = join(PKG_ROOT, "models")
-JINJA_TMPL_DIR = join(MODELS_PATH, "jinja")
+JINJA_TMPL_DIR = join(MODELS_PATH, "acceptance-criteria", "bdd")
 JINJA_FEATURE_TMPL = "feature.jinja"
 GENERATED_DIR = join(PKG_ROOT, "examples", "generated")
 
@@ -40,11 +40,18 @@ def prepare_gherkin_feature_data(us_data: dict):
 
 def main():
     g = load_metamodels()
-    g.parse(join(MODELS_PATH, "acceptance-criteria", "bdd-templates-pick.json"), format="json-ld")
-    g.parse(join(MODELS_PATH, "acceptance-criteria", "bdd-pick.json"), format="json-ld")
+    g.parse(
+        join(MODELS_PATH, "acceptance-criteria", "bdd", "templates", "pickup.json"),
+        format="json-ld",
+    )
+    g.parse(
+        join(MODELS_PATH, "acceptance-criteria", "bdd", "pickup-variants.json"),
+        format="json-ld",
+    )
     g.parse(join(MODELS_PATH, "coordination", "pickup-events.json"), format="json-ld")
-    g.parse(join(MODELS_PATH, "brsu-robots.json"), format="json-ld")
-    g.parse(join(MODELS_PATH, "brsu-env.json"), format="json-ld")
+    g.parse(join(MODELS_PATH, "environments", "brsu.json"), format="json-ld")
+    g.parse(join(MODELS_PATH, "environments", "avl.json"), format="json-ld")
+    g.parse(join(MODELS_PATH, "agents", "brsu.json"), format="json-ld")
 
     processed_bdd_data = process_bdd_us_from_graph(g)
     feature_template = load_template(JINJA_FEATURE_TMPL, JINJA_TMPL_DIR)

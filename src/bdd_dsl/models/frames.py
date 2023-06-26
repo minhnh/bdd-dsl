@@ -4,7 +4,7 @@ from bdd_dsl.models.uri import (
     URI_MM_EVENT,
     URI_MM_BT,
     URI_M_CRDN,
-    URI_M_AC,
+    URI_M_BDD,
     URI_M_ENV,
     URI_M_AGENT,
 )
@@ -106,7 +106,7 @@ BEHAVIOUR_TREE_FRAME = {
 
 BDD_FRAME = {
     "@context": {
-        "@base": URI_M_AC,
+        "@base": URI_M_BDD,
         Q_PREFIX_TRANS: URI_TRANS,
         Q_PREFIX_EVENT: URI_MM_EVENT,
         Q_PREFIX_BDD: URI_MM_BDD,

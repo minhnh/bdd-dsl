@@ -22,8 +22,6 @@ When [Event]
 Then [Expected Outcome]
 ```
 
-> **TODO**: refer to previous deliverables? public links available?
-
 ### Specifying Robotic Scenarios
 
 A challenge of applying BDD to any complex domains is to deal with the myriad variations that may
@@ -52,10 +50,10 @@ following files:
 
 | File | Description |
 |:---|:---|
-| [`agent.json`](https://hbrs-sesame.github.io/metamodels/agent.json) | Metamodel for specifying agents in a scenario |
-| [`environment.json`](https://hbrs-sesame.github.io/metamodels/environment.json) | Metamodel for specifying the environment in a robotic scenario |
-| [`event.json`](https://hbrs-sesame.github.io/metamodels/coordination/event.json) | Metamodel for specifying event-driven coordination of robot behaviours |
-| [`bdd.json`](https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd.json) | Metamodel for specifying BDD templates and their variants |
+| [agent.json](https://hbrs-sesame.github.io/metamodels/agent.json) | Metamodel for specifying agents in a scenario |
+| [environment.json](https://hbrs-sesame.github.io/metamodels/environment.json) | Metamodel for specifying the environment in a robotic scenario |
+| [event.json](https://hbrs-sesame.github.io/metamodels/coordination/event.json) | Metamodel for specifying event-driven coordination of robot behaviours |
+| [bdd.json](https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd.json) | Metamodel for specifying BDD templates and their variants |
 
 For an overview of main JSON-LD keywords used in our models, please take a look at our
 [modelling tutorial](https://github.com/comp-rob2b/modelling-tutorial#json-ld). More details on

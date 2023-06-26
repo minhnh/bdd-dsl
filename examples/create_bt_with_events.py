@@ -23,8 +23,10 @@ PORT = 5555
 def main():
     g = load_metamodels()
     g.parse(join(MODELS_PATH, "coordination", "pickup-events.json"), format="json-ld")
-    g.parse(join(MODELS_PATH, "coordination", "pickup-behaviours.json"), format="json-ld")
-    g.parse(join(MODELS_PATH, "coordination", "pickup-dual-arm-behaviours.json"), format="json-ld")
+    g.parse(join(MODELS_PATH, "coordination", "bt", "pickup-behaviours.json"), format="json-ld")
+    g.parse(
+        join(MODELS_PATH, "coordination", "bt", "pickup-dual-arm-behaviours.json"), format="json-ld"
+    )
 
     els_and_bts = create_bt_from_graph(g)
     for el, bt in els_and_bts:
