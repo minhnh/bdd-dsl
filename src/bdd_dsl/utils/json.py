@@ -45,8 +45,8 @@ from bdd_dsl.models.frames import (
     FR_CRITERIA,
     FR_FLUENT_DATA,
     FR_VARIABLES,
+    FR_ENTITIES,
     FR_VARIATIONS,
-    FR_CONN,
 )
 from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.utils.common import get_valid_var_name
@@ -249,12 +249,12 @@ def process_bdd_scenario_from_data(
     scenario_name = scenario_data[FR_NAME]
 
     # variable connections
-    if FR_CONN not in scenario_data:
+    if FR_VARIATIONS not in scenario_data:
         raise BDDConstraintViolation(
             f"{Q_BDD_SCENARIO_VARIANT} '{scenario_name}' has no connection"
         )
-    for conn_data in scenario_data[FR_CONN]:
-        if FR_VARIATIONS not in conn_data:
+    for conn_data in scenario_data[FR_VARIATIONS]:
+        if FR_ENTITIES not in conn_data:
             continue
         conn_name = conn_data[FR_NAME]
         conn_dict[conn_name] = conn_data
@@ -289,11 +289,11 @@ def process_bdd_scenario_from_data(
 def create_scenario_variations(scenario_data: dict, conn_dict: dict) -> Tuple[list, list]:
     var_names = []
     entities_list = []
-    for conn_data in scenario_data[FR_CONN]:
+    for conn_data in scenario_data[FR_VARIATIONS]:
         conn_name = conn_data[FR_NAME]
         var_name = conn_dict[conn_name][Q_OF_VARIABLE][FR_NAME]
         var_names.append(get_valid_var_name(var_name))
-        var_entities = conn_dict[conn_name][FR_VARIATIONS]
+        var_entities = conn_dict[conn_name][FR_ENTITIES]
         if isinstance(var_entities, dict):
             entities_list.append([var_entities[FR_NAME]])
         elif isinstance(var_entities, list):
@@ -323,7 +323,7 @@ def process_bdd_us_from_data(us_data: dict):
 
     for scenario_data in us_data[FR_CRITERIA]:
         # create variations for each scenario
-        scenario_data[FR_VARIABLES], scenario_data[FR_VARIATIONS] = create_scenario_variations(
+        scenario_data[FR_VARIABLES], scenario_data[FR_ENTITIES] = create_scenario_variations(
             scenario_data, conn_dict
         )
 

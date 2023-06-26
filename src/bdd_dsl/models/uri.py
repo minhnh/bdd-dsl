@@ -1,4 +1,5 @@
 URI_TRANS = "https://my.url/transformations/"
+URI_MM_TASK = "https://hbrs-sesame.github.io/metamodels/task#"
 URI_MM_BDD = "https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd#"
 URI_MM_EVENT = "https://hbrs-sesame.github.io/metamodels/coordination/event#"
 URI_MM_BT = "https://hbrs-sesame.github.io/metamodels/coordination/behaviour-tree#"
