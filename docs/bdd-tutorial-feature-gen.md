@@ -87,7 +87,7 @@ association with an object and an agent.
 
 The BDD scenario template defined above can now be extended with concrete variations, e.g. for
 generating concrete Gherkin feature files as shown in
-[the next section](#generating-gherkin-features-from-json-ld-models). For example, we would like
+[the next section](#generating-gherkin-features-from-bdd-models). For example, we would like
 to test the pickup behaviour in the robotics lab at Bonn-Rhein-Sieg University using battery cells
 sent from [AVL](https://www.avl.com) (An use case partner of the SESAME project), as well as some
 objects readily available in the lab.
@@ -169,14 +169,14 @@ our [metamodels](https://github.com/hbrs-sesame/metamodels).
 Models can then be loaded to the graph with the
 [`parse`](https://rdflib.readthedocs.io/en/stable/apidocs/rdflib.html#rdflib.graph.Graph.parse) method:
 
-```Python
+```python
 from bdd_dsl.utils.json import load_metamodels
 
 g = load_metamodels()
 g.parse("path/to/model.json", format="json-ld")
 ```
 
-## Generating Gherkin Features from JSON-LD Models
+## Generating Gherkin Features from BDD Models
 
 After creating scenario variants and templates, we can transform these models into other formats
 for use with existing tools. For example, from our BDD user stories, we can generate
@@ -185,7 +185,7 @@ test automation in most programming languages, e.g. [behave](https://behave.read
 in Python. In the following example, we use the [Jinja](https://jinja.palletsprojects.com/)
 template engine for the final text generation step.
 
-### Transform user stories into data
+### Extracting Relevant Information and Transforming BDD Models
 
 Extracting the relevant information from a `rdflib.Graph` object can be done with
 [SPARQL queries](https://rdflib.readthedocs.io/en/stable/intro_to_sparql.html).
@@ -197,7 +197,7 @@ as will be shown.
 The following example shows how BDD user stories akin to the example above can be transformed using
 the library's Python API:
 
-```Python
+```python
 from pyld import jsonld
 from bdd_dsl.models.queries import BDD_QUERY
 from bdd_dsl.models.frames import BDD_FRAME
@@ -248,11 +248,11 @@ The code snippet above should produce the following JSON when run on the above m
 
 ### Generating from Jinja Templates
 
-Up-to-date version of the Jinja template for generating Gherkin features
-[is available online](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/feature.jinja)
-for download.
+The extracted and transformed JSON data can be used to automatically render feature files using
+[Jinja](https://jinja.palletsprojects.com/api/) with the template below:
 
 ```jinja
+{% raw %}
 Feature: {{ data.name }}
 {% for scenario_data in data.criteria %}
   Scenario Outline: {{ scenario_data.name }}
@@ -269,6 +269,13 @@ Feature: {{ data.name }}
       for entity_name in entity_data %} {{ entity_name }} |{% endfor %}
     {% endfor %}
 {% endfor %}
+{% endraw %}
 ```
 
-> TODO: include video, maybe in top level README
+The up-to-date version of this template
+[is available online](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/feature.jinja)
+for download.
+
+> TODO: include video, maybe also in top level README
+
+## Conclusions
