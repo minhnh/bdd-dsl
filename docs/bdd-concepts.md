@@ -113,7 +113,10 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 - `bdd:given`, `bdd:when`, `bdd:then`: composition relations that link a `bdd:Scenario` to
   _exactly one_ instance of `bdd:GivenClause`, `bdd:WhenClause`, `bdd:ThenClause`, correspondingly.
 - `bdd:WhenEvent`: associates a `bdd:WhenClause` and a `evt:Event` instances using the
-  `bdd:of-clause` and `evt:has-event` relations, respectively.
+  `bdd:of-clause` and `evt:has-event` relations, respectively. Note that different interpretation
+  exists that explain the semantics of the _When_ clause in BDD. In the current iteration of
+  `bdd-dsl`, we choose to simply associate _When_ with `evt:Event` instances to denote the start
+  of the behaviour being tested.
 - `bdd:ScenarioVariant`: aggregate instances of `task:Variation` with relation `bdd:has-variation`;
   has a composition relation `bdd:of-scenario` with a `bdd:Scenario` instance.
 - `bdd:UserStory`: aggregate instances `bdd:ScenarioVariant` with relation `bdd:has-criteria`.

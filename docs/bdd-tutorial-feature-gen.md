@@ -82,57 +82,80 @@ picking behaviour, e.g. via association with time constraint `after-pick`.
 
 ### Specifying concrete scenario variant
 
-#### Specifying concrete agents and environment models
+The BDD scenario template defined above can now be extended with concrete variations, e.g. for
+generating concrete Gherkin feature files as shown in
+[the next section](#generating-gherkin-features-from-json-ld-models). For example, we would like
+to test the pickup behaviour in the robotics lab at Bonn-Rhein-Sieg University using battery cells
+sent from [AVL](https://www.avl.com) (An use case partner of the SESAME project), as well as some
+objects readily available in the lab.
 
-#### Specifying event loop coordination model
+#### Specifying concrete agents, environment, and coordination models
 
-Variable connections / Task variation
+We first need concrete models of the objects, workspaces, and agents that we may test with:
+```json
+{ "@id": "bottle", "@type": "env:Object" },
+{ "@id": "pouch1", "@type": [ "bdd:Object", "avl:PouchCell" ] },
+{ "@id": "prismatic1", "@type": [ "bdd:Object", "avl:PrismaticCell" ] },
+{ "@id": "dining-table-ws", "@type": "env:Workspace" },
+{ "@id": "kinova1", "@type": [ "agn:Agent", "kinova:gen3-robots" ] },
+{ "@id": "kinova2", "@type": [ "agn:Agent", "kinova:gen3-robots" ] }
+```
+
+We also need a coordination model which defines the event that denotes the start of the pickup
+behaviour, which we can associate with `pickup-when`.
+
+```json
+{ "@id": "pickup-start", "@type": "evt:Event" }
+```
+
+#### Specifying variations
+
+Using the `task:Variation` concept, we can associate the `bdd:ScenarioVariable` variables above
+with possible variations to be tested:
 
 ```json
 {
     "@id": "obj-variation", "@type": "task:Variation",
     "of-variable": "pick-object",
-    "can-be": [ "hbrs-env:box", "hbrs-env:bottle" ]
+    "can-be": [ "bottle", "pouch1", "prismatic1" ]
 },
 {
     "@id": "ws-variation", "@type": "task:Variation",
     "of-variable": "pick-workspace",
-    "can-be": [ "hbrs-env:dining-table" ]
+    "can-be": [ "dining-table-ws" ]
 },
 {
     "@id": "robot-variation", "@type": "task:Variation",
     "of-variable": "pick-robot",
-    "can-be": [ "hbrs-agents:kinova1" ]
+    "can-be": [ "kinova1", "kinova2" ]
 }
 ```
 
-Connection to event from coordination model
+The `pick-when` can be associated with the concrete event `pickup-start`.
 
 ```json
 {
     "@id": "pick-when-event", "@type": "bdd:WhenEvent",
-    "of-clause": "pick-when", "has-event": "pick-start"
+    "of-clause": "pick-when", "has-event": "pickup-start"
 }
 ```
 
-Scenario composition of the variations
+We can now define variant `scenario-pick-brsu` as a composition of the `task:Variation`
+instances, and user story `us-obj-transport` as a composition of scenario variants, one of which is
+`scenario-pick-brsu`.
 
 ```json
 {
-    "@id": "scenario-pick-1-arm", "@type": "bdd:ScenarioVariant",
+    "@id": "scenario-pick-brsu", "@type": "bdd:ScenarioVariant",
     "of-scenario": "scenario-pick",
     "has-variation": [
-        "object-connection", "workspace-connection", "robot-connection"
+        "obj-variation", "ws-variation", "robot-variation"
     ]
-}
-```
+},
 
-Composition of scenarios into user story
-
-```json
 {
-    "@id": "us-obj-transport-single-arm", "@type": "bdd:UserStory",
-    "has-criteria": [ "scenario-pick-1-arm" ]
+    "@id": "us-obj-transport", "@type": "bdd:UserStory",
+    "has-criteria": [ "scenario-pick-brsu" ]
 }
 ```
 
@@ -146,8 +169,4 @@ Framing
 
 ### Generating from Jinja Templates
 
-> TODO: include graphics
-
-## References
-
-[^alferez2019]: M. Alferez, F. Pastore, M. Sabetzadeh, et al., "Bridging the Gap between Requirements Modeling and Behavior-Driven Development," _22nd MODELS_, 2019, doi: [10.1109/MODELS.2019.00008](https://doi.org/10.1109/MODELS.2019.00008).
+> TODO: include video, maybe in top level README
