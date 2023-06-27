@@ -72,9 +72,8 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 
 ### Agent
 
-- `agn:Agent`: many definitions exist for agents in autonomous systems, we adopt the definition
-  from IEEE Std 1872-2015[^ieeestd1872] (cf. [prov:Agent](https://www.w3.org/TR/prov-o/#Agent),
-  which focuses on the role of an agent in data provenance):
+- `agn:Agent`: we adopt the definition from the IEEE Standard Ontologies for Robotics and
+  Automation[^ieeestd1872] (cf. [prov:Agent](https://www.w3.org/TR/prov-o/#Agent)):
   > Something or someone that can act on its own and produce changes in the world.
 - `agn:of-agent`: composition relation with a `agn:Agent` instance
 - `agn:has-agent`: aggregation relation with a `agn:Agent` instance
@@ -92,8 +91,9 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 
 ### Task
 
-- `task:Variation`: possible variations of a scenario. A `task:Variation` can be linked to a
-  `bdd:ScenarioVariable`, which case it
+- `task:Variation`: possible variations of a scenario. A `task:Variation` instance can be
+  associated with a `bdd:ScenarioVariable` via the `bdd:of-variable` relation, in which case the
+  instance denotes possible variations of the variable.
 - `task:can-be`: represents an aggregation relation from a `task:Variation` instance to the
   possible entities of the variation.
 
@@ -101,12 +101,32 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 
 - `evt:Event`: a time instant, conforms with
   [time:Instant](https://www.w3.org/TR/owl-time/#time:Instant) from the Time Ontology in OWL
-  (cf. [prov:InstantaneousEvent](https://www.w3.org/TR/prov-o/#InstantaneousEvent))
+  (cf. [prov:InstantaneousEvent](https://www.w3.org/TR/prov-o/#InstantaneousEvent)).
 
 ### BDD Scenario Templates and Variants
 
-- `bdd:Scenario`
-- `bdd:ScenarioVariable`
+- `bdd:Scenario`: represents a BDD scenario.
+- `bdd:of-scenario`: composition relation to `bdd:Scenario`
+- `bdd:GivenClause`, `bdd:WhenClause`, `bdd:ThenClause`: represents the three basic elements of a
+  BDD formulation.
+- `bdd:given`, `bdd:when`, `bdd:then`: composition relations that link a `bdd:Scenario` to
+  _exactly one_ instance of `bdd:GivenClause`, `bdd:WhenClause`, `bdd:ThenClause`, correspondingly.
+- `bdd:ScenarioVariable`: represents points of variation for a scenario.
+- `bdd:of-variable`: composition relation to a `bdd:ScenarioVariable`.
+- `bdd:IsHeldPredicate`, `bdd:IsNearPredicate`: domain-specific predicates relevant to
+  a pickup task.
+- `bdd:TimeConstraint`: constraint on when the predicate of `bdd:FluentClause` must hold.
+- `bdd:FluentClause`: represents a BDD clause as a
+  [fluent(https://en.wikipedia.org/wiki/Fluent_(artificial_intelligence))], i.e. a condition
+  evaluated at a point in time. A fluent clause has aggregation relations with one predicate,
+  e.g. a `bdd:IsHeldPredicate` instance, and one `bdd:TimeConstraint` instance. The relations
+  are `bdd:predicate` and `bdd:time-constraint`, respectively.
+- `bdd:clause-of`: aggregation relation between `bdd:FluentClause` instances and instance of
+  `bdd:GivenClause` and `bdd:ThenClause`. This relation allows for extending a BDD scenario template
+  with any number of clauses.
+- `bdd:ref-object`, `bdd:ref-workspace`, `bdd:ref-agent`: A `bdd:FluentClause` instance can
+  associate with a `bdd:ScenarioVariable` instance via these relations, which constrain the
+  semantic of the variable in the context of the `bdd:FluentClause` instance.
 
 ## References
 
@@ -116,4 +136,4 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 
 [^alferez2019]: M. Alferez, F. Pastore, M. Sabetzadeh, et al., "Bridging the Gap between Requirements Modeling and Behavior-Driven Development," _22nd MODELS_, 2019, doi: [10.1109/MODELS.2019.00008](https://doi.org/10.1109/MODELS.2019.00008).
 
-[^ieeestd1872] "IEEE Standard Ontologies for Robotics and Automation," in IEEE Std 1872-2015 , vol., no., pp.1-60, 10 April 2015, doi: [10.1109/IEEESTD.2015.7084073](https://doi.org/10.1109/IEEESTD.2015.7084073).
+[^ieeestd1872]: "IEEE Standard Ontologies for Robotics and Automation," in IEEE Std 1872-2015 , vol., no., pp.1-60, 10 April 2015, doi: [10.1109/IEEESTD.2015.7084073](https://doi.org/10.1109/IEEESTD.2015.7084073).

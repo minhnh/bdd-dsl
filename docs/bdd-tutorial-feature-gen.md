@@ -70,11 +70,11 @@ Attaching fluent clauses
 }
 ```
 
-### Specifying concrete agents and environment models
-
-### Specifying event loop coordination model
-
 ### Specifying concrete scenario variant
+
+#### Specifying concrete agents and environment models
+
+#### Specifying event loop coordination model
 
 Variable connections / Task variation
 
