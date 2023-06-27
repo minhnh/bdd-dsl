@@ -274,8 +274,25 @@ Feature: {{ data.name }}
 
 The up-to-date version of this template
 [is available online](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/feature.jinja)
-for download.
+for download. This should generate one feature file for each `bdd:UserStory` instance. Sample
+feature file generated from complete models of BDD scenario
+[variants](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/pickup-variants.json) and
+[templates](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/templates/pickup.json)
+is included below:
+
+```gherkin
+Feature: pickup-variants/us-obj-transport-single-arm
+
+  Scenario Outline: pickup-variants/scenario-approach-1-arm
+    Given "<tmpl_pu_pick_object>" is located at "<tmpl_pu_pick_workspace>"
+    When "evtm:pickup-events/approach-start"
+    Then "<tmpl_pu_pick_robot>" is near "<tmpl_pu_pick_object>"
+
+    Examples:
+    | tmpl_pu_pick_object | tmpl_pu_pick_workspace | tmpl_pu_pick_robot |
+    | env:brsu/bottle | env:brsu/dining-table | agn:brsu/kinova1 |
+    | env:avl/cylindrical1 | env:brsu/dining-table | agn:brsu/kinova2 |
+    ...
+```
 
 > TODO: include video, maybe also in top level README
-
-## Conclusions
