@@ -75,8 +75,8 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 - `agn:Agent`: we adopt the definition from the IEEE Standard Ontologies for Robotics and
   Automation[^ieeestd1872] (cf. [prov:Agent](https://www.w3.org/TR/prov-o/#Agent)):
   > Something or someone that can act on its own and produce changes in the world.
-- `agn:of-agent`: composition relation with a `agn:Agent` instance
-- `agn:has-agent`: aggregation relation with a `agn:Agent` instance
+- `agn:of-agent`: composition relation with a `agn:Agent` instance.
+- `agn:has-agent`: aggregation relation with a `agn:Agent` instance.
 
 ### Environment
 
@@ -86,8 +86,8 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 - `env:Workspace`: Abstract space in which an agent may operate. Instances can be areas surrounding
   objects like tables or kitchen counters, or rooms in a flat. A `env:Workspace` instance may
   contain other instances, e.g. a living room can contain a workspace surrounding the coffee table.
-- `env:has-object`, `env:has-workspace` represents aggregation relation to objects and workspaces
-- `env:of-object` represents composition relation to an object, e.g. a property of an object
+- `env:has-object`, `env:has-workspace` represents aggregation relation to objects and workspaces.
+- `env:of-object` represents composition relation to an object, e.g. a property of an object.
 
 ### Task
 
@@ -102,6 +102,7 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 - `evt:Event`: a time instant, conforms with
   [time:Instant](https://www.w3.org/TR/owl-time/#time:Instant) from the Time Ontology in OWL
   (cf. [prov:InstantaneousEvent](https://www.w3.org/TR/prov-o/#InstantaneousEvent)).
+- `evt:has-event`: aggregation relation with a `evt:Event` instance.
 
 ### BDD Scenario Templates and Variants
 
@@ -111,6 +112,11 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
   BDD formulation.
 - `bdd:given`, `bdd:when`, `bdd:then`: composition relations that link a `bdd:Scenario` to
   _exactly one_ instance of `bdd:GivenClause`, `bdd:WhenClause`, `bdd:ThenClause`, correspondingly.
+- `bdd:WhenEvent`: associates a `bdd:WhenClause` and a `evt:Event` instances using the
+  `bdd:of-clause` and `evt:has-event` relations, respectively.
+- `bdd:ScenarioVariant`: aggregate instances of `task:Variation` with relation `bdd:has-variation`;
+  has a composition relation `bdd:of-scenario` with a `bdd:Scenario` instance.
+- `bdd:UserStory`: aggregate instances `bdd:ScenarioVariant` with relation `bdd:has-criteria`.
 - `bdd:ScenarioVariable`: represents points of variation for a scenario.
 - `bdd:of-variable`: composition relation to a `bdd:ScenarioVariable`.
 - `bdd:IsHeldPredicate`, `bdd:IsNearPredicate`: domain-specific predicates relevant to
