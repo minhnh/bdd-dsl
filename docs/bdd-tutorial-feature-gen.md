@@ -9,7 +9,7 @@ BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for the Python la
 
 ## Specifying BDD Acceptance Criteria for A Pickup Task
 
-| ![BDD Template and Variant Example](assests/../assets/img/bdd-example-pickup.svg) |
+| ![BDD Template and Variant Example](assets/img/bdd-example-pickup.svg) |
 |:-:|
 | Figure 1: Partial example of a BDD scenario template and variant for the pickup task. |
 
