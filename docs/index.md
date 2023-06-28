@@ -10,6 +10,9 @@ and the relations needed to compose them into concrete test scenarios. These con
 are based on our analysis of rulebooks from several robotic benchmarks and competitions, the results
 of which is reported in [^nguyen2023rulebook].
 
+This library is one of the tools developed for the
+[Executable Scenario Workbench](https://sesame-project.github.io/exsce/)
+
 ## Content
 
 1. [Concepts and relations for specifying robotic scenarios](bdd-concepts.md)
@@ -24,4 +27,5 @@ under grant agreement No 101017258.
 
 [^north2003bdd]: [D. North, "Behavior Modification: The evolution of behaviour-driven development", _Better Software_, 2006.](https://dannorth.net/introducing-bdd/)
 
-[^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven requirement specification for robotic competitions", [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/), May 2023.
+[^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven requirement specification for robotic competitions",
+    [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/), May 2023.
