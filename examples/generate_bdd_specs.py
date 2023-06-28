@@ -1,21 +1,7 @@
 from os.path import join, dirname
 from bdd_dsl.utils.json import load_metamodels, process_bdd_us_from_graph
-from bdd_dsl.utils.jinja import (
-    load_template,
-    create_given_clauses_strings,
-    create_then_clauses_strings,
-)
-from bdd_dsl.models.queries import Q_HAS_EVENT
-from bdd_dsl.models.frames import (
-    FR_NAME,
-    FR_CRITERIA,
-    FR_SCENARIO,
-    FR_GIVEN,
-    FR_WHEN,
-    FR_THEN,
-    FR_CLAUSES,
-    FR_FLUENT_DATA,
-)
+from bdd_dsl.utils.jinja import load_template, prepare_gherkin_feature_data
+from bdd_dsl.models.frames import FR_NAME
 from bdd_dsl.utils.common import get_valid_filename
 
 
@@ -24,18 +10,6 @@ MODELS_PATH = join(PKG_ROOT, "models")
 JINJA_TMPL_DIR = join(MODELS_PATH, "acceptance-criteria", "bdd")
 JINJA_FEATURE_TMPL = "feature.jinja"
 GENERATED_DIR = join(PKG_ROOT, "examples", "generated")
-
-
-def prepare_gherkin_feature_data(us_data: dict):
-    for scenario_data in us_data[FR_CRITERIA]:
-        scenario_data["given_clauses"] = create_given_clauses_strings(
-            scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
-        )
-        scenario_data["then_clauses"] = create_then_clauses_strings(
-            scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
-        )
-        if Q_HAS_EVENT in scenario_data[FR_SCENARIO][FR_WHEN]:
-            scenario_data["when_event"] = scenario_data[FR_SCENARIO][FR_WHEN][Q_HAS_EVENT][FR_NAME]
 
 
 def main():

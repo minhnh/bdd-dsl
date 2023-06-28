@@ -248,7 +248,7 @@ The code snippet above should produce the following JSON when run on the above m
 
 ### Generating from Jinja Templates
 
-The extracted and transformed JSON data can be used to automatically render feature files using
+The extracted and transformed JSON data can then be used to automatically render feature files using
 [Jinja](https://jinja.palletsprojects.com/api/) with the template below:
 
 ```jinja
@@ -274,22 +274,36 @@ Feature: {{ data.name }}
 
 The up-to-date version of this template
 [is available online](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/feature.jinja)
-for download. This should generate one feature file for each `bdd:UserStory` instance. Sample
-feature file generated from complete models of BDD scenario
-[variants](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/pickup-variants.json) and
-[templates](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/templates/pickup.json)
-is included below:
+for download. `bdd-dsl` also provides utilities to further process the transformed data shown above
+before performing the final text transformation with Jinja. The code snippet below should generate
+one feature file for each `bdd:UserStory` instance.
+
+```python
+from bdd_dsl.utils.jinja import load_template, prepare_gherkin_feature_data
+
+# load Jinja template
+feature_template = load_template("feature.jinja", "/template/directory")
+
+# loop through data transformed using the code snippet in the previous section
+for us_data in processed_bdd_data:
+  us_name = us_data["name"]
+  prepare_gherkin_feature_data(us_data)
+  # the rendered text can be written normally to a file to produce the Gherkin feature
+  feature_content = feature_template.render(data=us_data)
+```
+
+The generation result should produce be a valid Gherkin feature file like shown below:
 
 ```gherkin
-Feature: pickup-variants/us-obj-transport-single-arm
+Feature: us-obj-transport
 
-  Scenario Outline: pickup-variants/scenario-approach-1-arm
-    Given "<tmpl_pu_pick_object>" is located at "<tmpl_pu_pick_workspace>"
-    When "evtm:pickup-events/approach-start"
-    Then "<tmpl_pu_pick_robot>" is near "<tmpl_pu_pick_object>"
+  Scenario Outline: scenario-pick-brsu
+    Given "<pick_object>" is located at "<pick_workspace>"
+    When "pickup-start"
+    Then "<pick_robot>" is near "<pick_object>"
 
     Examples:
-    | tmpl_pu_pick_object | tmpl_pu_pick_workspace | tmpl_pu_pick_robot |
+    | pick_object | pick_workspace | pick_robot |
     | env:brsu/bottle | env:brsu/dining-table | agn:brsu/kinova1 |
     | env:avl/cylindrical1 | env:brsu/dining-table | agn:brsu/kinova2 |
     ...

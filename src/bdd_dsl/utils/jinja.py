@@ -5,8 +5,22 @@ from bdd_dsl.models.queries import (
     Q_BDD_PRED_LOCATED_AT,
     Q_BDD_PRED_IS_NEAR,
     Q_BDD_PRED_IS_HELD,
+    Q_HAS_EVENT,
 )
-from bdd_dsl.models.frames import FR_TYPE, FR_NAME, FR_OBJECTS, FR_AGENTS, FR_WS
+from bdd_dsl.models.frames import (
+    FR_TYPE,
+    FR_NAME,
+    FR_OBJECTS,
+    FR_AGENTS,
+    FR_WS,
+    FR_CRITERIA,
+    FR_SCENARIO,
+    FR_GIVEN,
+    FR_WHEN,
+    FR_THEN,
+    FR_CLAUSES,
+    FR_FLUENT_DATA,
+)
 from bdd_dsl.utils.common import get_valid_var_name
 from bdd_dsl.exception import BDDConstraintViolation
 
@@ -93,3 +107,15 @@ def create_given_clauses_strings(scenario_clauses: List[dict], feature_clauses: 
 
 def create_then_clauses_strings(scenario_clauses: List[dict], feature_clauses: dict) -> List[str]:
     return create_clauses_strings(scenario_clauses, feature_clauses, "Then")
+
+
+def prepare_gherkin_feature_data(us_data: dict):
+    for scenario_data in us_data[FR_CRITERIA]:
+        scenario_data["given_clauses"] = create_given_clauses_strings(
+            scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
+        )
+        scenario_data["then_clauses"] = create_then_clauses_strings(
+            scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
+        )
+        if Q_HAS_EVENT in scenario_data[FR_SCENARIO][FR_WHEN]:
+            scenario_data["when_event"] = scenario_data[FR_SCENARIO][FR_WHEN][Q_HAS_EVENT][FR_NAME]
