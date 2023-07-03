@@ -5,7 +5,31 @@ to model acceptance criteria of a simple pickup task as Behaviour-Driven Develop
 scenarios, as well as how variations of such scenarios can be introduced in the model. An example
 is then presented to show how to transform this model into a
 [Gherkin](https://cucumber.io/docs/gherkin/reference/) feature for integration with appropriate
-BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for the Python language.
+BDD toolchains, e.g. `behave`[^behave] for the Python language.
+
+## Example: BDD Scenario for a Robotic Pickup Task
+
+Consider a simple robotic pickup task, where a robot must pick an object from a surface.
+A typical BDD scenario for such a task, when realized in the Gherkin format, may look
+something as follows:
+
+```gherkin
+Scenario: pickup scenario
+  Given an object is located on the table
+  When the robot starts picking
+  Then the object is held by the robot
+```
+
+In robotics, even such a simple task can vary in many dimensions: the objects to be picked up,
+the operational space in which the task take place, the robotic systems that carry out the task,
+or the mechanisms available for verifying the different BDD clauses. While some mechanisms are
+available in Gherkin to deal with variations of scenarios, applying existing BDD approaches
+like Gherkin directly to robotic scenarios remains challenging. These challenges are discussed
+in more details in our workshop paper [^nguyen2023rulebook]. The rest of this tutorial
+will present the process of composing a scenario template for such a pickup task, as well as
+how to introduce variations to the template for concrete scenarios. Finally, we will show
+how Gherkin feature files similar to the snippet above can be generated from the
+scenario variant model using our library.
 
 ## Specifying BDD Acceptance Criteria for A Pickup Task
 
@@ -14,14 +38,15 @@ BDD toolchains, e.g. [`behave`](https://behave.readthedocs.io) for the Python la
 | Figure 1: Partial example of a BDD scenario template and variant for the pickup task. |
 
 As mentioned in the [description of our metamodels](bdd-concepts.md), our models are graphs
-represented using the JSON-LD schema. Figure 1 shows part of such a graph, which consists of a BDD
-scenario template and corresponding variants for a simple pickup task. The rest of this section will
-walk through the process of creating this example. The motivation of the metamodel design and
-detailed descriptions of their concepts and relations can be found on the
-[documentation for the relevant metamodels](bdd-concepts.md). Complete JSON for the BDD scenario
+represented using the JSON-LD schema. Figure 1 shows part of such a graph, which consists of
+a BDD scenario template and corresponding variants for a simple pickup task. The motivation for
+this template-variant design is discussed in more details on
+[the documentation of our metamodels](bdd-concepts.md). Complete JSON-LD models for the scenario
 [template](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/templates/pickup.json)
-and [variant](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/pickup-variants.json)
-are also available online.
+and [variant](https://hbrs-sesame.github.io/models/acceptance-criteria/bdd/pickup-variants.json),
+along with their generated [visualization](assets/img/bdd_graph.svg) are publicly available
+for download. The rest of this section will walk through the process of composing these models
+from our metamodels.
 
 ### Specifying Scenario Templates
 
@@ -61,13 +86,17 @@ the pickup scenario.
 ```
 
 Having defined the variables, we can now create `bdd:FluentClause` instances and attach them to
-`pick-given` and `pick-then` to extend `scenario-pick` with more concrete clauses.
-In the example below, we define `fluent-obj-held-by-robot`, which asserts that the object is held
-by the robot at the end of the picking behaviour. In the model, this is done via association with
-predicate `pred-obj-held-by-robot` and time constraint `after-pick`. `fluent-obj-held-by-robot`
-refers to variables `pick-object` and `pick-robot` using the `bdd:ref-object` and `bdd:ref-agent`,
-respectively, which implies the domain-specific constraint that `pred-obj-held-by-robot` requires
-association with an object and an agent.
+`pick-given` and `pick-then` using the `bdd:clause-of` relation to extend `scenario-pick`
+with concrete clauses. Here, we have made a choice to represent BDD clauses as
+[fluents](https://en.wikipedia.org/wiki/Fluent_(artificial_intelligence)),
+i.e. time-dependent predicates. The composable design allows us to make this choice without
+limiting our metamodel to this single representation. Other representations of BDD clauses
+can still be attached to `pick-given` and `pick-then` using the `bdd:clause-of` relation.
+More details on composable design can be found on the corresponding discussion on our
+[kinematic chain modelling tutorial](https://github.com/comp-rob2b/modelling-tutorial).
+Furthermore, the `bdd:clause-of` relation can be used to attach any clauses to
+`pick-given` and `pick-then`, allowing extending `scenario-pick` with any number of
+use-case specific clauses.
 
 ```json
 { "@id": "pred-obj-held-by-robot", "@type": "bdd:IsHeldPredicate" },
@@ -83,14 +112,36 @@ association with an object and an agent.
 }
 ```
 
+In the example above, we define `fluent-obj-held-by-robot`, which asserts that the object is held
+by the robot at the end of the picking behaviour. This `bdd:FluentClause` instance is a
+composition linking to several elements in the template:
+
+- Predicate `pred-obj-held-by-robot` is an instance of the domain-specific `bdd:IsHeldPredicate`
+  concept for representing the fact that a robot is holding an object.
+- Instances of `bdd:ScenarioVariable`, namely `pick-object` and `pick-robot`, which are subjects
+  of `pred-obj-held-by-robot` in this context.
+- Instance `after-pick` of type `bdd:TimeConstraint` which represents _when_
+  `pred-obj-held-by-robot` should hold true.
+
+The use of `bdd:IsHeldPredicate` implies a constraint that the subjects of `pred-obj-held-by-robot`
+must represent objects and agents in the scenario. Here, the use of `bdd:ref-object` and
+`bdd:ref-agent` indicates that `pick-object` is the object and `pick-robot` is the agent in
+this context.
+
+Additionally, the model at this point contains no assumption about how the fact that a robot is
+holding an object can be verified. Further transformations and/or generations can be introduced
+to produce concrete, executable implementations for verification.
+
 ### Specifying A Concrete Scenario Variant
 
 The BDD scenario template defined above can now be extended with concrete variations, e.g. for
 generating concrete Gherkin feature files as shown in
-[the next section](#generating-gherkin-features-from-bdd-models). For example, we would like
-to test the pickup behaviour in the robotics lab at Bonn-Rhein-Sieg University using battery cells
-sent from [AVL](https://www.avl.com) (An use case partner of the SESAME project), as well as some
-objects readily available in the lab.
+[the next section](#generating-gherkin-features-from-bdd-models).
+This is done via linking the `bdd:ScenarioVariable` instances above to concrete instances of
+objects, workspaces and agents. For example, consider the use case where we want to test the
+pickup behaviour in the robotics lab at Bonn-Rhein-Sieg University using battery cells
+sent from [AVL](https://www.avl.com) (An use case partner of the SESAME project), as well as
+some objects readily available in the lab.
 
 #### Specifying Concrete Agents, Environment, and Coordination Models
 
@@ -180,10 +231,9 @@ g.parse("path/to/model.json", format="json-ld")
 
 After creating scenario variants and templates, we can transform these models into other formats
 for use with existing tools. For example, from our BDD user stories, we can generate
-[Gherkin feature files](https://cucumber.io/docs/gherkin/reference/) which has wide support for
-test automation in most programming languages, e.g. [behave](https://behave.readthedocs.io) library
-in Python. In the following example, we use the [Jinja](https://jinja.palletsprojects.com/)
-template engine for the final text generation step.
+Gherkin feature files which has wide support for test automation in most programming languages,
+e.g. [behave](https://behave.readthedocs.io) library in Python. In the following example, we use
+the [Jinja](https://jinja.palletsprojects.com/) template engine for the final text generation step.
 
 ### Extracting Relevant Information and Transforming BDD Models
 
@@ -288,7 +338,8 @@ feature_template = load_template("feature.jinja", "/template/directory")
 for us_data in processed_bdd_data:
   us_name = us_data["name"]
   prepare_gherkin_feature_data(us_data)
-  # the rendered text can be written normally to a file to produce the Gherkin feature
+  # the rendered text can be written normally to a file to produce the
+  # Gherkin feature
   feature_content = feature_template.render(data=us_data)
 ```
 
@@ -300,7 +351,7 @@ Feature: us-obj-transport
   Scenario Outline: scenario-pick-brsu
     Given "<pick_object>" is located at "<pick_workspace>"
     When "pickup-start"
-    Then "<pick_robot>" is near "<pick_object>"
+    Then "<pick_object>" is held by "<pick_robot>"
 
     Examples:
     | pick_object | pick_workspace | pick_robot |
@@ -309,4 +360,13 @@ Feature: us-obj-transport
     ...
 ```
 
+The generated feature files can then be used with existing BDD frameworks, e.g. `behave`[^behave],
+for test automation. Currently, the tools necessary to generate executable implements to verify
+the generated scenarios in simulation are still under development. Once ready, this tutorial
+will be extended to include usage of these new tools.
+
 > TODO: include video, maybe also in top level README
+
+[^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven requirement specification for robotic competitions", [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/), May 2023.
+
+[^behave]: https://behave.readthedocs.io

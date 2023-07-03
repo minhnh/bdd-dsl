@@ -13,14 +13,25 @@ I want [Feature]
 So that [Benefit]
 ```
 
-In his original blog post[^north2003bdd] introducing BDD, North proposed to represent acceptance criteria for each user story as a list of scenarios capturing the expected behaviours of the system,
-each using the following formulation:
+In his original blog post[^north2003bdd] introducing BDD, North proposed to represent
+acceptance criteria for each user story as a list of scenarios capturing the expected behaviours
+of the system, each using the following formulation:
 
 ``` Gherkin
 Given [Precondition]
-When [Event]
+When [Event/Action]
 Then [Expected Outcome]
 ```
+
+This formulation extends user stories with _narratives_, each consist of initial condition(s),
+events or actions that signal the start of the behaviour, and the criteria that characterizes
+what constitute a successful behaviour. We consider the `Given-When-Then` formulation a
+good metamodel because of its simple concepts, which are both easy to understand and flexible
+to different interpretations and extensions. Furthermore, BDD approaches, e.g. with the popular
+[Gherkin syntax](https://cucumber.io/docs/gherkin/reference/), has wide support in the
+software engineering community for test automation in many program languages and frameworks.
+This can reduce the effort in generating executable implementations for verifying BDD
+acceptance criteria in the future.
 
 ### Specifying Robotic Scenarios
 
@@ -74,7 +85,11 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 
 - `agn:Agent`: we adopt the definition from the IEEE Standard Ontologies for Robotics and
   Automation[^ieeestd1872] (cf. [prov:Agent](https://www.w3.org/TR/prov-o/#Agent)):
-  > Something or someone that can act on its own and produce changes in the world.
+
+Agent
+
+  : Something or someone that can act on its own and produce changes in the world.
+
 - `agn:of-agent`: composition relation with a `agn:Agent` instance.
 - `agn:has-agent`: aggregation relation with a `agn:Agent` instance.
 
