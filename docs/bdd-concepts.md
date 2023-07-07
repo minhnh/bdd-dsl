@@ -86,9 +86,8 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 - `agn:Agent`: we adopt the definition from the IEEE Standard Ontologies for Robotics and
   Automation[^ieeestd1872] (cf. [prov:Agent](https://www.w3.org/TR/prov-o/#Agent)):
 
-Agent
-
-  : Something or someone that can act on its own and produce changes in the world.
+  Agent
+    : Something or someone that can act on its own and produce changes in the world.
 
 - `agn:of-agent`: composition relation with a `agn:Agent` instance.
 - `agn:has-agent`: aggregation relation with a `agn:Agent` instance.
