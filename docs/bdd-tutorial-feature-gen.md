@@ -365,7 +365,13 @@ for test automation. Currently, the tools necessary to generate executable imple
 the generated scenarios in simulation are still under development. Once ready, this tutorial
 will be extended to include usage of these new tools.
 
-> TODO: include video, maybe also in top level README
+| ![Generating Gherkin features](assets/vid/20230731-pickup_feature_gen-q40.webm) |
+| :-- |
+| Generating Gherkin features files form `bdd-dsl` scenario templates and variants. |
+
+| ![Adding variations to features](assets/vid/20230731-pickup_feature_gen-q40.webm) |
+| :-- |
+| Adding more objects and agents to a template variant and regenerating Gherkin features files. |
 
 [^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven requirement specification for robotic competitions", [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/), May 2023.
 
