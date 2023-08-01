@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 from enum import StrEnum, IntEnum
 import logging
 import time

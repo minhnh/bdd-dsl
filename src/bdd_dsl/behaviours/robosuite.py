@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 import time
 import numpy as np
 import robosuite as rs

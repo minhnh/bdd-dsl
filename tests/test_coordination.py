@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 from os.path import join, dirname
 import unittest
 from py_trees.trees import BehaviourTree

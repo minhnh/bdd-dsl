@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 URI_TRANS = "https://my.url/transformations/"
 URI_MM_TASK = "https://hbrs-sesame.github.io/metamodels/task#"
 URI_MM_BDD = "https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd#"

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 from bdd_dsl.models.uri import (
     URI_TRANS,
     URI_MM_BDD,

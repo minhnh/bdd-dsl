@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 import time
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from py_trees.common import Status as PTStatus

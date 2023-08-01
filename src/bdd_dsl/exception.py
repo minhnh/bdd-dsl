@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 class ConstraintViolation(Exception):
     def __init__(self, domain, message):
         super().__init__(f"{domain} constraint: {message}")

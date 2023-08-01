@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 import re
 import signal
 from bdd_dsl.exception import GracefulExit

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 import glob
 from importlib import import_module
 from typing import List, Tuple, Type, Union

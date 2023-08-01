@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 from jinja2 import Environment, FileSystemLoader, Template
 from typing import List
 from bdd_dsl.models.queries import (

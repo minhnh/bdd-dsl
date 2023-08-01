@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 from os.path import join, dirname
 import unittest
 from bdd_dsl.utils.json import load_metamodels, process_bdd_us_from_graph
