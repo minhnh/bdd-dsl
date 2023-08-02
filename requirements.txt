@@ -1,5 +1,6 @@
 rdflib
 pyld
+pyshacl
 py_trees
 jinja2
 pyzmq

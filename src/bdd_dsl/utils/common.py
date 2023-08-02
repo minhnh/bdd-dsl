@@ -8,6 +8,23 @@ FILENAME_REPLACEMENTS = {" ": "_", ":": "__", "/": "_"}
 VAR_NAME_REPLACEMENTS = {"-": "_"}
 VAR_NAME_REPLACEMENTS.update(FILENAME_REPLACEMENTS)
 
+__FILE_LOADER_CACHE = {}
+
+
+def __read_file_and_cache(filepath: str) -> str:
+    """
+    Caching string contents of files for quick access and reducing IO operations.
+    May need "forgetting" mechanism if too many large files are stored. Should be fine
+    for loading JSON metamodels and SHACL constraints in Turtle format.
+    """
+    if filepath in __FILE_LOADER_CACHE:
+        return __FILE_LOADER_CACHE[filepath]
+
+    with open(filepath) as infile:
+        file_content = infile.read()
+    __FILE_LOADER_CACHE[filepath] = file_content
+    return file_content
+
 
 def get_valid_name(name: str, replacement_dict: dict) -> str:
     """
