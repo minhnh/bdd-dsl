@@ -140,7 +140,7 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
   a pickup task.
 - `bdd:TimeConstraint`: constraint on when the predicate of `bdd:FluentClause` must hold.
 - `bdd:FluentClause`: represents a BDD clause as a
-  [fluent(https://en.wikipedia.org/wiki/Fluent_(artificial_intelligence))], i.e. a condition
+  [fluent](https://en.wikipedia.org/wiki/Fluent_(artificial_intelligence)), i.e. a condition
   evaluated at a point in time. A fluent clause has aggregation relations with one predicate,
   e.g. a `bdd:IsHeldPredicate` instance, and one `bdd:TimeConstraint` instance. The relations
   are `bdd:predicate` and `bdd:time-constraint`, respectively.
@@ -150,6 +150,15 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 - `bdd:ref-object`, `bdd:ref-workspace`, `bdd:ref-agent`: A `bdd:FluentClause` instance can
   associate with a `bdd:ScenarioVariable` instance via these relations, which constrain the
   semantic of the variable in the context of the `bdd:FluentClause` instance.
+
+## Constraints
+
+### Structural
+- A `bdd:Scenario` _contains_ exactly one `bdd:GivenClause`, `bdd:WhenClause`, and `bdd:ThenClause`.
+  This is realized by the `bdd:given`, `bdd:when`, `bdd:then` relations for the respective clause types.
+- `bdd:GivenClause`, `bdd:WhenClause`, and `bdd:ThenClause` cannot exist by themselves, i.e. they must be
+  associated with exactly one `bdd:Scenario` via the `bdd:given`, `bdd:when`, `bdd:then` relations.
+- A `bdd:FluentClause` can only connect by `bdd:clause-of` to `bdd:GivenClause` and `bdd:ThenClause`
 
 ## References
 
