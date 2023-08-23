@@ -51,7 +51,7 @@ from bdd_dsl.models.frames import (
     FR_VARIATIONS,
 )
 from bdd_dsl.exception import BDDConstraintViolation, SHACLViolation
-from bdd_dsl.utils.common import get_valid_var_name, __read_file_and_cache
+from bdd_dsl.utils.common import get_valid_var_name, read_file_and_cache
 
 
 def load_metamodels() -> rdflib.Graph:
@@ -70,12 +70,12 @@ def query_graph(graph: rdflib.Graph, query_str: str) -> dict:
 
 
 def query_graph_with_file(graph: rdflib.Graph, query_file: str):
-    query_str = __read_file_and_cache(query_file)
+    query_str = read_file_and_cache(query_file)
     return query_graph(graph, query_str)
 
 
 def frame_model_with_file(model: dict, frame_file: str):
-    frame_str = __read_file_and_cache(frame_file)
+    frame_str = read_file_and_cache(frame_file)
     frame_dict = json.loads(frame_str)
     return jsonld.frame(model, frame_dict)
 
@@ -335,7 +335,7 @@ def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
     """Query and process all UserStory in the JSON-LD graph"""
 
     # checking conformance against SHACL shape constraints
-    bdd_shacl_str = __read_file_and_cache(
+    bdd_shacl_str = read_file_and_cache(
         join(META_MODELs_PATH, "acceptance-criteria", "bdd-shape-constraints.ttl")
     )
     conforms, report_graph, report_text = pyshacl.validate(

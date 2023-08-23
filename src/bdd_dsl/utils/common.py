@@ -1,19 +1,21 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+import logging
 import re
 import signal
+
 from bdd_dsl.exception import GracefulExit
 
 
-FILENAME_REPLACEMENTS = {" ": "_", ":": "__", "/": "_"}
-VAR_NAME_REPLACEMENTS = {"-": "_"}
-VAR_NAME_REPLACEMENTS.update(FILENAME_REPLACEMENTS)
+__FILENAME_REPLACEMENTS = {" ": "_", ":": "__", "/": "_"}
+__VAR_NAME_REPLACEMENTS = {"-": "_"}
+__VAR_NAME_REPLACEMENTS.update(__FILENAME_REPLACEMENTS)
 
 __FILE_LOADER_CACHE = {}
 
 
-def __read_file_and_cache(filepath: str) -> str:
-    """
-    Caching string contents of files for quick access and reducing IO operations.
+def read_file_and_cache(filepath: str) -> str:
+    """Read and cache string contents of files for quick access and reducing IO operations.
+
     May need "forgetting" mechanism if too many large files are stored. Should be fine
     for loading JSON metamodels and SHACL constraints in Turtle format.
     """
@@ -27,14 +29,13 @@ def __read_file_and_cache(filepath: str) -> str:
 
 
 def get_valid_name(name: str, replacement_dict: dict) -> str:
-    """
-    based on same function from https://github.com/django/django/blob/main/django/utils/text.py
+    """Return the given string converted to a string that can be used for a clean filename.
+
+    Based on same function from https://github.com/django/django/blob/main/django/utils/text.py
     also convert ':' to '__' and '/' to '_'
 
-    Return the given string converted to a string that can be used for a clean
-    filename. Remove leading and trailing spaces; convert other spaces to
-    underscores; and remove anything that is not an alphanumeric, dash,
-    underscore, or dot.
+    Remove leading and trailing spaces; convert other spaces to underscores;
+    and remove anything that is not an alphanumeric, dash, underscore, or dot.
     >>> get_valid_filename("john's portrait in 2004.jpg")
     'johns_portrait_in_2004.jpg'
     """
@@ -51,11 +52,11 @@ def get_valid_name(name: str, replacement_dict: dict) -> str:
 
 
 def get_valid_filename(name: str) -> str:
-    return get_valid_name(name, FILENAME_REPLACEMENTS)
+    return get_valid_name(name, __FILENAME_REPLACEMENTS)
 
 
 def get_valid_var_name(name: str) -> str:
-    return get_valid_name(name, VAR_NAME_REPLACEMENTS)
+    return get_valid_name(name, __VAR_NAME_REPLACEMENTS)
 
 
 def raise_graceful_exit_handler(signum, frame):
