@@ -16,7 +16,7 @@ _KNOWN_PHYSICS = {
     "ycb_cracker": {"mass": 0.411},
     "ycb_sugar": {"mass": 0.514},
     "ycb_soup": {"mass": 0.349},
-    "ycb_mustard": {"mass": 0.603}
+    "ycb_mustard": {"mass": 0.603},
 }
 _CACHED_ASSET_ROOT = None
 

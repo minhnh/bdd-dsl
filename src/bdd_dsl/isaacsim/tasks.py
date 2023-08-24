@@ -2,6 +2,8 @@
 import numpy as np
 from typing import Optional
 
+from bdd_dsl.utils.common import check_or_convert_ndarray
+
 # These imports are assumed to be called after SimulationApp() call, otherwise my cause import errors
 from bdd_dsl.isaacsim.utils import get_asset_path, get_asset_physics
 from omni.isaac.core.tasks import BaseTask
@@ -58,18 +60,19 @@ class PickPlace(BaseTask):
         scenario_info: dict,
         cube_initial_position: Optional[np.ndarray] = None,
         cube_initial_orientation: Optional[np.ndarray] = None,
-        target_position: Optional[np.ndarray] = None,
+        placing_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
     ) -> None:
         BaseTask.__init__(self, name=name, offset=offset)
         self._robot = None
         self._scenario_info = scenario_info
-        self._target_cube = None
+        self._pickable_objects = set()
+        self._target_object = None
         self._cube = None
         self._cube_initial_position = cube_initial_position
         self._cube_initial_orientation = cube_initial_orientation
-        self._target_position = target_position
+        self._placing_position = placing_position
         self._cube_size = cube_size
         if self._cube_size is None:
             self._cube_size = np.array([0.0515, 0.0515, 0.0515]) / get_stage_units()
@@ -77,10 +80,10 @@ class PickPlace(BaseTask):
             self._cube_initial_position = np.array([0.3, 0.3, 0.3]) / get_stage_units()
         if self._cube_initial_orientation is None:
             self._cube_initial_orientation = np.array([1, 0, 0, 0])
-        if self._target_position is None:
-            self._target_position = np.array([-0.3, -0.3, 0]) / get_stage_units()
-            self._target_position[2] = self._cube_size[2] / 2.0
-        self._target_position = self._target_position + self._offset
+        if self._placing_position is None:
+            self._placing_position = np.array([-0.3, -0.3, 0]) / get_stage_units()
+            self._placing_position[2] = self._cube_size[2] / 2.0
+        self._placing_position = self._placing_position + self._offset
         return
 
     def set_up_scene(self, scene: Scene) -> None:
@@ -113,7 +116,8 @@ class PickPlace(BaseTask):
             model_info = self._scenario_info["objects"]["models"][model_id]
             asset_path = get_asset_path(**model_info)
             instance_prim_path = find_unique_string_name(
-                initial_name="/World/Objects/" + model_id, is_unique_fn=lambda x: not is_prim_path_valid(x)
+                initial_name="/World/Objects/" + model_id,
+                is_unique_fn=lambda x: not is_prim_path_valid(x),
             )
             instance_name = find_unique_string_name(
                 initial_name=model_id, is_unique_fn=lambda x: not self.scene.object_exists(x)
@@ -129,17 +133,23 @@ class PickPlace(BaseTask):
                     position=initial_position,
                     orientation=self._cube_initial_orientation,
                     # scale=np.array([0.2, 0.2, 0.2]) / get_stage_units(),
-                    **get_asset_physics(model_info["asset_id"])
+                    **get_asset_physics(model_info["asset_id"]),
                 )
             )
             self._task_objects[obj_instance.name] = obj_instance
+            self._pickable_objects.add(obj_instance.name)
 
         self._task_objects[self._cube.name] = self._cube
+        self._pickable_objects.add(self._cube.name)
         self._robot = self.set_robot()
         scene.add(self._robot)
         self._task_objects[self._robot.name] = self._robot
         self._move_task_objects_to_their_frame()
         return
+
+    @property
+    def pickable_objects(self):
+        return self._pickable_objects
 
     def set_robot(self) -> Franka:
         """[summary]
@@ -155,29 +165,47 @@ class PickPlace(BaseTask):
         )
         return Franka(prim_path=franka_prim_path, name=franka_robot_name)
 
-    def set_params(
-        self,
-        cube_position: Optional[np.ndarray] = None,
-        cube_orientation: Optional[np.ndarray] = None,
-        target_position: Optional[np.ndarray] = None,
-    ) -> None:
-        if target_position is not None:
-            self._target_position = target_position
-        if cube_position is not None or cube_orientation is not None:
-            self._cube.set_local_pose(translation=cube_position, orientation=cube_orientation)
+    def set_params(self, **kwargs) -> None:
+        """Set parameters values.
+
+        Extension of BaseTask.set_params(). Modifiable parameters:
+        - target_object: ID of object to be picked and placed
+        - placing_position (np.ndarray): position to place the picked object. Defaults to None.
+
+        Args:
+            cube_position (Optional[np.ndarray], optional): _description_. Defaults to None.
+            cube_orientation (Optional[np.ndarray], optional): _description_. Defaults to None.
+        """
+        placing_position = kwargs.get("placing_position", None)
+        if placing_position is not None:
+            self._placing_position = check_or_convert_ndarray(placing_position)
+
+        target_object_id = kwargs.get("target_object", None)
+        if target_object_id is not None:
+            if target_object_id not in self._pickable_objects:
+                raise ValueError(f"ID '{target_object_id}' not found among pickable objects.")
+            self._target_object = target_object_id
         return
 
     def get_params(self) -> dict:
+        """Return parameters values.
+
+        Extension of BaseTask.get_params(). Parameters:
+        - robot_name: name of robot
+        - target_object: ID of object to be picked and placed
+        - placing_position: position where the picked object should be placed
+
+        Returns:
+            dict: dictionary containing parameters' values and modifiable flag
+        """
         params_representation = {}
-        position, orientation = self._cube.get_local_pose()
-        params_representation["cube_position"] = {"value": position, "modifiable": True}
-        params_representation["cube_orientation"] = {"value": orientation, "modifiable": True}
-        params_representation["target_position"] = {
-            "value": self._target_position,
+        params_representation["robot_name"] = {"value": self._robot.name, "modifiable": False}
+        params_representation["placing_position"] = {
+            "value": self._placing_position,
             "modifiable": True,
         }
-        params_representation["cube_name"] = {"value": self._cube.name, "modifiable": False}
-        params_representation["robot_name"] = {"value": self._robot.name, "modifiable": False}
+        params_representation["target_object"] = {"value": self._target_object, "modifiable": True}
+
         return params_representation
 
     def get_observations(self) -> dict:
@@ -187,13 +215,17 @@ class PickPlace(BaseTask):
             dict: [description]
         """
         joints_state = self._robot.get_joints_state()
-        cube_position, cube_orientation = self._cube.get_local_pose()
+        if self._target_object is None:
+            raise RuntimeError("no target object set")
+
+        obj_position, obj_orientation = self._task_objects[self._target_object].get_local_pose()
         end_effector_position, _ = self._robot.end_effector.get_local_pose()
         return {
-            self._cube.name: {
-                "position": cube_position,
-                "orientation": cube_orientation,
-                "target_position": self._target_position,
+            "target_object": {
+                "name": self._target_object,
+                "position": obj_position,
+                "orientation": obj_orientation,
+                "placing_position": self._placing_position,
             },
             self._robot.name: {
                 "joint_positions": joints_state.positions,
