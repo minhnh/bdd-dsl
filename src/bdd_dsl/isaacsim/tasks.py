@@ -5,13 +5,12 @@ from typing import Optional
 from bdd_dsl.utils.common import check_or_convert_ndarray
 
 # These imports are assumed to be called after SimulationApp() call, otherwise my cause import errors
-from bdd_dsl.isaacsim.utils import get_asset_path, get_asset_physics
+from bdd_dsl.isaacsim.utils import create_rigid_prim_in_scene
 from omni.isaac.core.tasks import BaseTask
 from omni.isaac.core.scenes.scene import Scene
 from omni.isaac.core.objects import DynamicCuboid
 from omni.isaac.core.utils.prims import is_prim_path_valid
-from omni.isaac.core.prims.rigid_prim import RigidPrim
-from omni.isaac.core.utils.stage import add_reference_to_stage, get_stage_units
+from omni.isaac.core.utils.stage import get_stage_units
 from omni.isaac.core.utils.string import find_unique_string_name
 from omni.isaac.franka import Franka
 
@@ -58,8 +57,8 @@ class PickPlace(BaseTask):
         self,
         name: str,
         scenario_info: dict,
-        cube_initial_position: Optional[np.ndarray] = None,
-        cube_initial_orientation: Optional[np.ndarray] = None,
+        default_obj_position: Optional[np.ndarray] = None,
+        default_obj_orientation: Optional[np.ndarray] = None,
         placing_position: Optional[np.ndarray] = None,
         cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
@@ -70,16 +69,16 @@ class PickPlace(BaseTask):
         self._pickable_objects = set()
         self._target_object = None
         self._cube = None
-        self._cube_initial_position = cube_initial_position
-        self._cube_initial_orientation = cube_initial_orientation
+        self._default_obj_position = default_obj_position
+        self._default_obj_orientation = default_obj_orientation
         self._placing_position = placing_position
         self._cube_size = cube_size
         if self._cube_size is None:
             self._cube_size = np.array([0.0515, 0.0515, 0.0515]) / get_stage_units()
-        if self._cube_initial_position is None:
-            self._cube_initial_position = np.array([0.3, 0.3, 0.3]) / get_stage_units()
-        if self._cube_initial_orientation is None:
-            self._cube_initial_orientation = np.array([1, 0, 0, 0])
+        if self._default_obj_position is None:
+            self._default_obj_position = np.array([0.3, 0.3, 0.3]) / get_stage_units()
+        if self._default_obj_orientation is None:
+            self._default_obj_orientation = np.array([1, 0, 0, 0])
         if self._placing_position is None:
             self._placing_position = np.array([-0.3, -0.3, 0]) / get_stage_units()
             self._placing_position[2] = self._cube_size[2] / 2.0
@@ -103,8 +102,8 @@ class PickPlace(BaseTask):
         self._cube = scene.add(
             DynamicCuboid(
                 name=cube_name,
-                position=self._cube_initial_position,
-                orientation=self._cube_initial_orientation,
+                position=self._default_obj_position,
+                orientation=self._default_obj_orientation,
                 prim_path=cube_prim_path,
                 scale=self._cube_size,
                 size=1.0,
@@ -112,29 +111,19 @@ class PickPlace(BaseTask):
             )
         )
         for instance_info in self._scenario_info["objects"]["instances"]:
-            model_id = instance_info["model"]
+            model_id = instance_info["model_id"]
             model_info = self._scenario_info["objects"]["models"][model_id]
-            asset_path = get_asset_path(**model_info)
-            instance_prim_path = find_unique_string_name(
-                initial_name="/World/Objects/" + model_id,
-                is_unique_fn=lambda x: not is_prim_path_valid(x),
-            )
-            instance_name = find_unique_string_name(
-                initial_name=model_id, is_unique_fn=lambda x: not self.scene.object_exists(x)
-            )
-            add_reference_to_stage(usd_path=asset_path, prim_path=instance_prim_path)
-            initial_position = None
-            if "initial_postion" in instance_info:
-                initial_position = np.array(instance_info["initial_postion"]) / get_stage_units()
-            obj_instance = scene.add(
-                RigidPrim(
-                    prim_path=instance_prim_path,
-                    name=instance_name,
-                    position=initial_position,
-                    orientation=self._cube_initial_orientation,
-                    # scale=np.array([0.2, 0.2, 0.2]) / get_stage_units(),
-                    **get_asset_physics(model_info["asset_id"]),
-                )
+            instance_configs = {
+                "initial_position": self._default_obj_position,
+                "initial_orientation": self._default_obj_orientation,
+            }
+            instance_configs.update(instance_info["configs"])
+            obj_instance = create_rigid_prim_in_scene(
+                scene,
+                instance_name=instance_info["id"],
+                prim_prefix="/World/Objects/",
+                model_info=model_info,
+                instance_configs=instance_configs,
             )
             self._task_objects[obj_instance.name] = obj_instance
             self._pickable_objects.add(obj_instance.name)
