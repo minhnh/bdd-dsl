@@ -24,6 +24,7 @@ _ISAAC_ASSETS = {
     },
 }
 _CACHED_ASSET_ROOT = None
+_CACHED_SHAPE_MAP = None
 
 
 class PathType(IntEnum):
@@ -36,6 +37,7 @@ class SimpleShape(IntEnum):
     CYLINDER = 1
     SPHERE = 2
     CONE = 3
+    CAPSULE = 4
 
 
 class ModelType(IntEnum):
@@ -111,6 +113,40 @@ def get_asset_configs(asset_name: str) -> dict:
     return _ISAAC_ASSETS[asset_name]["configs"]
 
 
+def create_simple_shape_in_scene(
+    scene, shape: SimpleShape, instance_name: str, instance_prim_path: str, prim_configs: dict
+):
+    from omni.isaac.core.objects import (
+        DynamicCuboid,
+        DynamicSphere,
+        DynamicCylinder,
+        DynamicCone,
+        DynamicCapsule,
+    )
+
+    global _CACHED_SHAPE_MAP
+    if _CACHED_SHAPE_MAP is None:
+        _CACHED_SHAPE_MAP = {
+            SimpleShape.CUBOID: DynamicCuboid,
+            SimpleShape.SPHERE: DynamicSphere,
+            SimpleShape.CYLINDER: DynamicCylinder,
+            SimpleShape.CONE: DynamicCone,
+            SimpleShape.CAPSULE: DynamicCapsule,
+        }
+
+    if shape not in _CACHED_SHAPE_MAP:
+        raise RuntimeError(f"can't create shape for unhandled shape type '{str(shape)}'")
+
+    shape_class = _CACHED_SHAPE_MAP[shape]
+    return scene.add(
+        shape_class(
+            name=instance_name,
+            prim_path=instance_prim_path,
+            **prim_configs,
+        )
+    )
+
+
 def create_rigid_prim_in_scene(
     scene,
     instance_name: str,
@@ -152,6 +188,10 @@ def create_rigid_prim_in_scene(
         prim_configs["scale"] = (
             check_or_convert_ndarray(instance_configs["scale"]) / get_stage_units()
         )
+    if "color" in instance_configs:
+        prim_configs["color"] = (
+            check_or_convert_ndarray(instance_configs["color"]) / get_stage_units()
+        )
 
     if model_type == ModelType.USD:
         asset_path = get_asset_path(**model_info)
@@ -159,5 +199,11 @@ def create_rigid_prim_in_scene(
         return scene.add(
             RigidPrim(prim_path=instance_prim_path, name=instance_name, **prim_configs)
         )
-    else:
-        raise RuntimeError("unhandled object model type: " + str(model_type))
+
+    if model_type == ModelType.SIMPLE_SHAPE:
+        shape = model_info["shape"]
+        return create_simple_shape_in_scene(
+            scene, shape, instance_name, instance_prim_path, prim_configs
+        )
+
+    raise RuntimeError("unhandled object model type: " + str(model_type))

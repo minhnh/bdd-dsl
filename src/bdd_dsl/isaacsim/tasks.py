@@ -68,7 +68,6 @@ class PickPlace(BaseTask):
         self._scenario_info = scenario_info
         self._pickable_objects = set()
         self._target_object = None
-        self._cube = None
         self._default_obj_position = default_obj_position
         self._default_obj_orientation = default_obj_orientation
         self._placing_position = placing_position
@@ -93,23 +92,6 @@ class PickPlace(BaseTask):
         """
         super().set_up_scene(scene)
         scene.add_default_ground_plane()
-        cube_prim_path = find_unique_string_name(
-            initial_name="/World/Cube", is_unique_fn=lambda x: not is_prim_path_valid(x)
-        )
-        cube_name = find_unique_string_name(
-            initial_name="cube", is_unique_fn=lambda x: not self.scene.object_exists(x)
-        )
-        self._cube = scene.add(
-            DynamicCuboid(
-                name=cube_name,
-                position=self._default_obj_position,
-                orientation=self._default_obj_orientation,
-                prim_path=cube_prim_path,
-                scale=self._cube_size,
-                size=1.0,
-                color=np.array([0, 0, 1]),
-            )
-        )
         for instance_info in self._scenario_info["objects"]["instances"]:
             model_id = instance_info["model_id"]
             model_info = self._scenario_info["objects"]["models"][model_id]
@@ -128,8 +110,6 @@ class PickPlace(BaseTask):
             self._task_objects[obj_instance.name] = obj_instance
             self._pickable_objects.add(obj_instance.name)
 
-        self._task_objects[self._cube.name] = self._cube
-        self._pickable_objects.add(self._cube.name)
         self._robot = self.set_robot()
         scene.add(self._robot)
         self._task_objects[self._robot.name] = self._robot
