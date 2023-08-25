@@ -60,7 +60,6 @@ class PickPlace(BaseTask):
         default_obj_position: Optional[np.ndarray] = None,
         default_obj_orientation: Optional[np.ndarray] = None,
         placing_position: Optional[np.ndarray] = None,
-        cube_size: Optional[np.ndarray] = None,
         offset: Optional[np.ndarray] = None,
     ) -> None:
         BaseTask.__init__(self, name=name, offset=offset)
@@ -71,16 +70,13 @@ class PickPlace(BaseTask):
         self._default_obj_position = default_obj_position
         self._default_obj_orientation = default_obj_orientation
         self._placing_position = placing_position
-        self._cube_size = cube_size
-        if self._cube_size is None:
-            self._cube_size = np.array([0.0515, 0.0515, 0.0515]) / get_stage_units()
         if self._default_obj_position is None:
             self._default_obj_position = np.array([0.3, 0.3, 0.3]) / get_stage_units()
         if self._default_obj_orientation is None:
             self._default_obj_orientation = np.array([1, 0, 0, 0])
         if self._placing_position is None:
             self._placing_position = np.array([-0.3, -0.3, 0]) / get_stage_units()
-            self._placing_position[2] = self._cube_size[2] / 2.0
+            self._placing_position[2] = 0.03
         self._placing_position = self._placing_position + self._offset
         return
 
