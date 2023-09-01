@@ -19,13 +19,10 @@ class PickPlace(BaseTask):
     """[summary]
 
     Expected scenario information (some maybe generated):
-    - objects:
-        - models:
-            - resource mapping
-        - instances:
-            - model mapping
-            - initial pose
-            - initial configuration?
+    - objects: mapping from object ID to
+        - model info
+        - initial pose
+        - initial configuration?
     - workspaces:
         - object instance mapping, e.g. table
     - agents:
@@ -88,19 +85,17 @@ class PickPlace(BaseTask):
         """
         super().set_up_scene(scene)
         scene.add_default_ground_plane()
-        for instance_info in self._scenario_info["objects"]["instances"]:
-            model_id = instance_info["model_id"]
-            model_info = self._scenario_info["objects"]["models"][model_id]
+        for obj_id, obj_info in self._scenario_info["objects"].items():
             instance_configs = {
                 "initial_position": self._default_obj_position,
                 "initial_orientation": self._default_obj_orientation,
             }
-            instance_configs.update(instance_info["configs"])
+            instance_configs.update(obj_info["configs"])
             obj_instance = create_rigid_prim_in_scene(
                 scene,
-                instance_name=instance_info["id"],
+                instance_name=obj_id,
                 prim_prefix="/World/Objects/",
-                model_info=model_info,
+                model_info=obj_info["model_info"],
                 instance_configs=instance_configs,
             )
             self._task_objects[obj_instance.name] = obj_instance
