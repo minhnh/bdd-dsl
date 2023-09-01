@@ -20,7 +20,7 @@ from bdd_dsl.models.queries import (
     Q_BT_PARALLEL,
     Q_OF_VARIABLE,
     Q_BDD_SCENARIO_VARIANT,
-    Q_BDD_SCENARIO_VARIABLE,
+    Q_BDD_SCENARIO_TASK_VARIABLE,
     Q_PREDICATE,
 )
 from bdd_dsl.models.frames import (
@@ -45,6 +45,7 @@ from bdd_dsl.models.frames import (
     FR_THEN,
     FR_CLAUSES,
     FR_CRITERIA,
+    FR_BG,
     FR_FLUENT_DATA,
     FR_VARIABLES,
     FR_ENTITIES,
@@ -244,9 +245,29 @@ def create_bt_from_graph(
 
 
 def process_bdd_scenario_from_data(
-    scenario_data: dict, conn_dict: dict, var_set: set, fluent_dict: dict
+    scenario_data: dict, conn_dict: dict, var_set: set, fluent_dict: dict, bg_dict: dict
 ):
     scenario_name = scenario_data[FR_NAME]
+
+    # background TODO(minhnh): for some reason agents are not showing up in the query result
+    if FR_BG in scenario_data:
+        for bg_data in scenario_data[FR_BG]:
+            bg_name = bg_data[FR_NAME]
+            # one background can be shared by multiple scenarios
+            if bg_name in bg_dict["bg-scenario-map"]:
+                bg_dict["bg-scenario-map"][bg_name].add(scenario_name)
+            else:
+                bg_dict["bg-scenario-map"][bg_name] = {scenario_name}
+            # one scenario can have multiple background clauses
+            if scenario_name in bg_dict["scenario-bg-map"]:
+                bg_dict["scenario-bg-map"][scenario_name].add(bg_name)
+            else:
+                bg_dict["scenario-bg-map"][scenario_name] = {bg_name}
+            # add background data
+            if bg_name not in bg_dict["data"]:
+                bg_dict["data"][bg_name] = bg_data
+            else:
+                bg_dict["data"][bg_name].update(bg_data)
 
     # variable connections
     if FR_VARIATIONS not in scenario_data:
@@ -261,7 +282,7 @@ def process_bdd_scenario_from_data(
         var_name = conn_data[Q_OF_VARIABLE][FR_NAME]
         if var_name in var_set:
             raise BDDConstraintViolation(
-                f"multiple connections for {Q_BDD_SCENARIO_VARIABLE} '{var_name}'"
+                f"multiple connections for {Q_BDD_SCENARIO_TASK_VARIABLE} '{var_name}'"
             )
         var_set.add(var_name)
 
@@ -312,6 +333,11 @@ def create_scenario_variations(scenario_data: dict, conn_dict: dict) -> Tuple[li
 def process_bdd_us_from_data(us_data: dict):
     conn_dict = {}
     fluent_dict = {}
+    background_dict = {
+        FR_DATA: {},  # map from background ID to background data
+        "bg-scenario-map": {},  # map from background ID to scenario variant ID
+        "scenario-bg-map": {},  # map from scenario variant ID to background ID
+    }
     var_set = set()
     if not isinstance(us_data[FR_CRITERIA], list):
         us_data[FR_CRITERIA] = [us_data[FR_CRITERIA]]
@@ -319,7 +345,9 @@ def process_bdd_us_from_data(us_data: dict):
     # framing will include child concepts once for the same entity within one match,
     # so need to collect data for variable connections and fluent clauses to refer to later
     for scenario_data in us_data[FR_CRITERIA]:
-        process_bdd_scenario_from_data(scenario_data, conn_dict, var_set, fluent_dict)
+        process_bdd_scenario_from_data(
+            scenario_data, conn_dict, var_set, fluent_dict, background_dict
+        )
 
     for scenario_data in us_data[FR_CRITERIA]:
         # create variations for each scenario
@@ -327,6 +355,8 @@ def process_bdd_us_from_data(us_data: dict):
             scenario_data, conn_dict
         )
 
+    if len(background_dict[FR_DATA]) > 0:
+        us_data[FR_BG] = background_dict
     us_data[FR_FLUENT_DATA] = fluent_dict
     return us_data
 
@@ -350,6 +380,7 @@ def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
 
     bdd_result = query_graph(graph, BDD_QUERY)
     model_framed = jsonld.frame(bdd_result, BDD_FRAME)
+
     if FR_DATA in model_framed:
         return [process_bdd_us_from_data(us_data) for us_data in model_framed[FR_DATA]]
     return [process_bdd_us_from_data(model_framed)]

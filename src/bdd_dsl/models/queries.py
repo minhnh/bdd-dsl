@@ -6,6 +6,8 @@ from bdd_dsl.models.uri import (
     URI_MM_BT,
     URI_MM_PY,
     URI_MM_TASK,
+    URI_MM_ENV,
+    URI_MM_AGENT,
 )
 
 # transformation concepts and relations
@@ -14,6 +16,7 @@ Q_HAS_AC = f"{Q_PREFIX_TRANS}:has-criteria"
 Q_OF_SCENARIO = f"{Q_PREFIX_TRANS}:of-scenario"
 Q_OF_VARIABLE = f"{Q_PREFIX_TRANS}:of-variable"
 Q_HAS_VARIATION = f"{Q_PREFIX_TRANS}:has-variation"
+Q_HAS_BG = f"{Q_PREFIX_TRANS}:has-background"
 Q_CAN_BE = f"{Q_PREFIX_TRANS}:can-be"
 Q_GIVEN = f"{Q_PREFIX_TRANS}:given"
 Q_WHEN = f"{Q_PREFIX_TRANS}:when"
@@ -74,12 +77,22 @@ Q_PREFIX_TASK = "task"
 Q_TASK_HAS_VARIATION = f"{Q_PREFIX_TASK}:has-variation"
 Q_TASK_CAN_BE = f"{Q_PREFIX_TASK}:can-be"
 
+# Environment concepts and relations
+Q_PREFIX_ENV = "env"
+Q_ENV_HAS_OBJ = f"{Q_PREFIX_ENV}:has-object"
+
+# Environment concepts and relations
+Q_PREFIX_AGENT = "agn"
+Q_AGN_HAS_AGENT = f"{Q_PREFIX_AGENT}:has-agent"
+
 # BDD concepts & relations
 Q_PREFIX_BDD = "bdd"
 Q_BDD_US = f"{Q_PREFIX_BDD}:UserStory"
 Q_BDD_SCENARIO = f"{Q_PREFIX_BDD}:Scenario"
+Q_BDD_SCENARIO_HAS_OBJ = f"{Q_PREFIX_BDD}:ScenarioHasObjects"
+Q_BDD_SCENARIO_HAS_AGN = f"{Q_PREFIX_BDD}:ScenarioHasAgents"
 Q_BDD_SCENARIO_VARIANT = f"{Q_PREFIX_BDD}:ScenarioVariant"
-Q_BDD_SCENARIO_VARIABLE = f"{Q_PREFIX_BDD}:ScenarioVariable"
+Q_BDD_SCENARIO_TASK_VARIABLE = f"{Q_PREFIX_BDD}:ScenarioTaskVariable"
 Q_BDD_GIVEN_CLAUSE = f"{Q_PREFIX_BDD}:GivenClause"
 Q_BDD_WHEN_CLAUSE = f"{Q_PREFIX_BDD}:WhenClause"
 Q_BDD_THEN_CLAUSE = f"{Q_PREFIX_BDD}:ThenClause"
@@ -87,6 +100,7 @@ Q_BDD_FLUENT_CLAUSE = f"{Q_PREFIX_BDD}:FluentClause"
 Q_BDD_PRED_LOCATED_AT = f"{Q_PREFIX_BDD}:LocatedAtPredicate"
 Q_BDD_PRED_IS_NEAR = f"{Q_PREFIX_BDD}:IsNearPredicate"
 Q_BDD_PRED_IS_HELD = f"{Q_PREFIX_BDD}:IsHeldPredicate"
+Q_BDD_HAS_BG = f"{Q_PREFIX_BDD}:has-background"
 Q_BDD_HAS_AC = f"{Q_PREFIX_BDD}:has-criteria"
 Q_BDD_OF_SCENARIO = f"{Q_PREFIX_BDD}:of-scenario"
 Q_BDD_GIVEN = f"{Q_PREFIX_BDD}:given"
@@ -185,27 +199,33 @@ WHERE {{
 BDD_QUERY = f"""
 PREFIX {Q_PREFIX_TRANS}: <{URI_TRANS}>
 PREFIX {Q_PREFIX_TASK}: <{URI_MM_TASK}>
+PREFIX {Q_PREFIX_ENV}: <{URI_MM_ENV}>
+PREFIX {Q_PREFIX_AGENT}: <{URI_MM_AGENT}>
 PREFIX {Q_PREFIX_BDD}: <{URI_MM_BDD}>
 
 CONSTRUCT {{
     ?us {Q_HAS_AC} ?scenarioVar .
     ?scenarioVar
         {Q_OF_SCENARIO} ?scenario ;
+        {Q_HAS_BG} ?background ;
         {Q_HAS_VARIATION} ?variation .
     ?scenario
         {Q_GIVEN} ?given ;
         {Q_WHEN} ?when ;
         {Q_THEN} ?then .
     ?when {Q_HAS_EVENT} ?event .
+    ?background a ?bgType ;
+        {Q_HAS_OBJECT} ?scenarioObject ;
+        {Q_HAS_AGENT} ?scenarioAgent .
     ?variation
         {Q_OF_VARIABLE} ?variable ;
         {Q_CAN_BE} ?entity .
     ?clauseOrigin {Q_HAS_CLAUSE} ?clause .
     ?clause
         {Q_PREDICATE} ?predicate ;
-        {Q_HAS_OBJECT} ?clauseObject ;
-        {Q_HAS_WS} ?clauseWorkspace ;
-        {Q_HAS_AGENT} ?clauseAgent .
+        {Q_HAS_OBJECT} ?taskObject ;
+        {Q_HAS_WS} ?taskWorkspace ;
+        {Q_HAS_AGENT} ?taskAgent .
     ?predicate a ?predicateType .
 }}
 WHERE {{
@@ -213,6 +233,7 @@ WHERE {{
         {Q_BDD_HAS_AC} ?scenarioVar .
     ?scenarioVar a {Q_BDD_SCENARIO_VARIANT} ;
         {Q_BDD_OF_SCENARIO} ?scenario ;
+        {Q_BDD_HAS_BG} ?background ;
         {Q_TASK_HAS_VARIATION} ?variation .
 
     ?scenario a {Q_BDD_SCENARIO} ;
@@ -220,11 +241,23 @@ WHERE {{
         {Q_BDD_WHEN} ?when ;
         {Q_BDD_THEN} ?then .
 
+    ?background a ?bgType .
+    OPTIONAL {{
+        ?background a {Q_BDD_SCENARIO_HAS_OBJ} ;
+            {Q_BDD_OF_SCENARIO} ?scenario ;
+            {Q_ENV_HAS_OBJ} ?scenarioObject .
+    }}
+    OPTIONAL {{
+        ?background a {Q_BDD_SCENARIO_HAS_AGN} ;
+            {Q_BDD_OF_SCENARIO} ?scenario ;
+            {Q_AGN_HAS_AGENT} ?scenarioAgent .
+    }}
+
     ?variation
         {Q_BDD_OF_VARIABLE} ?variable ;
         {Q_TASK_CAN_BE} ?entity .
 
-    ?variable a {Q_BDD_SCENARIO_VARIABLE} .
+    ?variable a {Q_BDD_SCENARIO_TASK_VARIABLE} .
     ?when a {Q_BDD_WHEN_CLAUSE} .
 
     OPTIONAL {{ ?when ^{Q_BDD_OF_CLAUSE} / {Q_CRDN_HAS_EVENT} ?event }}
@@ -232,9 +265,9 @@ WHERE {{
     ?clause a {Q_BDD_FLUENT_CLAUSE} ;
         {Q_BDD_PREDICATE} ?predicate ;
         {Q_BDD_CLAUSE_OF} ?clauseOrigin .
-    OPTIONAL {{ ?clause {Q_BDD_REF_OBJECT} ?clauseObject }}
-    OPTIONAL {{ ?clause {Q_BDD_REF_WS} ?clauseWorkspace }}
-    OPTIONAL {{ ?clause {Q_BDD_REF_AGENT} ?clauseAgent }}
+    OPTIONAL {{ ?clause {Q_BDD_REF_OBJECT} ?taskObject }}
+    OPTIONAL {{ ?clause {Q_BDD_REF_WS} ?taskWorkspace }}
+    OPTIONAL {{ ?clause {Q_BDD_REF_AGENT} ?taskAgent }}
 
     ?predicate a ?predicateType ;
 }}
