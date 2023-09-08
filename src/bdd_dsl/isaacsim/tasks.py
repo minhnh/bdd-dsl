@@ -8,7 +8,6 @@ from bdd_dsl.utils.common import check_or_convert_ndarray
 from bdd_dsl.isaacsim.utils import create_rigid_prim_in_scene
 from omni.isaac.core.tasks import BaseTask
 from omni.isaac.core.scenes.scene import Scene
-from omni.isaac.core.objects import DynamicCuboid
 from omni.isaac.core.utils.prims import is_prim_path_valid
 from omni.isaac.core.utils.stage import get_stage_units
 from omni.isaac.core.utils.string import find_unique_string_name

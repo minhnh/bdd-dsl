@@ -9,6 +9,38 @@ from bdd_dsl.models.uri import (
     URI_MM_ENV,
     URI_MM_AGENT,
 )
+from bdd_dsl.models.urirefs import (
+    URI_GEOM_RIGID_BODY,
+    URI_GEOM_SIMPLICES,
+    URI_GEOM_FRAME,
+    URI_GEOM_POSE,
+    URI_GEOM_OF,
+    URI_GEOM_WRT,
+    URI_GEOM_POSE_COORD,
+    URI_GEOM_POSITION_COORD,
+    URI_GEOM_ORIENTATION_COORD,
+    URI_GEOM_OF_POSE,
+    URI_GEOM_OF_POSITION,
+    URI_GEOM_OF_ORIENTATION,
+    URI_GEOM_POSE_FROM_POS_ORN,
+    URI_PROB_SAMPLED_QUANTITY,
+    URI_PROB_UNIFORM,
+    URI_PROB_DIM,
+    URI_PROB_LOWER,
+    URI_PROB_UPPER,
+    URI_PROB_FROM_DISTRIBUTION,
+    URI_ENV_OF_OBJ,
+    URI_TRANS_HAS_BODY,
+    URI_TRANS_HAS_POSE,
+    URI_TRANS_HAS_POSITION,
+    URI_TRANS_HAS_ORIENTATION,
+    URI_TRANS_HAS_FRAME,
+    URI_TRANS_WRT,
+    URI_TRANS_SAMPLED_FROM,
+    URI_TRANS_DIM,
+    URI_TRANS_UPPER,
+    URI_TRANS_LOWER,
+)
 
 # transformation concepts and relations
 Q_PREFIX_TRANS = "trans"
@@ -38,6 +70,14 @@ Q_IMPL_MODULE = f"{Q_PREFIX_TRANS}:impl-module"
 Q_IMPL_CLASS = f"{Q_PREFIX_TRANS}:impl-class"
 Q_IMPL_ARG_NAME = f"{Q_PREFIX_TRANS}:impl-arg-name"
 Q_IMPL_ARG_VALUE = f"{Q_PREFIX_TRANS}:impl-arg-value"
+
+# Geometry concept and relations
+Q_PREFIX_GEOM = "geom"
+Q_PREFIX_GEOM_REL = "geom-rel"
+Q_PREFIX_GEOM_COORD = "geom-coord"
+
+# Probability
+Q_PREFIX_PROB = "prob"
 
 # coordination concepts & relations
 Q_PREFIX_EVENT = "evt"
@@ -81,7 +121,7 @@ Q_TASK_CAN_BE = f"{Q_PREFIX_TASK}:can-be"
 Q_PREFIX_ENV = "env"
 Q_ENV_HAS_OBJ = f"{Q_PREFIX_ENV}:has-object"
 
-# Environment concepts and relations
+# Agent concepts and relations
 Q_PREFIX_AGENT = "agn"
 Q_AGN_HAS_AGENT = f"{Q_PREFIX_AGENT}:has-agent"
 
@@ -270,5 +310,77 @@ WHERE {{
     OPTIONAL {{ ?clause {Q_BDD_REF_AGENT} ?taskAgent }}
 
     ?predicate a ?predicateType ;
+}}
+"""
+
+OBJ_POSE_COORD_QUERY = f"""
+CONSTRUCT {{
+    ?obj {URI_TRANS_HAS_BODY.n3()} ?body .
+    ?body
+        {URI_TRANS_HAS_POSE.n3()} ?pose ;
+        {URI_TRANS_HAS_FRAME.n3()} ?frame .
+    ?pose a ?poseCoordType ;
+        {URI_TRANS_WRT.n3()} ?poseOriginFrame ;
+        {URI_TRANS_HAS_POSITION.n3()} ?posePosition ;
+        {URI_TRANS_HAS_ORIENTATION.n3()} ?poseOrientation .
+    ?posePosition a ?positionCoordType ;
+        {URI_TRANS_SAMPLED_FROM.n3()} ?positionDistr .
+    ?positionDistr a ?positionDistrType ;
+        {URI_TRANS_DIM.n3()} ?positionDistrDim ;
+        {URI_TRANS_LOWER.n3()} ?positionDistrLower ;
+        {URI_TRANS_UPPER.n3()} ?positionDistrUpper .
+    ?poseOrientation a ?orientationCoordType ;
+        {URI_TRANS_SAMPLED_FROM.n3()} ?orientationDistr .
+    ?orientationDistr a ?orientationDistrType ;
+        {URI_TRANS_DIM.n3()} ?orientationDistrDim ;
+        {URI_TRANS_LOWER.n3()} ?orientationDistrLower ;
+        {URI_TRANS_UPPER.n3()} ?orientationDistrUpper .
+}}
+WHERE {{
+    ?body a {URI_GEOM_RIGID_BODY.n3()} ;
+        {URI_ENV_OF_OBJ.n3()} ?obj ;
+        {URI_GEOM_SIMPLICES.n3()} ?frame .
+    ?frame a {URI_GEOM_FRAME.n3()} ;
+        ^{URI_GEOM_OF.n3()} ?pose .
+    ?pose a {URI_GEOM_POSE.n3()} ;
+        {URI_GEOM_WRT.n3()} ?poseOriginFrame ;
+        ^{URI_GEOM_OF_POSE.n3()} ?poseCoord .
+    ?poseCoord a {URI_GEOM_POSE_COORD.n3()} ;
+        a ?poseCoordType .
+    OPTIONAL {{
+        ?poseCoord a {URI_GEOM_POSE_FROM_POS_ORN.n3()} ;
+            {URI_GEOM_OF_POSITION.n3()} ?posePosition ;
+            {URI_GEOM_OF_ORIENTATION.n3()} ?poseOrientation .
+
+        ?posePosition ^{URI_GEOM_OF_POSITION.n3()} ?positionCoord .
+        ?positionCoord a {URI_GEOM_POSITION_COORD.n3()} ;
+            a ?positionCoordType .
+        OPTIONAL {{
+            ?positionCoord a {URI_PROB_SAMPLED_QUANTITY.n3()} ;
+                {URI_PROB_FROM_DISTRIBUTION.n3()} ?positionDistr .
+            ?positionDistr a ?positionDistrType .
+            OPTIONAL {{ ?positionDistr {URI_PROB_DIM.n3()} ?positionDistrDim }}
+            OPTIONAL {{
+                ?positionDistr a {URI_PROB_UNIFORM.n3()} ;
+                    {URI_PROB_LOWER.n3()} ?positionDistrLower ;
+                    {URI_PROB_UPPER.n3()} ?positionDistrUpper .
+            }}
+        }}
+
+        ?poseOrientation ^{URI_GEOM_OF_ORIENTATION.n3()} ?orientationCoord .
+        ?orientationCoord a {URI_GEOM_ORIENTATION_COORD.n3()} ;
+            a ?orientationCoordType .
+        OPTIONAL {{
+            ?orientationCoord a {URI_PROB_SAMPLED_QUANTITY.n3()} ;
+                {URI_PROB_FROM_DISTRIBUTION.n3()} ?orientationDistr .
+            ?orientationDistr a ?orientationDistrType .
+            OPTIONAL {{ ?orientationDistr {URI_PROB_DIM.n3()} ?orientationDistrDim }}
+            OPTIONAL {{
+                ?orientationDistr a {URI_PROB_UNIFORM.n3()} ;
+                    {URI_PROB_LOWER.n3()} ?orientationDistrLower ;
+                    {URI_PROB_UPPER.n3()} ?orientationDistrUpper .
+            }}
+        }}
+    }}
 }}
 """

@@ -1,6 +1,11 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from bdd_dsl.models.uri import (
     URI_TRANS,
+    URI_MM_GEOM,
+    URI_MM_GEOM_REL,
+    URI_MM_GEOM_COORD,
+    URI_MM_GEOM_EXT,
+    URI_MM_PROB,
     URI_MM_BDD,
     URI_MM_EVENT,
     URI_MM_BT,
@@ -8,9 +13,14 @@ from bdd_dsl.models.uri import (
     URI_M_BDD,
     URI_M_ENV,
     URI_M_AGENT,
+    URI_M_SIM,
 )
 from bdd_dsl.models.queries import (
     Q_PREFIX_TRANS,
+    Q_PREFIX_GEOM,
+    Q_PREFIX_GEOM_REL,
+    Q_PREFIX_GEOM_COORD,
+    Q_PREFIX_PROB,
     Q_PREFIX_BDD,
     Q_HAS_VARIATION,
     Q_CAN_BE,
@@ -38,7 +48,9 @@ from bdd_dsl.models.queries import (
     Q_PREFIX_EVENT,
     Q_PREFIX_BT,
     Q_HAS_SUBTREE,
+    Q_PREFIX_ENV,
 )
+from bdd_dsl.models.urirefs import URI_TRANS_HAS_BODY
 
 
 FR_NAME = "name"
@@ -70,6 +82,12 @@ FR_OBJECTS = "objects"
 FR_WS = "workspaces"
 FR_AGENTS = "agents"
 FR_FLUENT_DATA = "fluent_data"
+FR_BODY = "body"
+FR_FRAME = "frame"
+FR_POSE = "pose"
+FR_POSITION = "position"
+FR_ORIENTATION = "orientation"
+FR_DISTRIBUTION = "distribution"
 
 EVENT_LOOP_FRAME = {
     "@context": {
@@ -113,7 +131,7 @@ BDD_FRAME = {
         Q_PREFIX_TRANS: URI_TRANS,
         Q_PREFIX_EVENT: URI_MM_EVENT,
         Q_PREFIX_BDD: URI_MM_BDD,
-        "env": URI_M_ENV,
+        Q_PREFIX_ENV: URI_M_ENV,
         "agn": URI_M_AGENT,
         f"{Q_PREFIX_EVENT}m": URI_M_CRDN,
         FR_DATA: "@graph",
@@ -133,4 +151,22 @@ BDD_FRAME = {
         FR_AGENTS: Q_HAS_AGENT,
     },
     FR_DATA: {FR_CRITERIA: {}},
+}
+
+OBJ_POSE_FRAME = {
+    "@context": {
+        Q_PREFIX_TRANS: URI_TRANS,
+        Q_PREFIX_ENV: URI_M_ENV,
+        Q_PREFIX_GEOM: URI_MM_GEOM,
+        Q_PREFIX_GEOM_REL: URI_MM_GEOM_REL,
+        Q_PREFIX_GEOM_COORD: URI_MM_GEOM_COORD,
+        f"{Q_PREFIX_GEOM}-ext": URI_MM_GEOM_EXT,
+        Q_PREFIX_PROB: URI_MM_PROB,
+        "agn": URI_M_AGENT,
+        "sim": URI_M_SIM,
+        FR_DATA: "@graph",
+        FR_NAME: "@id",
+        FR_TYPE: "@type",
+    },
+    FR_DATA: {URI_TRANS_HAS_BODY.n3(): {}},
 }
