@@ -5,17 +5,19 @@ from typing import List, Tuple, Type, Union
 import itertools
 import json
 from os.path import join
+import numpy as np
 from pyld import jsonld
 import pyshacl
 import py_trees as pt
 import rdflib
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
-from bdd_dsl import META_MODELs_PATH
+from bdd_dsl import META_MODELS_PATH
 from bdd_dsl.models.queries import (
     EVENT_LOOP_QUERY,
     BEHAVIOUR_TREE_QUERY,
     BDD_QUERY,
+    OBJ_POSE_COORD_QUERY,
     Q_BT_SEQUENCE,
     Q_BT_PARALLEL,
     Q_OF_VARIABLE,
@@ -27,8 +29,10 @@ from bdd_dsl.models.frames import (
     EVENT_LOOP_FRAME,
     BEHAVIOUR_TREE_FRAME,
     BDD_FRAME,
+    OBJ_POSE_FRAME,
     FR_NAME,
     FR_DATA,
+    FR_LIST,
     FR_EVENTS,
     FR_SUBTREE,
     FR_TYPE,
@@ -50,14 +54,32 @@ from bdd_dsl.models.frames import (
     FR_VARIABLES,
     FR_ENTITIES,
     FR_VARIATIONS,
+    FR_BODY,
+    FR_POSE,
+    FR_POSITION,
+    FR_ORIENTATION,
+    FR_OF,
+    FR_WRT,
+    FR_DISTRIBUTION,
+    FR_DIM,
+    FR_UPPER,
+    FR_LOWER,
 )
+from bdd_dsl.models.urirefs import (
+    URI_GEOM_POSE_FROM_POS_ORN,
+    URI_PROB_SAMPLED_QUANTITY,
+    URI_PROB_UNIFORM_ROTATION,
+    URI_PROB_UNIFORM,
+    URI_PROB_CONTINUOUS,
+)
+from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.exception import BDDConstraintViolation, SHACLViolation
 from bdd_dsl.utils.common import get_valid_var_name, read_file_and_cache
 
 
 def load_metamodels() -> rdflib.Graph:
     graph = rdflib.Graph()
-    mm_files = glob.glob(join(META_MODELs_PATH, "**", "*.json"), recursive=True)
+    mm_files = glob.glob(join(META_MODELS_PATH, "**", "*.json"), recursive=True)
     for mm_file in mm_files:
         graph.parse(mm_file, format="json-ld")
     return graph
@@ -79,6 +101,21 @@ def frame_model_with_file(model: dict, frame_file: str):
     frame_str = read_file_and_cache(frame_file)
     frame_dict = json.loads(frame_str)
     return jsonld.frame(model, frame_dict)
+
+
+def get_type_set(data: dict) -> set:
+    assert FR_TYPE in data
+
+    data_types = data[FR_TYPE]
+    data_types_set = set()
+    if isinstance(data_types, str):
+        data_types_set.add(data_types)
+    elif isinstance(data_types, list):
+        for t in data_types:
+            data_types_set.add(t)
+    else:
+        raise RuntimeError(f"unexpected type for '{FR_TYPE}' field: {type(data[FR_TYPE])}")
+    return data_types_set
 
 
 def get_el_conn_event_names(graph: rdflib.Graph, el_conn_id: str) -> Union[List[str], None]:
@@ -110,9 +147,9 @@ def get_el_conn_event_names(graph: rdflib.Graph, el_conn_id: str) -> Union[List[
 def create_event_handler_from_data(
     el_data: dict, e_handler_cls: Type[EventHandler], e_handler_kwargs: dict
 ) -> EventHandler:
-    """
-    Create an event handler object from framed, dictionary-like data. Event handler must be an
-    extension of EventDriven
+    """Create an event handler object from framed, dictionary-like data.
+
+    Event handler must be an extension of EventDriven
     """
     event_names = [event[FR_NAME] for event in el_data[FR_EVENTS]]
     return e_handler_cls(el_data[FR_NAME], event_names, **e_handler_kwargs)
@@ -363,10 +400,9 @@ def process_bdd_us_from_data(us_data: dict):
 
 def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
     """Query and process all UserStory in the JSON-LD graph"""
-
     # checking conformance against SHACL shape constraints
     bdd_shacl_str = read_file_and_cache(
-        join(META_MODELs_PATH, "acceptance-criteria", "bdd-shape-constraints.ttl")
+        join(META_MODELS_PATH, "acceptance-criteria", "bdd-shape-constraints.ttl")
     )
     conforms, report_graph, report_text = pyshacl.validate(
         graph,
@@ -384,3 +420,103 @@ def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
     if FR_DATA in model_framed:
         return [process_bdd_us_from_data(us_data) for us_data in model_framed[FR_DATA]]
     return [process_bdd_us_from_data(model_framed)]
+
+
+def sample_from_distribution_data(distr_data: dict):
+    distr_types = get_type_set(distr_data)
+    if URI_PROB_UNIFORM_ROTATION.n3(NS_MANAGER) in distr_types:
+        from scipy.spatial.transform import Rotation
+
+        # TODO(minhnh): Handle different types of rotation coordinates
+        # Now returning quaternions in (w, x, y, z) format
+        rand_rot = Rotation.random().as_quat()  # (x, y, x, w)
+        w = rand_rot[-1]
+        rand_rot = rand_rot[:3]
+        rand_rot = np.insert(rand_rot, 0, w)
+        return rand_rot
+
+    if URI_PROB_UNIFORM.n3(NS_MANAGER) in distr_types:
+        upper_bounds = distr_data[FR_UPPER][FR_LIST]
+        lower_bounds = distr_data[FR_LOWER][FR_LIST]
+        dimension = distr_data[FR_DIM]
+        assert dimension == len(upper_bounds) and dimension == len(lower_bounds)
+
+        if URI_PROB_CONTINUOUS.n3(NS_MANAGER) in distr_types:
+            return np.random.uniform(lower_bounds, upper_bounds)
+
+        # TODO(minhnh): also handle discrete case
+
+    raise RuntimeError(f"unhandled sampling from distribution types: {distr_types}")
+
+
+def get_position_coordinates(position_data: dict):
+    position_types = get_type_set(position_data)
+    if URI_PROB_SAMPLED_QUANTITY.n3(NS_MANAGER) in position_types:
+        assert FR_DISTRIBUTION in position_data
+        return sample_from_distribution_data(position_data[FR_DISTRIBUTION])
+
+    raise RuntimeError(f"unhandled position coordinate type: {position_types}")
+
+
+def get_orientation_coordinates(orn_data: dict):
+    orn_types = get_type_set(orn_data)
+    if URI_PROB_SAMPLED_QUANTITY.n3(NS_MANAGER) in orn_types:
+        assert FR_DISTRIBUTION in orn_data
+        return sample_from_distribution_data(orn_data[FR_DISTRIBUTION])
+
+    raise RuntimeError(f"unhandled position coordinate type: {orn_types}")
+
+
+def get_pose_coordinates(pose_data: dict) -> dict:
+    """Extract pose coordinates from JSON data"""
+    pose_types = get_type_set(pose_data)
+
+    coords = {}
+    # composition of position and coordination
+    if URI_GEOM_POSE_FROM_POS_ORN.n3(NS_MANAGER) in pose_types:
+        assert FR_POSITION in pose_data
+        assert FR_ORIENTATION in pose_data
+
+        coords[FR_POSITION] = get_position_coordinates(pose_data[FR_POSITION])
+        coords[FR_ORIENTATION] = get_position_coordinates(pose_data[FR_ORIENTATION])
+    else:
+        raise RuntimeError(f"unhandled pose coordinate type: {pose_types}")
+
+    return coords
+
+
+def get_object_poses(graph: rdflib.Graph) -> dict:
+    """Return a dictionary of object mapping to poses."""
+    transformed_model = query_graph(graph, OBJ_POSE_COORD_QUERY)
+    framed_model = jsonld.frame(transformed_model, OBJ_POSE_FRAME)
+    objects_data = framed_model[FR_DATA]
+    if isinstance(objects_data, dict):
+        raise RuntimeError("single result not handled")
+
+    obj_poses = {}
+    for obj_data in objects_data:
+        obj_id = obj_data[FR_NAME]
+        if isinstance(obj_data[FR_BODY], list):
+            raise RuntimeError("multiple bodies for one object not handled")
+        body_id = obj_data[FR_BODY][FR_NAME]
+        obj_poses[obj_id] = {FR_BODY: body_id, FR_POSE: {}, "frame_pose_map": {}}
+        poses_data = obj_data[FR_BODY][FR_POSE]
+        if isinstance(poses_data, dict):
+            poses_list = [poses_data]
+        elif isinstance(poses_data, list):
+            poses_list = poses_data
+        else:
+            raise RuntimeError(f"unrecognized poses data type: '{type(poses_data)}'")
+        for pose_data in poses_list:
+            pose_id = pose_data[FR_NAME]
+            obj_poses[obj_id][FR_POSE][pose_id] = pose_data
+            frame_id = pose_data[FR_OF][FR_NAME]
+            if frame_id not in obj_poses[obj_id]["frame_pose_map"]:
+                obj_poses[obj_id]["frame_pose_map"][frame_id] = {}
+            wrt_frame_id = pose_data[FR_WRT][FR_NAME]
+            if wrt_frame_id not in obj_poses[obj_id]["frame_pose_map"][frame_id]:
+                obj_poses[obj_id]["frame_pose_map"][frame_id][wrt_frame_id] = set()
+            obj_poses[obj_id]["frame_pose_map"][frame_id][wrt_frame_id].add(pose_id)
+            # obj_poses[obj_id][FR_POSE][pose_id]["coordinates"] = get_pose_coordinates(pose_data)
+
+    return obj_poses

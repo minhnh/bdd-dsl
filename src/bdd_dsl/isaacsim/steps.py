@@ -1,5 +1,7 @@
 from bdd_dsl.isaacsim.utils import ModelType, PathType, SimpleShape
 from bdd_dsl.utils.common import get_valid_var_name
+from bdd_dsl.utils.json import get_pose_coordinates
+from bdd_dsl.models.frames import FR_POSE, FR_WRT, FR_NAME, FR_POSITION, FR_ORIENTATION
 
 from behave import given
 
@@ -88,6 +90,17 @@ def step_add_objects(context):
         if model_id not in OBJECT_MODEL_MAPS["models"]:
             raise RuntimeError(f"no model with ID '{model_id}'")
         context.objects[valid_obj_id]["model_info"] = OBJECT_MODEL_MAPS["models"][model_id]
+
+        if obj_id in context.obj_pose_data:
+            obj_data = context.obj_pose_data[obj_id]
+            for _, pose_data in obj_data[FR_POSE].items():
+                if "world-frame" not in pose_data[FR_WRT][FR_NAME]:
+                    continue
+                coords = get_pose_coordinates(pose_data)
+                context.objects[valid_obj_id]["configs"]["initial_position"] = coords[FR_POSITION]
+                context.objects[valid_obj_id]["configs"]["initial_orientation"] = coords[
+                    FR_ORIENTATION
+                ]
 
 
 @given("specified objects, workspaces and agents are available")

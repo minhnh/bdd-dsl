@@ -10,10 +10,10 @@ from bdd_dsl.models.namespace import (
 
 # Transformation
 URI_TRANS_HAS_BODY = NS_TRANS["has-body"]
-URI_TRANS_HAS_FRAME = NS_TRANS["has-frame"]
 URI_TRANS_HAS_POSE = NS_TRANS["has-pose"]
 URI_TRANS_HAS_POSITION = NS_TRANS["has-position"]
 URI_TRANS_HAS_ORIENTATION = NS_TRANS["has-orientation"]
+URI_TRANS_OF = NS_TRANS["of"]
 URI_TRANS_WRT = NS_TRANS["with-respect-to"]
 URI_TRANS_SAMPLED_FROM = NS_TRANS["sampled-from"]
 URI_TRANS_DIM = NS_TRANS["dimension"]
@@ -49,7 +49,10 @@ URI_GEOM_POSE_FROM_POS_ORN = NS_MM_GEOM_EXT["PoseFromPositionOrientation"]
 
 # Probability
 URI_PROB_SAMPLED_QUANTITY = NS_MM_PROB["SampledQuantity"]
+URI_PROB_DISCRETE = NS_MM_PROB["Discrete"]
+URI_PROB_CONTINUOUS = NS_MM_PROB["Continuous"]
 URI_PROB_UNIFORM = NS_MM_PROB["Uniform"]
+URI_PROB_UNIFORM_ROTATION = NS_MM_PROB["UniformRotation"]
 URI_PROB_DIM = NS_MM_PROB["dimension"]
 URI_PROB_LOWER = NS_MM_PROB["lower-bound"]
 URI_PROB_UPPER = NS_MM_PROB["upper-bound"]

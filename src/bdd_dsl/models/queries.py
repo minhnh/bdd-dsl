@@ -1,4 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from bdd_dsl.models.namespace import PREFIX_TRANS, PREFIX_ENV
 from bdd_dsl.models.uri import (
     URI_TRANS,
     URI_MM_BDD,
@@ -34,7 +35,7 @@ from bdd_dsl.models.urirefs import (
     URI_TRANS_HAS_POSE,
     URI_TRANS_HAS_POSITION,
     URI_TRANS_HAS_ORIENTATION,
-    URI_TRANS_HAS_FRAME,
+    URI_TRANS_OF,
     URI_TRANS_WRT,
     URI_TRANS_SAMPLED_FROM,
     URI_TRANS_DIM,
@@ -43,41 +44,32 @@ from bdd_dsl.models.urirefs import (
 )
 
 # transformation concepts and relations
-Q_PREFIX_TRANS = "trans"
-Q_HAS_AC = f"{Q_PREFIX_TRANS}:has-criteria"
-Q_OF_SCENARIO = f"{Q_PREFIX_TRANS}:of-scenario"
-Q_OF_VARIABLE = f"{Q_PREFIX_TRANS}:of-variable"
-Q_HAS_VARIATION = f"{Q_PREFIX_TRANS}:has-variation"
-Q_HAS_BG = f"{Q_PREFIX_TRANS}:has-background"
-Q_CAN_BE = f"{Q_PREFIX_TRANS}:can-be"
-Q_GIVEN = f"{Q_PREFIX_TRANS}:given"
-Q_WHEN = f"{Q_PREFIX_TRANS}:when"
-Q_THEN = f"{Q_PREFIX_TRANS}:then"
-Q_PREDICATE = f"{Q_PREFIX_TRANS}:predicate"
-Q_HAS_CLAUSE = f"{Q_PREFIX_TRANS}:has-clause"
-Q_HAS_OBJECT = f"{Q_PREFIX_TRANS}:has-object"
-Q_HAS_WS = f"{Q_PREFIX_TRANS}:has-workspace"
-Q_HAS_AGENT = f"{Q_PREFIX_TRANS}:has-agent"
-Q_HAS_EVENT = f"{Q_PREFIX_TRANS}:has-event"
-Q_HAS_EL_CONN = f"{Q_PREFIX_TRANS}:has-el-conn"
-Q_HAS_ROOT = f"{Q_PREFIX_TRANS}:has-root"
-Q_HAS_SUBTREE = f"{Q_PREFIX_TRANS}:has-subtree"
-Q_HAS_PARENT = f"{Q_PREFIX_TRANS}:has-parent"
-Q_HAS_CHILD = f"{Q_PREFIX_TRANS}:has-child"
-Q_HAS_START_E = f"{Q_PREFIX_TRANS}:has-start-event"
-Q_HAS_END_E = f"{Q_PREFIX_TRANS}:has-end-event"
-Q_IMPL_MODULE = f"{Q_PREFIX_TRANS}:impl-module"
-Q_IMPL_CLASS = f"{Q_PREFIX_TRANS}:impl-class"
-Q_IMPL_ARG_NAME = f"{Q_PREFIX_TRANS}:impl-arg-name"
-Q_IMPL_ARG_VALUE = f"{Q_PREFIX_TRANS}:impl-arg-value"
-
-# Geometry concept and relations
-Q_PREFIX_GEOM = "geom"
-Q_PREFIX_GEOM_REL = "geom-rel"
-Q_PREFIX_GEOM_COORD = "geom-coord"
-
-# Probability
-Q_PREFIX_PROB = "prob"
+Q_HAS_AC = f"{PREFIX_TRANS}:has-criteria"
+Q_OF_SCENARIO = f"{PREFIX_TRANS}:of-scenario"
+Q_OF_VARIABLE = f"{PREFIX_TRANS}:of-variable"
+Q_HAS_VARIATION = f"{PREFIX_TRANS}:has-variation"
+Q_HAS_BG = f"{PREFIX_TRANS}:has-background"
+Q_CAN_BE = f"{PREFIX_TRANS}:can-be"
+Q_GIVEN = f"{PREFIX_TRANS}:given"
+Q_WHEN = f"{PREFIX_TRANS}:when"
+Q_THEN = f"{PREFIX_TRANS}:then"
+Q_PREDICATE = f"{PREFIX_TRANS}:predicate"
+Q_HAS_CLAUSE = f"{PREFIX_TRANS}:has-clause"
+Q_HAS_OBJECT = f"{PREFIX_TRANS}:has-object"
+Q_HAS_WS = f"{PREFIX_TRANS}:has-workspace"
+Q_HAS_AGENT = f"{PREFIX_TRANS}:has-agent"
+Q_HAS_EVENT = f"{PREFIX_TRANS}:has-event"
+Q_HAS_EL_CONN = f"{PREFIX_TRANS}:has-el-conn"
+Q_HAS_ROOT = f"{PREFIX_TRANS}:has-root"
+Q_HAS_SUBTREE = f"{PREFIX_TRANS}:has-subtree"
+Q_HAS_PARENT = f"{PREFIX_TRANS}:has-parent"
+Q_HAS_CHILD = f"{PREFIX_TRANS}:has-child"
+Q_HAS_START_E = f"{PREFIX_TRANS}:has-start-event"
+Q_HAS_END_E = f"{PREFIX_TRANS}:has-end-event"
+Q_IMPL_MODULE = f"{PREFIX_TRANS}:impl-module"
+Q_IMPL_CLASS = f"{PREFIX_TRANS}:impl-class"
+Q_IMPL_ARG_NAME = f"{PREFIX_TRANS}:impl-arg-name"
+Q_IMPL_ARG_VALUE = f"{PREFIX_TRANS}:impl-arg-value"
 
 # coordination concepts & relations
 Q_PREFIX_EVENT = "evt"
@@ -118,8 +110,7 @@ Q_TASK_HAS_VARIATION = f"{Q_PREFIX_TASK}:has-variation"
 Q_TASK_CAN_BE = f"{Q_PREFIX_TASK}:can-be"
 
 # Environment concepts and relations
-Q_PREFIX_ENV = "env"
-Q_ENV_HAS_OBJ = f"{Q_PREFIX_ENV}:has-object"
+Q_ENV_HAS_OBJ = f"{PREFIX_ENV}:has-object"
 
 # Agent concepts and relations
 Q_PREFIX_AGENT = "agn"
@@ -157,7 +148,7 @@ Q_BDD_REF_AGENT = f"{Q_PREFIX_BDD}:ref-agent"
 # Query for event loops from graph
 EVENT_LOOP_QUERY = f"""
 PREFIX {Q_PREFIX_EVENT}: <{URI_MM_EVENT}>
-PREFIX {Q_PREFIX_TRANS}: <{URI_TRANS}>
+PREFIX {PREFIX_TRANS}: <{URI_TRANS}>
 
 CONSTRUCT {{
     ?eventLoopConn {Q_HAS_EVENT} ?event .
@@ -173,7 +164,7 @@ WHERE {{
 BEHAVIOUR_TREE_QUERY = f"""
 PREFIX {Q_PREFIX_BT}: <{URI_MM_BT}>
 PREFIX {Q_PREFIX_PY}: <{URI_MM_PY}>
-PREFIX {Q_PREFIX_TRANS}: <{URI_TRANS}>
+PREFIX {PREFIX_TRANS}: <{URI_TRANS}>
 
 CONSTRUCT {{
     ?rootImpl
@@ -237,9 +228,9 @@ WHERE {{
 """
 
 BDD_QUERY = f"""
-PREFIX {Q_PREFIX_TRANS}: <{URI_TRANS}>
+PREFIX {PREFIX_TRANS}: <{URI_TRANS}>
 PREFIX {Q_PREFIX_TASK}: <{URI_MM_TASK}>
-PREFIX {Q_PREFIX_ENV}: <{URI_MM_ENV}>
+PREFIX {PREFIX_ENV}: <{URI_MM_ENV}>
 PREFIX {Q_PREFIX_AGENT}: <{URI_MM_AGENT}>
 PREFIX {Q_PREFIX_BDD}: <{URI_MM_BDD}>
 
@@ -314,12 +305,14 @@ WHERE {{
 """
 
 OBJ_POSE_COORD_QUERY = f"""
+prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
 CONSTRUCT {{
     ?obj {URI_TRANS_HAS_BODY.n3()} ?body .
     ?body
-        {URI_TRANS_HAS_POSE.n3()} ?pose ;
-        {URI_TRANS_HAS_FRAME.n3()} ?frame .
+        {URI_TRANS_HAS_POSE.n3()} ?pose .
     ?pose a ?poseCoordType ;
+        {URI_TRANS_OF.n3()} ?frame ;
         {URI_TRANS_WRT.n3()} ?poseOriginFrame ;
         {URI_TRANS_HAS_POSITION.n3()} ?posePosition ;
         {URI_TRANS_HAS_ORIENTATION.n3()} ?poseOrientation .
@@ -327,14 +320,17 @@ CONSTRUCT {{
         {URI_TRANS_SAMPLED_FROM.n3()} ?positionDistr .
     ?positionDistr a ?positionDistrType ;
         {URI_TRANS_DIM.n3()} ?positionDistrDim ;
-        {URI_TRANS_LOWER.n3()} ?positionDistrLower ;
-        {URI_TRANS_UPPER.n3()} ?positionDistrUpper .
+        {URI_TRANS_LOWER.n3()} ?positionDistrLowerList ;
+        {URI_TRANS_UPPER.n3()} ?positionDistrUpperList .
+    ?positionDistrLowerListRest
+        rdf:first ?positionDistrLowerListHead ;
+        rdf:rest ?positionDistrLowerListTail .
+    ?positionDistrUpperListRest
+        rdf:first ?positionDistrUpperListHead ;
+        rdf:rest ?positionDistrUpperListTail .
     ?poseOrientation a ?orientationCoordType ;
         {URI_TRANS_SAMPLED_FROM.n3()} ?orientationDistr .
-    ?orientationDistr a ?orientationDistrType ;
-        {URI_TRANS_DIM.n3()} ?orientationDistrDim ;
-        {URI_TRANS_LOWER.n3()} ?orientationDistrLower ;
-        {URI_TRANS_UPPER.n3()} ?orientationDistrUpper .
+    ?orientationDistr a ?orientationDistrType .
 }}
 WHERE {{
     ?body a {URI_GEOM_RIGID_BODY.n3()} ;
@@ -362,8 +358,14 @@ WHERE {{
             OPTIONAL {{ ?positionDistr {URI_PROB_DIM.n3()} ?positionDistrDim }}
             OPTIONAL {{
                 ?positionDistr a {URI_PROB_UNIFORM.n3()} ;
-                    {URI_PROB_LOWER.n3()} ?positionDistrLower ;
-                    {URI_PROB_UPPER.n3()} ?positionDistrUpper .
+                    {URI_PROB_LOWER.n3()} ?positionDistrLowerList ;
+                    {URI_PROB_UPPER.n3()} ?positionDistrUpperList .
+                ?positionDistrLowerList rdf:rest* ?positionDistrLowerListRest .
+                ?positionDistrLowerListRest rdf:first ?positionDistrLowerListHead ;
+                    rdf:rest ?positionDistrLowerListTail .
+                ?positionDistrUpperList rdf:rest* ?positionDistrUpperListRest .
+                ?positionDistrUpperListRest rdf:first ?positionDistrUpperListHead ;
+                    rdf:rest ?positionDistrUpperListTail .
             }}
         }}
 
@@ -374,12 +376,6 @@ WHERE {{
             ?orientationCoord a {URI_PROB_SAMPLED_QUANTITY.n3()} ;
                 {URI_PROB_FROM_DISTRIBUTION.n3()} ?orientationDistr .
             ?orientationDistr a ?orientationDistrType .
-            OPTIONAL {{ ?orientationDistr {URI_PROB_DIM.n3()} ?orientationDistrDim }}
-            OPTIONAL {{
-                ?orientationDistr a {URI_PROB_UNIFORM.n3()} ;
-                    {URI_PROB_LOWER.n3()} ?orientationDistrLower ;
-                    {URI_PROB_UPPER.n3()} ?orientationDistrUpper .
-            }}
         }}
     }}
 }}

@@ -1,9 +1,6 @@
 from os.path import join, dirname
-from bdd_dsl.utils.json import load_metamodels, query_graph
-from bdd_dsl.models.queries import OBJ_POSE_COORD_QUERY
-from bdd_dsl.models.frames import OBJ_POSE_FRAME
+from bdd_dsl.utils.json import load_metamodels, get_object_poses
 from pprint import pprint
-from pyld import jsonld
 
 
 PKG_ROOT = join(dirname(__file__), "..")
@@ -26,11 +23,8 @@ def main():
     g.parse(join(MODELS_PATH, "environments", "avl.geom.json"), format="json-ld")
     g.parse(join(MODELS_PATH, "agents", "isaac-sim.json"), format="json-ld")
 
-    # pprint(list(g))
-    transformed_model = query_graph(g, OBJ_POSE_COORD_QUERY)
-    # pprint(transformed_model)
-    framed_model = jsonld.frame(transformed_model, OBJ_POSE_FRAME)
-    pprint(framed_model)
+    obj_poses = get_object_poses(g)
+    pprint(obj_poses)
 
 
 if __name__ == "__main__":
