@@ -66,21 +66,21 @@ composition relation to exactly one instance of `bdd:GivenClause`, `bdd:WhenClau
 }
 ```
 
-Next, we define `bdd:ScenarioTaskVariable` instances, which are points of variation of the
+Next, we define `bdd:ScenarioVariable` instances, which are points of variation of the
 scenario template. Here, we may change the object, workspace, and agent in different variants of
 the pickup scenario.
 
 ```json
 {
-    "@id": "pick-object", "@type": "bdd:ScenarioTaskVariable",
+    "@id": "pick-object", "@type": "bdd:ScenarioVariable",
     "bdd:of-scenario": [ "scenario-pick" ]
 },
 {
-    "@id": "pick-workspace", "@type": "bdd:ScenarioTaskVariable",
+    "@id": "pick-workspace", "@type": "bdd:ScenarioVariable",
     "bdd:of-scenario": [ "scenario-pick" ]
 },
 {
-    "@id": "pick-robot", "@type": "bdd:ScenarioTaskVariable",
+    "@id": "pick-robot", "@type": "bdd:ScenarioVariable",
     "bdd:of-scenario": [ "scenario-pick" ]
 }
 ```
@@ -118,7 +118,7 @@ composition linking to several elements in the template:
 
 - Predicate `pred-obj-held-by-robot` is an instance of the domain-specific `bdd:IsHeldPredicate`
   concept for representing the fact that a robot is holding an object.
-- Instances of `bdd:ScenarioTaskVariable`, namely `pick-object` and `pick-robot`, which are subjects
+- Instances of `bdd:ScenarioVariable`, namely `pick-object` and `pick-robot`, which are subjects
   of `pred-obj-held-by-robot` in this context.
 - Instance `after-pick` of type `bdd:TimeConstraint` which represents _when_
   `pred-obj-held-by-robot` should hold true.
@@ -137,7 +137,7 @@ to produce concrete, executable implementations for verification.
 The BDD scenario template defined above can now be extended with concrete variations, e.g. for
 generating concrete Gherkin feature files as shown in
 [the next section](#generating-gherkin-features-from-bdd-models).
-This is done via linking the `bdd:ScenarioTaskVariable` instances above to concrete instances of
+This is done via linking the `bdd:ScenarioVariable` instances above to concrete instances of
 objects, workspaces and agents. For example, consider the use case where we want to test the
 pickup behaviour in the robotics lab at Bonn-Rhein-Sieg University using battery cells
 sent from [AVL](https://www.avl.com) (An use case partner of the SESAME project), as well as
@@ -165,7 +165,7 @@ behaviour, which we can associate with `pickup-when`.
 
 #### Specifying Variations
 
-Using the `task:Variation` concept, we can associate the `bdd:ScenarioTaskVariable` instances above
+Using the `task:Variation` concept, we can associate the `bdd:ScenarioVariable` instances above
 with possible entities via the `task:can-be` relation:
 
 ```json

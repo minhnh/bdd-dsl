@@ -22,7 +22,7 @@ from bdd_dsl.models.queries import (
     Q_BT_PARALLEL,
     Q_OF_VARIABLE,
     Q_BDD_SCENARIO_VARIANT,
-    Q_BDD_SCENARIO_TASK_VARIABLE,
+    Q_BDD_SCENARIO_VARIABLE,
     Q_PREDICATE,
 )
 from bdd_dsl.models.frames import (
@@ -319,7 +319,7 @@ def process_bdd_scenario_from_data(
         var_name = conn_data[Q_OF_VARIABLE][FR_NAME]
         if var_name in var_set:
             raise BDDConstraintViolation(
-                f"multiple connections for {Q_BDD_SCENARIO_TASK_VARIABLE} '{var_name}'"
+                f"multiple connections for {Q_BDD_SCENARIO_VARIABLE} '{var_name}'"
             )
         var_set.add(var_name)
 
