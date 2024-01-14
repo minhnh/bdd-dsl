@@ -123,7 +123,7 @@ Q_BDD_SCENARIO = f"{Q_PREFIX_BDD}:Scenario"
 Q_BDD_SCENARIO_HAS_OBJ = f"{Q_PREFIX_BDD}:ScenarioHasObjects"
 Q_BDD_SCENARIO_HAS_AGN = f"{Q_PREFIX_BDD}:ScenarioHasAgents"
 Q_BDD_SCENARIO_VARIANT = f"{Q_PREFIX_BDD}:ScenarioVariant"
-Q_BDD_SCENARIO_VARIABLE = f"{Q_PREFIX_BDD}:ScenarioVariable"
+Q_BDD_SCENARIO_TASK_VARIABLE = f"{Q_PREFIX_BDD}:ScenarioTaskVariable"
 Q_BDD_GIVEN_CLAUSE = f"{Q_PREFIX_BDD}:GivenClause"
 Q_BDD_WHEN_CLAUSE = f"{Q_PREFIX_BDD}:WhenClause"
 Q_BDD_THEN_CLAUSE = f"{Q_PREFIX_BDD}:ThenClause"
@@ -288,7 +288,7 @@ WHERE {{
         {Q_BDD_OF_VARIABLE} ?variable ;
         {Q_TASK_CAN_BE} ?entity .
 
-    ?variable a {Q_BDD_SCENARIO_VARIABLE} .
+    ?variable a {Q_BDD_SCENARIO_TASK_VARIABLE} .
     ?when a {Q_BDD_WHEN_CLAUSE} .
 
     OPTIONAL {{ ?when ^{Q_BDD_OF_CLAUSE} / {Q_CRDN_HAS_EVENT} ?event }}

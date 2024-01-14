@@ -106,7 +106,7 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 ### Task
 
 - `task:Variation`: possible variations of a scenario. A `task:Variation` instance can be
-  associated with a `bdd:ScenarioVariable` via the `bdd:of-variable` relation, in which case the
+  associated with a `bdd:ScenarioTaskVariable` via the `bdd:of-variable` relation, in which case the
   instance denotes possible variations of the variable.
 - `task:can-be`: represents an aggregation relation from a `task:Variation` instance to the
   possible entities of the variation.
@@ -134,8 +134,8 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 - `bdd:ScenarioVariant`: aggregate instances of `task:Variation` with relation `bdd:has-variation`;
   has a composition relation `bdd:of-scenario` with a `bdd:Scenario` instance.
 - `bdd:UserStory`: aggregate instances `bdd:ScenarioVariant` with relation `bdd:has-criteria`.
-- `bdd:ScenarioVariable`: represents points of variation for a scenario.
-- `bdd:of-variable`: composition relation to a `bdd:ScenarioVariable`.
+- `bdd:ScenarioTaskVariable`: represents points of variation for a scenario.
+- `bdd:of-variable`: composition relation to a `bdd:ScenarioTaskVariable`.
 - `bdd:IsHeldPredicate`, `bdd:IsNearPredicate`: domain-specific predicates relevant to
   a pickup task.
 - `bdd:TimeConstraint`: constraint on when the predicate of `bdd:FluentClause` must hold.
@@ -148,7 +148,7 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
   `bdd:GivenClause` and `bdd:ThenClause`. This relation allows for extending a BDD scenario template
   with any number of clauses.
 - `bdd:ref-object`, `bdd:ref-workspace`, `bdd:ref-agent`: A `bdd:FluentClause` instance can
-  associate with a `bdd:ScenarioVariable` instance via these relations, which constrain the
+  associate with a `bdd:ScenarioTaskVariable` instance via these relations, which constrain the
   semantic of the variable in the context of the `bdd:FluentClause` instance.
 
 ## Constraints
