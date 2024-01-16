@@ -48,7 +48,7 @@ Q_HAS_AC = f"{PREFIX_TRANS}:has-criteria"
 Q_OF_SCENARIO = f"{PREFIX_TRANS}:of-scenario"
 Q_OF_VARIABLE = f"{PREFIX_TRANS}:of-variable"
 Q_HAS_VARIATION = f"{PREFIX_TRANS}:has-variation"
-Q_HAS_BG = f"{PREFIX_TRANS}:has-background"
+Q_HAS_IN_SCENE = f"{PREFIX_TRANS}:has-in-scene"
 Q_CAN_BE = f"{PREFIX_TRANS}:can-be"
 Q_GIVEN = f"{PREFIX_TRANS}:given"
 Q_WHEN = f"{PREFIX_TRANS}:when"
@@ -120,8 +120,8 @@ Q_AGN_HAS_AGENT = f"{Q_PREFIX_AGENT}:has-agent"
 Q_PREFIX_BDD = "bdd"
 Q_BDD_US = f"{Q_PREFIX_BDD}:UserStory"
 Q_BDD_SCENARIO = f"{Q_PREFIX_BDD}:Scenario"
-Q_BDD_SCENARIO_HAS_OBJ = f"{Q_PREFIX_BDD}:ScenarioHasObjects"
-Q_BDD_SCENARIO_HAS_AGN = f"{Q_PREFIX_BDD}:ScenarioHasAgents"
+Q_BDD_SCENE_HAS_OBJ = f"{Q_PREFIX_BDD}:SceneHasObjects"
+Q_BDD_SCENE_HAS_AGN = f"{Q_PREFIX_BDD}:SceneHasAgents"
 Q_BDD_SCENARIO_VARIANT = f"{Q_PREFIX_BDD}:ScenarioVariant"
 Q_BDD_SCENARIO_TASK_VARIABLE = f"{Q_PREFIX_BDD}:ScenarioTaskVariable"
 Q_BDD_GIVEN_CLAUSE = f"{Q_PREFIX_BDD}:GivenClause"
@@ -131,7 +131,7 @@ Q_BDD_FLUENT_CLAUSE = f"{Q_PREFIX_BDD}:FluentClause"
 Q_BDD_PRED_LOCATED_AT = f"{Q_PREFIX_BDD}:LocatedAtPredicate"
 Q_BDD_PRED_IS_NEAR = f"{Q_PREFIX_BDD}:IsNearPredicate"
 Q_BDD_PRED_IS_HELD = f"{Q_PREFIX_BDD}:IsHeldPredicate"
-Q_BDD_HAS_BG = f"{Q_PREFIX_BDD}:has-background"
+Q_BDD_HAS_IN_SCENE = f"{Q_PREFIX_BDD}:has-in-scene"
 Q_BDD_HAS_AC = f"{Q_PREFIX_BDD}:has-criteria"
 Q_BDD_OF_SCENARIO = f"{Q_PREFIX_BDD}:of-scenario"
 Q_BDD_GIVEN = f"{Q_PREFIX_BDD}:given"
@@ -238,14 +238,14 @@ CONSTRUCT {{
     ?us {Q_HAS_AC} ?scenarioVar .
     ?scenarioVar
         {Q_OF_SCENARIO} ?scenario ;
-        {Q_HAS_BG} ?background ;
+        {Q_HAS_IN_SCENE} ?scene ;
         {Q_HAS_VARIATION} ?variation .
     ?scenario
         {Q_GIVEN} ?given ;
         {Q_WHEN} ?when ;
         {Q_THEN} ?then .
     ?when {Q_HAS_EVENT} ?event .
-    ?background a ?bgType ;
+    ?scene a ?bgType ;
         {Q_HAS_OBJECT} ?scenarioObject ;
         {Q_HAS_AGENT} ?scenarioAgent .
     ?variation
@@ -264,7 +264,7 @@ WHERE {{
         {Q_BDD_HAS_AC} ?scenarioVar .
     ?scenarioVar a {Q_BDD_SCENARIO_VARIANT} ;
         {Q_BDD_OF_SCENARIO} ?scenario ;
-        {Q_BDD_HAS_BG} ?background ;
+        {Q_BDD_HAS_IN_SCENE} ?scene ;
         {Q_TASK_HAS_VARIATION} ?variation .
 
     ?scenario a {Q_BDD_SCENARIO} ;
@@ -272,14 +272,14 @@ WHERE {{
         {Q_BDD_WHEN} ?when ;
         {Q_BDD_THEN} ?then .
 
-    ?background a ?bgType .
+    ?scene a ?bgType .
     OPTIONAL {{
-        ?background a {Q_BDD_SCENARIO_HAS_OBJ} ;
+        ?scene a {Q_BDD_SCENE_HAS_OBJ} ;
             {Q_BDD_OF_SCENARIO} ?scenario ;
             {Q_ENV_HAS_OBJ} ?scenarioObject .
     }}
     OPTIONAL {{
-        ?background a {Q_BDD_SCENARIO_HAS_AGN} ;
+        ?scene a {Q_BDD_SCENE_HAS_AGN} ;
             {Q_BDD_OF_SCENARIO} ?scenario ;
             {Q_AGN_HAS_AGENT} ?scenarioAgent .
     }}
