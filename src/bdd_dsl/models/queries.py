@@ -245,7 +245,7 @@ CONSTRUCT {{
         {Q_WHEN} ?when ;
         {Q_THEN} ?then .
     ?when {Q_HAS_EVENT} ?event .
-    ?scene a ?bgType ;
+    ?scene a ?sceneType ;
         {Q_HAS_OBJECT} ?scenarioObject ;
         {Q_HAS_AGENT} ?scenarioAgent .
     ?variation
@@ -272,7 +272,7 @@ WHERE {{
         {Q_BDD_WHEN} ?when ;
         {Q_BDD_THEN} ?then .
 
-    ?scene a ?bgType .
+    ?scene a ?sceneType .
     OPTIONAL {{
         ?scene a {Q_BDD_SCENE_HAS_OBJ} ;
             {Q_BDD_OF_SCENARIO} ?scenario ;
