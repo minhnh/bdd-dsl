@@ -49,11 +49,9 @@ Q_OF_SCENARIO = f"{PREFIX_TRANS}:of-scenario"
 Q_OF_VARIABLE = f"{PREFIX_TRANS}:of-variable"
 Q_HAS_VARIATION = f"{PREFIX_TRANS}:has-variation"
 Q_HAS_IN_SCENE = f"{PREFIX_TRANS}:has-in-scene"
-Q_CAN_BE = f"{PREFIX_TRANS}:can-be"
 Q_GIVEN = f"{PREFIX_TRANS}:given"
 Q_WHEN = f"{PREFIX_TRANS}:when"
 Q_THEN = f"{PREFIX_TRANS}:then"
-Q_PREDICATE = f"{PREFIX_TRANS}:predicate"
 Q_HAS_CLAUSE = f"{PREFIX_TRANS}:has-clause"
 Q_HAS_OBJECT = f"{PREFIX_TRANS}:has-object"
 Q_HAS_WS = f"{PREFIX_TRANS}:has-workspace"
@@ -107,7 +105,6 @@ Q_PY_ARG_VAL = f"{Q_PREFIX_PY}:ArgValue"
 # Task concepts and relations
 Q_PREFIX_TASK = "task"
 Q_TASK_HAS_VARIATION = f"{Q_PREFIX_TASK}:has-variation"
-Q_TASK_CAN_BE = f"{Q_PREFIX_TASK}:can-be"
 
 # Environment concepts and relations
 Q_ENV_HAS_OBJ = f"{PREFIX_ENV}:has-object"
@@ -139,11 +136,12 @@ Q_BDD_WHEN = f"{Q_PREFIX_BDD}:when"
 Q_BDD_THEN = f"{Q_PREFIX_BDD}:then"
 Q_BDD_CLAUSE_OF = f"{Q_PREFIX_BDD}:clause-of"
 Q_BDD_OF_CLAUSE = f"{Q_PREFIX_BDD}:of-clause"
-Q_BDD_PREDICATE = f"{Q_PREFIX_BDD}:predicate"
+Q_BDD_HOLDS = f"{Q_PREFIX_BDD}:holds"
 Q_BDD_OF_VARIABLE = f"{Q_PREFIX_BDD}:of-variable"
 Q_BDD_REF_OBJECT = f"{Q_PREFIX_BDD}:ref-object"
 Q_BDD_REF_WS = f"{Q_PREFIX_BDD}:ref-workspace"
 Q_BDD_REF_AGENT = f"{Q_PREFIX_BDD}:ref-agent"
+Q_BDD_CAN_BE = f"{Q_PREFIX_BDD}:can-be"
 
 # Query for event loops from graph
 EVENT_LOOP_QUERY = f"""
@@ -250,10 +248,10 @@ CONSTRUCT {{
         {Q_HAS_AGENT} ?scenarioAgent .
     ?variation
         {Q_OF_VARIABLE} ?variable ;
-        {Q_CAN_BE} ?entity .
+        {Q_BDD_CAN_BE} ?entity .
     ?clauseOrigin {Q_HAS_CLAUSE} ?clause .
     ?clause
-        {Q_PREDICATE} ?predicate ;
+        {Q_BDD_HOLDS} ?predicate ;
         {Q_HAS_OBJECT} ?taskObject ;
         {Q_HAS_WS} ?taskWorkspace ;
         {Q_HAS_AGENT} ?taskAgent .
@@ -286,7 +284,7 @@ WHERE {{
 
     ?variation
         {Q_BDD_OF_VARIABLE} ?variable ;
-        {Q_TASK_CAN_BE} ?entity .
+        {Q_BDD_CAN_BE} ?entity .
 
     ?variable a {Q_BDD_SCENARIO_TASK_VARIABLE} .
     ?when a {Q_BDD_WHEN_CLAUSE} .
@@ -294,7 +292,7 @@ WHERE {{
     OPTIONAL {{ ?when ^{Q_BDD_OF_CLAUSE} / {Q_CRDN_HAS_EVENT} ?event }}
 
     ?clause a {Q_BDD_FLUENT_CLAUSE} ;
-        {Q_BDD_PREDICATE} ?predicate ;
+        {Q_BDD_HOLDS} ?predicate ;
         {Q_BDD_CLAUSE_OF} ?clauseOrigin .
     OPTIONAL {{ ?clause {Q_BDD_REF_OBJECT} ?taskObject }}
     OPTIONAL {{ ?clause {Q_BDD_REF_WS} ?taskWorkspace }}

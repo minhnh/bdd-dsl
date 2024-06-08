@@ -20,15 +20,14 @@ from bdd_dsl.models.queries import (
     OBJ_POSE_COORD_QUERY,
     Q_BT_SEQUENCE,
     Q_BT_PARALLEL,
-    Q_OF_VARIABLE,
     Q_BDD_SCENARIO_VARIANT,
     Q_BDD_SCENARIO_TASK_VARIABLE,
-    Q_PREDICATE,
 )
 from bdd_dsl.models.frames import (
     EVENT_LOOP_FRAME,
     BEHAVIOUR_TREE_FRAME,
     BDD_FRAME,
+    FR_HOLDS,
     OBJ_POSE_FRAME,
     FR_NAME,
     FR_DATA,
@@ -47,12 +46,11 @@ from bdd_dsl.models.frames import (
     FR_SCENARIO,
     FR_GIVEN,
     FR_THEN,
-    FR_CLAUSES,
     FR_CRITERIA,
     FR_SCENE,
     FR_FLUENT_DATA,
     FR_VARIABLES,
-    FR_ENTITIES,
+    FR_CAN_BE,
     FR_VARIATIONS,
     FR_BODY,
     FR_POSE,
@@ -97,10 +95,12 @@ def query_graph_with_file(graph: rdflib.Graph, query_file: str):
     return query_graph(graph, query_str)
 
 
-def frame_model_with_file(model: dict, frame_file: str):
+def frame_model_with_file(model: dict, frame_file: str) -> dict:
     frame_str = read_file_and_cache(frame_file)
     frame_dict = json.loads(frame_str)
-    return jsonld.frame(model, frame_dict)
+    framed_res = jsonld.frame(model, frame_dict)
+    assert isinstance(framed_res, dict)
+    return framed_res
 
 
 def get_type_set(data: dict) -> set:
@@ -282,12 +282,15 @@ def create_bt_from_graph(
 
 
 def process_bdd_scenario_from_data(
-    scenario_data: dict, conn_dict: dict, var_set: set, fluent_dict: dict, scene_dict: dict
+    scenario_data: dict, var_dict: dict, var_set: set, fluent_dict: dict, scene_dict: dict
 ):
     scenario_name = scenario_data[FR_NAME]
 
     # scene TODO(minhnh): for some reason agents are not showing up in the query result
     if FR_SCENE in scenario_data:
+        if not isinstance(scenario_data[FR_SCENE], list):
+            scenario_data[FR_SCENE] = [scenario_data[FR_SCENE]]
+
         for scene_data in scenario_data[FR_SCENE]:
             scene_name = scene_data[FR_NAME]
             # one scene can be shared by multiple scenarios
@@ -311,12 +314,11 @@ def process_bdd_scenario_from_data(
         raise BDDConstraintViolation(
             f"{Q_BDD_SCENARIO_VARIANT} '{scenario_name}' has no connection"
         )
-    for conn_data in scenario_data[FR_VARIATIONS]:
-        if FR_ENTITIES not in conn_data:
+    for var_data in scenario_data[FR_VARIATIONS]:
+        if FR_CAN_BE not in var_data:
             continue
-        conn_name = conn_data[FR_NAME]
-        conn_dict[conn_name] = conn_data
-        var_name = conn_data[Q_OF_VARIABLE][FR_NAME]
+        var_name = var_data[FR_NAME]
+        var_dict[var_name] = var_data
         if var_name in var_set:
             raise BDDConstraintViolation(
                 f"multiple connections for {Q_BDD_SCENARIO_TASK_VARIABLE} '{var_name}'"
@@ -325,18 +327,18 @@ def process_bdd_scenario_from_data(
 
     # fluent clauses
     clauses_data = []
-    given_clauses_data = scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES]
+    given_clauses_data = scenario_data[FR_SCENARIO][FR_GIVEN]
     if not isinstance(given_clauses_data, list):
-        scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES] = [given_clauses_data]
-    clauses_data.extend(scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES])
+        scenario_data[FR_SCENARIO][FR_GIVEN] = [given_clauses_data]
+    clauses_data.extend(scenario_data[FR_SCENARIO][FR_GIVEN])
 
-    then_clauses_data = scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES]
+    then_clauses_data = scenario_data[FR_SCENARIO][FR_THEN]
     if not isinstance(then_clauses_data, list):
-        scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES] = [then_clauses_data]
-    clauses_data.extend(scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES])
+        scenario_data[FR_SCENARIO][FR_THEN] = [then_clauses_data]
+    clauses_data.extend(scenario_data[FR_SCENARIO][FR_THEN])
 
     for clause_data in clauses_data:
-        if Q_PREDICATE not in clause_data:
+        if FR_HOLDS not in clause_data:
             continue
         clause_id = clause_data[FR_NAME]
         if clause_id in fluent_dict:
@@ -344,14 +346,13 @@ def process_bdd_scenario_from_data(
         fluent_dict[clause_id] = clause_data
 
 
-def create_scenario_variations(scenario_data: dict, conn_dict: dict) -> Tuple[list, list]:
+def create_scenario_variations(scenario_data: dict, var_dict: dict) -> Tuple[list, list]:
     var_names = []
     entities_list = []
-    for conn_data in scenario_data[FR_VARIATIONS]:
-        conn_name = conn_data[FR_NAME]
-        var_name = conn_dict[conn_name][Q_OF_VARIABLE][FR_NAME]
+    for var_data in scenario_data[FR_VARIATIONS]:
+        var_name = var_data[FR_NAME]
         var_names.append(get_valid_var_name(var_name))
-        var_entities = conn_dict[conn_name][FR_ENTITIES]
+        var_entities = var_dict[var_name][FR_CAN_BE]
         if isinstance(var_entities, dict):
             entities_list.append([var_entities[FR_NAME]])
         elif isinstance(var_entities, list):
@@ -368,7 +369,7 @@ def create_scenario_variations(scenario_data: dict, conn_dict: dict) -> Tuple[li
 
 
 def process_bdd_us_from_data(us_data: dict):
-    conn_dict = {}
+    var_dict = {}
     fluent_dict = {}
     scene_dict = {
         FR_DATA: {},  # map from scene ID to scene data
@@ -382,12 +383,12 @@ def process_bdd_us_from_data(us_data: dict):
     # framing will include child concepts once for the same entity within one match,
     # so need to collect data for variable connections and fluent clauses to refer to later
     for scenario_data in us_data[FR_CRITERIA]:
-        process_bdd_scenario_from_data(scenario_data, conn_dict, var_set, fluent_dict, scene_dict)
+        process_bdd_scenario_from_data(scenario_data, var_dict, var_set, fluent_dict, scene_dict)
 
     for scenario_data in us_data[FR_CRITERIA]:
         # create variations for each scenario
-        scenario_data[FR_VARIABLES], scenario_data[FR_ENTITIES] = create_scenario_variations(
-            scenario_data, conn_dict
+        scenario_data[FR_VARIABLES], scenario_data[FR_CAN_BE] = create_scenario_variations(
+            scenario_data, var_dict
         )
 
     if len(scene_dict[FR_DATA]) > 0:
@@ -402,7 +403,7 @@ def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
     bdd_shacl_str = read_file_and_cache(
         join(META_MODELS_PATH, "acceptance-criteria", "bdd-shape-constraints.ttl")
     )
-    conforms, report_graph, report_text = pyshacl.validate(
+    conforms, _, report_text = pyshacl.validate(
         graph,
         shacl_graph=bdd_shacl_str,
         data_graph_format="json-ld",

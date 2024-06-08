@@ -27,14 +27,15 @@ from bdd_dsl.models.namespace import (
 )
 from bdd_dsl.models.queries import (
     Q_PREFIX_BDD,
+    Q_BDD_CAN_BE,
     Q_HAS_VARIATION,
-    Q_CAN_BE,
     Q_HAS_AC,
     Q_HAS_IN_SCENE,
     Q_OF_SCENARIO,
     Q_GIVEN,
     Q_WHEN,
     Q_THEN,
+    Q_BDD_HOLDS,
     Q_HAS_CLAUSE,
     Q_HAS_OBJECT,
     Q_HAS_WS,
@@ -92,10 +93,11 @@ FR_SCENARIO = "scenario"
 FR_GIVEN = "given"
 FR_WHEN = "when"
 FR_THEN = "then"
+FR_HOLDS = "holds"
 FR_CLAUSES = "clauses"
 FR_VARIATIONS = "variations"
 FR_VARIABLES = "variables"
-FR_ENTITIES = "entities"
+FR_CAN_BE = "can_be"
 FR_OBJECTS = "objects"
 FR_WS = "workspaces"
 FR_AGENTS = "agents"
@@ -160,13 +162,14 @@ BDD_FRAME = {
         FR_NAME: "@id",
         FR_TYPE: "@type",
         FR_VARIATIONS: Q_HAS_VARIATION,
-        FR_ENTITIES: Q_CAN_BE,
+        FR_CAN_BE: Q_BDD_CAN_BE,
         FR_CRITERIA: Q_HAS_AC,
         FR_SCENARIO: Q_OF_SCENARIO,
         FR_SCENE: Q_HAS_IN_SCENE,
         FR_GIVEN: Q_GIVEN,
         FR_WHEN: Q_WHEN,
         FR_THEN: Q_THEN,
+        FR_HOLDS: Q_BDD_HOLDS,
         FR_CLAUSES: Q_HAS_CLAUSE,
         FR_OBJECTS: Q_HAS_OBJECT,
         FR_WS: Q_HAS_WS,

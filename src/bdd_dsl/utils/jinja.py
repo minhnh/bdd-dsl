@@ -2,10 +2,10 @@
 from jinja2 import Environment, FileSystemLoader, Template
 from typing import List
 from bdd_dsl.models.queries import (
-    Q_PREDICATE,
     Q_BDD_PRED_LOCATED_AT,
     Q_BDD_PRED_IS_NEAR,
     Q_BDD_PRED_IS_HELD,
+    Q_BDD_HOLDS,
     Q_HAS_EVENT,
 )
 from bdd_dsl.models.frames import (
@@ -56,7 +56,7 @@ def extract_valid_ref_names(fluent_data: dict, ref_type: str) -> list:
 def clause_string_from_fluent_data(fluent_data: dict, feature_clauses) -> str:
     fluent_name = fluent_data[FR_NAME]
     fluent_data = feature_clauses[fluent_name]
-    clause_type = fluent_data[Q_PREDICATE][FR_TYPE]
+    clause_type = fluent_data[Q_BDD_HOLDS][FR_TYPE]
 
     object_names = extract_valid_ref_names(fluent_data, FR_OBJECTS)
     num_obj_refs = len(object_names)
