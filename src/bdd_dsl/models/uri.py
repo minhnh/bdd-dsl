@@ -1,6 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 URL_COMP_ROB2B = "https://comp-rob2b.github.io"
 URL_SESAME = "https://hbrs-sesame.github.io"
+URL_SECORO = "https://secorolab.github.io"
 
 URI_TRANS = f"{URL_SESAME}/transformations/"
 

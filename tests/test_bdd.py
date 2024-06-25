@@ -8,7 +8,7 @@ from bdd_dsl.models.frames import (
     FR_GIVEN,
     FR_THEN,
     FR_CLAUSES,
-    FR_FLUENT_DATA,
+    FR_CLAUSES_DATA,
 )
 from bdd_dsl.utils.jinja import (
     create_given_clauses_strings,
@@ -44,12 +44,12 @@ class BDD(unittest.TestCase):
 
             for scenario_data in us_data[FR_CRITERIA]:
                 given_clause_strings = create_given_clauses_strings(
-                    scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
+                    scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES], us_data[FR_CLAUSES_DATA]
                 )
                 self.assertTrue(len(given_clause_strings) > 0)
                 self.assertTrue(len(given_clause_strings) == len(scenario_data["given_clauses"]))
                 then_clause_strings = create_then_clauses_strings(
-                    scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
+                    scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES], us_data[FR_CLAUSES_DATA]
                 )
                 self.assertTrue(len(then_clause_strings) > 0)
                 self.assertTrue(len(then_clause_strings) == len(scenario_data["then_clauses"]))

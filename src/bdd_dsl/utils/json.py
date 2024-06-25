@@ -48,7 +48,8 @@ from bdd_dsl.models.frames import (
     FR_THEN,
     FR_CRITERIA,
     FR_SCENE,
-    FR_FLUENT_DATA,
+    FR_CLAUSES_DATA,
+    FR_FLUENTS,
     FR_VARIABLES,
     FR_CAN_BE,
     FR_VARIATIONS,
@@ -265,7 +266,7 @@ def get_bt_event_data_from_graph(graph: rdflib.Graph, bt_root_name: str = None) 
 
 def create_bt_from_graph(
     graph: rdflib.Graph,
-    bt_name: str = None,
+    bt_name: str,
     e_handler_cls: Type[EventHandler] = SimpleEventLoop,
     e_handler_kwargs: dict = {},
 ) -> List[Tuple]:
@@ -282,7 +283,7 @@ def create_bt_from_graph(
 
 
 def process_bdd_scenario_from_data(
-    scenario_data: dict, var_dict: dict, var_set: set, fluent_dict: dict, scene_dict: dict
+    scenario_data: dict, var_dict: dict, var_set: set, clause_dict: dict, scene_dict: dict
 ):
     scenario_name = scenario_data[FR_NAME]
 
@@ -340,10 +341,18 @@ def process_bdd_scenario_from_data(
     for clause_data in clauses_data:
         if FR_HOLDS not in clause_data:
             continue
+
+        # cache clause info
         clause_id = clause_data[FR_NAME]
-        if clause_id in fluent_dict:
+        if clause_id in clause_dict:
             continue
-        fluent_dict[clause_id] = clause_data
+        clause_dict[clause_id] = clause_data
+
+        # cache fluent info
+        fluent_id = clause_data[FR_HOLDS][FR_NAME]
+        if fluent_id in clause_dict[FR_FLUENTS]:
+            continue
+        clause_dict[FR_FLUENTS][fluent_id] = clause_data[FR_HOLDS]
 
 
 def create_scenario_variations(scenario_data: dict, var_dict: dict) -> Tuple[list, list]:
@@ -370,7 +379,7 @@ def create_scenario_variations(scenario_data: dict, var_dict: dict) -> Tuple[lis
 
 def process_bdd_us_from_data(us_data: dict):
     var_dict = {}
-    fluent_dict = {}
+    clause_dict = {FR_FLUENTS: {}}
     scene_dict = {
         FR_DATA: {},  # map from scene ID to scene data
         "scene-scenario-map": {},  # map from scene ID to scenario variant ID
@@ -383,7 +392,7 @@ def process_bdd_us_from_data(us_data: dict):
     # framing will include child concepts once for the same entity within one match,
     # so need to collect data for variable connections and fluent clauses to refer to later
     for scenario_data in us_data[FR_CRITERIA]:
-        process_bdd_scenario_from_data(scenario_data, var_dict, var_set, fluent_dict, scene_dict)
+        process_bdd_scenario_from_data(scenario_data, var_dict, var_set, clause_dict, scene_dict)
 
     for scenario_data in us_data[FR_CRITERIA]:
         # create variations for each scenario
@@ -393,7 +402,7 @@ def process_bdd_us_from_data(us_data: dict):
 
     if len(scene_dict[FR_DATA]) > 0:
         us_data[FR_SCENE] = scene_dict
-    us_data[FR_FLUENT_DATA] = fluent_dict
+    us_data[FR_CLAUSES_DATA] = clause_dict
     return us_data
 
 
@@ -416,6 +425,9 @@ def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
     bdd_result = query_graph(graph, BDD_QUERY)
     model_framed = jsonld.frame(bdd_result, BDD_FRAME)
 
+    assert isinstance(
+        model_framed, dict
+    ), f"expected framed model to be a dictionary, got type {type(model_framed)}"
     if FR_DATA in model_framed:
         return [process_bdd_us_from_data(us_data) for us_data in model_framed[FR_DATA]]
     return [process_bdd_us_from_data(model_framed)]

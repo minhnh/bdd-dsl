@@ -103,18 +103,18 @@ Q_PY_ARG_NAME = f"{Q_PREFIX_PY}:ArgName"
 Q_PY_ARG_VAL = f"{Q_PREFIX_PY}:ArgValue"
 
 # Task concepts and relations
-Q_PREFIX_TASK = "task"
+Q_PREFIX_TASK = "mm_task"
 Q_TASK_HAS_VARIATION = f"{Q_PREFIX_TASK}:has-variation"
 
 # Environment concepts and relations
 Q_ENV_HAS_OBJ = f"{PREFIX_ENV}:has-object"
 
 # Agent concepts and relations
-Q_PREFIX_AGENT = "agn"
+Q_PREFIX_AGENT = "mm_agn"
 Q_AGN_HAS_AGENT = f"{Q_PREFIX_AGENT}:has-agent"
 
 # BDD concepts & relations
-Q_PREFIX_BDD = "bdd"
+Q_PREFIX_BDD = "mm_bdd"
 Q_BDD_US = f"{Q_PREFIX_BDD}:UserStory"
 Q_BDD_SCENARIO = f"{Q_PREFIX_BDD}:Scenario"
 Q_BDD_SCENE_HAS_OBJ = f"{Q_PREFIX_BDD}:SceneHasObjects"

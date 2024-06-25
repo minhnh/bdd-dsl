@@ -28,7 +28,7 @@ PREFIX_GEOM_REL = "geom-rel"
 PREFIX_GEOM_COORD = "geom-coord"
 PREFIX_GEOM_EXT = "geom-ext"
 PREFIX_PROB = "prob"
-PREFIX_ENV = "env"
+PREFIX_ENV = "mm_env"
 
 PREFIX_TRANS = "trans"
 
