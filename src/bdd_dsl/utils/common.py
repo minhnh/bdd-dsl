@@ -48,7 +48,7 @@ def read_url_and_cache(url: str, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> str:
     if url in __URL_CONTENT_CACHE:
         return __URL_CONTENT_CACHE[url]
 
-    with urllib.request.urlopen(url, timeout) as f:
+    with urllib.request.urlopen(url, timeout=timeout) as f:
         url_content = f.read()
 
     if isinstance(url_content, bytes):

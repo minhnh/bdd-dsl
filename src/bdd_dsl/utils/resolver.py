@@ -1,5 +1,6 @@
 # Inspired by https://github.com/comp-rob2b/kindyngen/ (kindyngen.utility.resolver)
 # SPDX-License-Identifier: MPL-2.0
+from socket import _GLOBAL_DEFAULT_TIMEOUT
 from typing import Optional
 from os.path import join
 import platformdirs
@@ -33,7 +34,7 @@ class IriToFileResolver(urllib.request.OpenerDirector):
         self._download = download
         self._empty_header = EmailMessage()  # header expected by addinfourl
 
-    def open(self, fullurl, data=None, timeout=None):
+    def open(self, fullurl, data=None, timeout=_GLOBAL_DEFAULT_TIMEOUT):
         if isinstance(fullurl, str):
             url_req = urllib.request.Request(fullurl)
             url_req.add_header("User-Agent", f"bdd-dsl/{BDD_DSL_VERSION}")
@@ -66,7 +67,7 @@ class IriToFileResolver(urllib.request.OpenerDirector):
                     parent_path.mkdir(parents=True)
                 assert parent_path.is_dir(), f"not a directory: {parent_path}"
 
-                with self.default_opener.open(url_req, data, timeout) as url_data:
+                with self.default_opener.open(url_req, data=data, timeout=timeout) as url_data:
                     with path.open("wb") as cache_file:
                         cache_file.write(url_data.read())
                 assert path.exists(), f"File '{path}' not cached for URL '{url_req.full_url}'"
@@ -80,7 +81,7 @@ class IriToFileResolver(urllib.request.OpenerDirector):
 
         # If we did not find any match above just continue with the default opener
         # which has the behaviour as initially expected by rdflib.
-        return self.default_opener.open(url_req, data, timeout)
+        return self.default_opener.open(url_req, data=data, timeout=timeout)
 
 
 def install_resolver(
