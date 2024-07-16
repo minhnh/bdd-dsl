@@ -1,10 +1,9 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-import glob
 from importlib import import_module
-from typing import List, Tuple, Type, Union
+from typing import List, Optional, Tuple, Type, Union
+from socket import _GLOBAL_DEFAULT_TIMEOUT
 import itertools
 import json
-from os.path import join
 import numpy as np
 from pyld import jsonld
 import pyshacl
@@ -12,23 +11,19 @@ import py_trees as pt
 import rdflib
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
-from bdd_dsl import META_MODELS_PATH
 from bdd_dsl.models.queries import (
     EVENT_LOOP_QUERY,
     BEHAVIOUR_TREE_QUERY,
-    BDD_QUERY,
     OBJ_POSE_COORD_QUERY,
     Q_BT_SEQUENCE,
     Q_BT_PARALLEL,
-    Q_OF_VARIABLE,
     Q_BDD_SCENARIO_VARIANT,
     Q_BDD_SCENARIO_TASK_VARIABLE,
-    Q_PREDICATE,
 )
 from bdd_dsl.models.frames import (
     EVENT_LOOP_FRAME,
     BEHAVIOUR_TREE_FRAME,
-    BDD_FRAME,
+    FR_HOLDS,
     OBJ_POSE_FRAME,
     FR_NAME,
     FR_DATA,
@@ -47,12 +42,12 @@ from bdd_dsl.models.frames import (
     FR_SCENARIO,
     FR_GIVEN,
     FR_THEN,
-    FR_CLAUSES,
     FR_CRITERIA,
     FR_SCENE,
-    FR_FLUENT_DATA,
+    FR_CLAUSES_DATA,
+    FR_FLUENTS,
     FR_VARIABLES,
-    FR_ENTITIES,
+    FR_CAN_BE,
     FR_VARIATIONS,
     FR_BODY,
     FR_POSE,
@@ -65,6 +60,7 @@ from bdd_dsl.models.frames import (
     FR_UPPER,
     FR_LOWER,
 )
+from bdd_dsl.models.uri import URL_SECORO_M, URL_SECORO_MM
 from bdd_dsl.models.urirefs import (
     URI_GEOM_POSE_FROM_POS_ORN,
     URI_PROB_SAMPLED_QUANTITY,
@@ -74,20 +70,35 @@ from bdd_dsl.models.urirefs import (
 )
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.exception import BDDConstraintViolation, SHACLViolation
-from bdd_dsl.utils.common import get_valid_var_name, read_file_and_cache
+from bdd_dsl.utils.common import get_valid_var_name, read_file_and_cache, read_url_and_cache
 
 
-def load_metamodels() -> rdflib.Graph:
-    graph = rdflib.Graph()
-    mm_files = glob.glob(join(META_MODELS_PATH, "**", "*.json"), recursive=True)
-    for mm_file in mm_files:
-        graph.parse(mm_file, format="json-ld")
+__BDD_SHACL_URLS = {
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd-shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/time-shacl.ttl": "turtle",
+}
+__BDD_QUERY_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/user-story.rq"
+__BDD_FRAME_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/frames/user-story.frame.json"
+
+
+def load_bdd_shacl_constraints() -> rdflib.Graph:
+    """Load BDD SHACL constraints into an `rdflib.Graph`.
+
+    If `bdd_dsl.utils.resolver.IriToFileResolver` is installed, this will cache files to
+    the user's cache directory (e.g. `$HOME/.cache/bdd-dsl` in Linux).
+    """
+    graph = rdflib.ConjunctiveGraph()
+    for mm_url, fmt in __BDD_SHACL_URLS.items():
+        graph.parse(mm_url, format=fmt)
     return graph
 
 
 def query_graph(graph: rdflib.Graph, query_str: str) -> dict:
     res = graph.query(query_str)
-    res_json = json.loads(res.serialize(format="json-ld"))
+    res_serialized = res.serialize(format="json-ld")
+    assert res_serialized is not None
+
+    res_json = json.loads(res_serialized)
     transformed_model = {"@graph": res_json}
     return transformed_model
 
@@ -97,10 +108,25 @@ def query_graph_with_file(graph: rdflib.Graph, query_file: str):
     return query_graph(graph, query_str)
 
 
-def frame_model_with_file(model: dict, frame_file: str):
+def query_graph_with_url(graph: rdflib.Graph, url: str, timeout=_GLOBAL_DEFAULT_TIMEOUT):
+    query_str = read_url_and_cache(url, timeout=timeout)
+    return query_graph(graph, query_str)
+
+
+def frame_model_with_file(model: dict, frame_file: str) -> dict:
     frame_str = read_file_and_cache(frame_file)
     frame_dict = json.loads(frame_str)
-    return jsonld.frame(model, frame_dict)
+    framed_res = jsonld.frame(model, frame_dict)
+    assert isinstance(framed_res, dict)
+    return framed_res
+
+
+def frame_model_with_url(model: dict, url: str, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> dict:
+    frame_str = read_url_and_cache(url, timeout=timeout)
+    frame_dict = json.loads(frame_str)
+    framed_res = jsonld.frame(model, frame_dict)
+    assert isinstance(framed_res, dict)
+    return framed_res
 
 
 def get_type_set(data: dict) -> set:
@@ -121,6 +147,8 @@ def get_type_set(data: dict) -> set:
 def get_el_conn_event_names(graph: rdflib.Graph, el_conn_id: str) -> Union[List[str], None]:
     model = query_graph(graph, EVENT_LOOP_QUERY)
     framed_model = jsonld.frame(model, EVENT_LOOP_FRAME)
+
+    assert isinstance(framed_model, dict), f"unexpected type for framed model: {type(framed_model)}"
 
     # single match
     if FR_DATA not in framed_model:
@@ -160,6 +188,8 @@ def create_event_handler_from_graph(
 ) -> list:
     model = query_graph(graph, EVENT_LOOP_QUERY)
     framed_model = jsonld.frame(model, EVENT_LOOP_FRAME)
+
+    assert isinstance(framed_model, dict), f"unexpected type for framed model: {type(framed_model)}"
 
     if FR_DATA in framed_model:
         # multiple matches
@@ -239,13 +269,15 @@ def create_subtree_behaviours(
     return subtree_root
 
 
-def get_bt_event_data_from_graph(graph: rdflib.Graph, bt_root_name: str = None) -> List[tuple]:
+def get_bt_event_data_from_graph(
+    graph: rdflib.Graph, bt_root_name: Optional[str] = None
+) -> List[tuple]:
     bt_model = query_graph(graph, BEHAVIOUR_TREE_QUERY)
     bt_model_framed = jsonld.frame(bt_model, BEHAVIOUR_TREE_FRAME)
 
-    from pprint import pprint
-
-    pprint(bt_model_framed)
+    assert isinstance(
+        bt_model_framed, dict
+    ), f"unexpected type for framed model: {type(bt_model_framed)}"
 
     if FR_DATA not in bt_model_framed:
         if bt_root_name is not None and bt_model_framed[FR_NAME] != bt_root_name:
@@ -265,7 +297,7 @@ def get_bt_event_data_from_graph(graph: rdflib.Graph, bt_root_name: str = None) 
 
 def create_bt_from_graph(
     graph: rdflib.Graph,
-    bt_name: str = None,
+    bt_name: str,
     e_handler_cls: Type[EventHandler] = SimpleEventLoop,
     e_handler_kwargs: dict = {},
 ) -> List[Tuple]:
@@ -282,12 +314,15 @@ def create_bt_from_graph(
 
 
 def process_bdd_scenario_from_data(
-    scenario_data: dict, conn_dict: dict, var_set: set, fluent_dict: dict, scene_dict: dict
+    scenario_data: dict, var_dict: dict, var_set: set, clause_dict: dict, scene_dict: dict
 ):
     scenario_name = scenario_data[FR_NAME]
 
     # scene TODO(minhnh): for some reason agents are not showing up in the query result
     if FR_SCENE in scenario_data:
+        if not isinstance(scenario_data[FR_SCENE], list):
+            scenario_data[FR_SCENE] = [scenario_data[FR_SCENE]]
+
         for scene_data in scenario_data[FR_SCENE]:
             scene_name = scene_data[FR_NAME]
             # one scene can be shared by multiple scenarios
@@ -311,12 +346,11 @@ def process_bdd_scenario_from_data(
         raise BDDConstraintViolation(
             f"{Q_BDD_SCENARIO_VARIANT} '{scenario_name}' has no connection"
         )
-    for conn_data in scenario_data[FR_VARIATIONS]:
-        if FR_ENTITIES not in conn_data:
+    for var_data in scenario_data[FR_VARIATIONS]:
+        if FR_CAN_BE not in var_data:
             continue
-        conn_name = conn_data[FR_NAME]
-        conn_dict[conn_name] = conn_data
-        var_name = conn_data[Q_OF_VARIABLE][FR_NAME]
+        var_name = var_data[FR_NAME]
+        var_dict[var_name] = var_data
         if var_name in var_set:
             raise BDDConstraintViolation(
                 f"multiple connections for {Q_BDD_SCENARIO_TASK_VARIABLE} '{var_name}'"
@@ -325,33 +359,40 @@ def process_bdd_scenario_from_data(
 
     # fluent clauses
     clauses_data = []
-    given_clauses_data = scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES]
+    given_clauses_data = scenario_data[FR_SCENARIO][FR_GIVEN]
     if not isinstance(given_clauses_data, list):
-        scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES] = [given_clauses_data]
-    clauses_data.extend(scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES])
+        scenario_data[FR_SCENARIO][FR_GIVEN] = [given_clauses_data]
+    clauses_data.extend(scenario_data[FR_SCENARIO][FR_GIVEN])
 
-    then_clauses_data = scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES]
+    then_clauses_data = scenario_data[FR_SCENARIO][FR_THEN]
     if not isinstance(then_clauses_data, list):
-        scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES] = [then_clauses_data]
-    clauses_data.extend(scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES])
+        scenario_data[FR_SCENARIO][FR_THEN] = [then_clauses_data]
+    clauses_data.extend(scenario_data[FR_SCENARIO][FR_THEN])
 
     for clause_data in clauses_data:
-        if Q_PREDICATE not in clause_data:
+        if FR_HOLDS not in clause_data:
             continue
+
+        # cache clause info
         clause_id = clause_data[FR_NAME]
-        if clause_id in fluent_dict:
+        if clause_id in clause_dict:
             continue
-        fluent_dict[clause_id] = clause_data
+        clause_dict[clause_id] = clause_data
+
+        # cache fluent info
+        fluent_id = clause_data[FR_HOLDS][FR_NAME]
+        if fluent_id in clause_dict[FR_FLUENTS]:
+            continue
+        clause_dict[FR_FLUENTS][fluent_id] = clause_data[FR_HOLDS]
 
 
-def create_scenario_variations(scenario_data: dict, conn_dict: dict) -> Tuple[list, list]:
+def create_scenario_variations(scenario_data: dict, var_dict: dict) -> Tuple[list, list]:
     var_names = []
     entities_list = []
-    for conn_data in scenario_data[FR_VARIATIONS]:
-        conn_name = conn_data[FR_NAME]
-        var_name = conn_dict[conn_name][Q_OF_VARIABLE][FR_NAME]
+    for var_data in scenario_data[FR_VARIATIONS]:
+        var_name = var_data[FR_NAME]
         var_names.append(get_valid_var_name(var_name))
-        var_entities = conn_dict[conn_name][FR_ENTITIES]
+        var_entities = var_dict[var_name][FR_CAN_BE]
         if isinstance(var_entities, dict):
             entities_list.append([var_entities[FR_NAME]])
         elif isinstance(var_entities, list):
@@ -368,8 +409,8 @@ def create_scenario_variations(scenario_data: dict, conn_dict: dict) -> Tuple[li
 
 
 def process_bdd_us_from_data(us_data: dict):
-    conn_dict = {}
-    fluent_dict = {}
+    var_dict = {}
+    clause_dict = {FR_FLUENTS: {}}
     scene_dict = {
         FR_DATA: {},  # map from scene ID to scene data
         "scene-scenario-map": {},  # map from scene ID to scenario variant ID
@@ -382,29 +423,27 @@ def process_bdd_us_from_data(us_data: dict):
     # framing will include child concepts once for the same entity within one match,
     # so need to collect data for variable connections and fluent clauses to refer to later
     for scenario_data in us_data[FR_CRITERIA]:
-        process_bdd_scenario_from_data(scenario_data, conn_dict, var_set, fluent_dict, scene_dict)
+        process_bdd_scenario_from_data(scenario_data, var_dict, var_set, clause_dict, scene_dict)
 
     for scenario_data in us_data[FR_CRITERIA]:
         # create variations for each scenario
-        scenario_data[FR_VARIABLES], scenario_data[FR_ENTITIES] = create_scenario_variations(
-            scenario_data, conn_dict
+        scenario_data[FR_VARIABLES], scenario_data[FR_CAN_BE] = create_scenario_variations(
+            scenario_data, var_dict
         )
 
     if len(scene_dict[FR_DATA]) > 0:
         us_data[FR_SCENE] = scene_dict
-    us_data[FR_FLUENT_DATA] = fluent_dict
+    us_data[FR_CLAUSES_DATA] = clause_dict
     return us_data
 
 
-def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
+def process_bdd_us_from_graph(graph: rdflib.Graph, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> List:
     """Query and process all UserStory in the JSON-LD graph"""
     # checking conformance against SHACL shape constraints
-    bdd_shacl_str = read_file_and_cache(
-        join(META_MODELS_PATH, "acceptance-criteria", "bdd-shape-constraints.ttl")
-    )
-    conforms, report_graph, report_text = pyshacl.validate(
+    shacl_g = load_bdd_shacl_constraints()
+    conforms, _, report_text = pyshacl.validate(
         graph,
-        shacl_graph=bdd_shacl_str,
+        shacl_graph=shacl_g,
         data_graph_format="json-ld",
         shacl_graph_format="ttl",
         inference="rdfs",
@@ -412,9 +451,12 @@ def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
     if not conforms:
         raise SHACLViolation(report_text)
 
-    bdd_result = query_graph(graph, BDD_QUERY)
-    model_framed = jsonld.frame(bdd_result, BDD_FRAME)
+    bdd_result = query_graph_with_url(graph, __BDD_QUERY_US_URL, timeout=timeout)
+    model_framed = frame_model_with_url(bdd_result, __BDD_FRAME_US_URL, timeout=timeout)
 
+    assert isinstance(
+        model_framed, dict
+    ), f"expected framed model to be a dictionary, got type {type(model_framed)}"
     if FR_DATA in model_framed:
         return [process_bdd_us_from_data(us_data) for us_data in model_framed[FR_DATA]]
     return [process_bdd_us_from_data(model_framed)]
@@ -487,6 +529,9 @@ def get_object_poses(graph: rdflib.Graph) -> dict:
     """Return a dictionary of object mapping to poses."""
     transformed_model = query_graph(graph, OBJ_POSE_COORD_QUERY)
     framed_model = jsonld.frame(transformed_model, OBJ_POSE_FRAME)
+
+    assert isinstance(framed_model, dict), f"unexpected type for framed model: {type(framed_model)}"
+
     objects_data = framed_model[FR_DATA]
     if isinstance(objects_data, dict):
         raise RuntimeError("single result not handled")

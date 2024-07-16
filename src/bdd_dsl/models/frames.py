@@ -6,11 +6,9 @@ from bdd_dsl.models.uri import (
     URI_MM_GEOM_COORD,
     URI_MM_GEOM_EXT,
     URI_MM_PROB,
-    URI_MM_BDD,
     URI_MM_EVENT,
     URI_MM_BT,
     URI_M_CRDN,
-    URI_M_BDD,
     URI_M_ENV,
     URI_M_AGENT,
     URI_M_SIM,
@@ -26,19 +24,6 @@ from bdd_dsl.models.namespace import (
     NS_MANAGER,
 )
 from bdd_dsl.models.queries import (
-    Q_PREFIX_BDD,
-    Q_HAS_VARIATION,
-    Q_CAN_BE,
-    Q_HAS_AC,
-    Q_HAS_IN_SCENE,
-    Q_OF_SCENARIO,
-    Q_GIVEN,
-    Q_WHEN,
-    Q_THEN,
-    Q_HAS_CLAUSE,
-    Q_HAS_OBJECT,
-    Q_HAS_WS,
-    Q_HAS_AGENT,
     Q_HAS_EVENT,
     Q_HAS_ROOT,
     Q_HAS_EL_CONN,
@@ -92,14 +77,19 @@ FR_SCENARIO = "scenario"
 FR_GIVEN = "given"
 FR_WHEN = "when"
 FR_THEN = "then"
+FR_HOLDS = "holds"
 FR_CLAUSES = "clauses"
 FR_VARIATIONS = "variations"
 FR_VARIABLES = "variables"
-FR_ENTITIES = "entities"
+FR_VAR_OBJ = "var_obj"
+FR_VAR_WS = "var_ws"
+FR_VAR_AGN = "var_agn"
+FR_CAN_BE = "can_be"
 FR_OBJECTS = "objects"
 FR_WS = "workspaces"
 FR_AGENTS = "agents"
-FR_FLUENT_DATA = "fluent_data"
+FR_CLAUSES_DATA = "clauses_data"
+FR_FLUENTS = "fluents"
 FR_BODY = "body"
 FR_FRAME = "frame"
 FR_POSE = "pose"
@@ -145,34 +135,6 @@ BEHAVIOUR_TREE_FRAME = {
         FR_IMPL_ARG_VALS: Q_IMPL_ARG_VALUE,
     },
     FR_DATA: {FR_EL: {}},
-}
-
-BDD_FRAME = {
-    "@context": {
-        "@base": URI_M_BDD,
-        PREFIX_TRANS: URI_TRANS,
-        Q_PREFIX_EVENT: URI_MM_EVENT,
-        Q_PREFIX_BDD: URI_MM_BDD,
-        PREFIX_ENV: URI_M_ENV,
-        "agn": URI_M_AGENT,
-        f"{Q_PREFIX_EVENT}m": URI_M_CRDN,
-        FR_DATA: "@graph",
-        FR_NAME: "@id",
-        FR_TYPE: "@type",
-        FR_VARIATIONS: Q_HAS_VARIATION,
-        FR_ENTITIES: Q_CAN_BE,
-        FR_CRITERIA: Q_HAS_AC,
-        FR_SCENARIO: Q_OF_SCENARIO,
-        FR_SCENE: Q_HAS_IN_SCENE,
-        FR_GIVEN: Q_GIVEN,
-        FR_WHEN: Q_WHEN,
-        FR_THEN: Q_THEN,
-        FR_CLAUSES: Q_HAS_CLAUSE,
-        FR_OBJECTS: Q_HAS_OBJECT,
-        FR_WS: Q_HAS_WS,
-        FR_AGENTS: Q_HAS_AGENT,
-    },
-    FR_DATA: {FR_CRITERIA: {}},
 }
 
 OBJ_POSE_FRAME = {
