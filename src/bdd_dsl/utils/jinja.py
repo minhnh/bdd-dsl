@@ -22,22 +22,31 @@ from bdd_dsl.models.frames import (
     FR_HOLDS,
     FR_CLAUSES_DATA,
 )
-from bdd_dsl.utils.common import get_valid_var_name
+from bdd_dsl.utils.common import get_valid_var_name, read_file_and_cache, read_url_and_cache
 from bdd_dsl.exception import BDDConstraintViolation
 
 
-def _load_template(template_name: str, env: Environment) -> Template:
-    return env.get_template(template_name)
+def load_template_from_file(file_path: str) -> Template:
+    """Create template instance from text content of a file.
+
+    Not using Jinja's environment loading mechanism may break more advanced features like
+    template inheritance and filters.
+    """
+    return Template(read_file_and_cache(file_path), autoescape=True)
+
+
+def load_template_from_url(url: str) -> Template:
+    """Create template instance by downloading a remote template URL.
+
+    Not using Jinja's environment loading mechanism may break more advanced features like
+    template inheritance and filters.
+    """
+    return Template(read_url_and_cache(url), autoescape=True)
 
 
 def load_template(template_name: str, dir_name: str) -> Template:
     env = Environment(loader=FileSystemLoader(dir_name), autoescape=True)
-    return _load_template(template_name, env)
-
-
-def load_templates(template_names: List[str], dir_name: str) -> List[Template]:
-    env = Environment(loader=FileSystemLoader(dir_name), autoescape=True)
-    return [_load_template(name, env) for name in template_names]
+    return env.get_template(template_name)
 
 
 def extract_valid_ref_names(clause_data: dict, ref_type: str) -> list:

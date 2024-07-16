@@ -249,12 +249,10 @@ the library's Python API:
 
 ```python
 from pyld import jsonld
-from bdd_dsl.models.queries import BDD_QUERY
-from bdd_dsl.models.frames import BDD_FRAME
-from bdd_dsl.utils.json import query_graph, process_bdd_us_from_graph
+from bdd_dsl.utils.json import query_graph_with_url, frame_model_with_url, process_bdd_us_from_graph
 
-bdd_result = query_graph(g, BDD_QUERY)
-model_framed = jsonld.frame(bdd_result, BDD_FRAME)
+bdd_result = query_graph_with_url(graph, "https://secorolab.github.io/models/acceptance-criteria/bdd/queries/user-story.rq")
+model_framed = frame_model_with_url(bdd_result, "https://secorolab.github.io/models/acceptance-criteria/bdd/frames/user-story.frame.json")
 
 # alternatively, there's also an utility function that executes the above
 # as well as doing some further cleanup of the result

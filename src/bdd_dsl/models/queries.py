@@ -2,13 +2,9 @@
 from bdd_dsl.models.namespace import PREFIX_TRANS, PREFIX_ENV
 from bdd_dsl.models.uri import (
     URI_TRANS,
-    URI_MM_BDD,
     URI_MM_EVENT,
     URI_MM_BT,
     URI_MM_PY,
-    URI_MM_TASK,
-    URI_MM_ENV,
-    URI_MM_AGENT,
 )
 from bdd_dsl.models.urirefs import (
     URI_GEOM_RIGID_BODY,
@@ -44,18 +40,6 @@ from bdd_dsl.models.urirefs import (
 )
 
 # transformation concepts and relations
-Q_HAS_AC = f"{PREFIX_TRANS}:has-criteria"
-Q_OF_SCENARIO = f"{PREFIX_TRANS}:of-scenario"
-Q_OF_VARIABLE = f"{PREFIX_TRANS}:of-variable"
-Q_HAS_VARIATION = f"{PREFIX_TRANS}:has-variation"
-Q_HAS_IN_SCENE = f"{PREFIX_TRANS}:has-in-scene"
-Q_GIVEN = f"{PREFIX_TRANS}:given"
-Q_WHEN = f"{PREFIX_TRANS}:when"
-Q_THEN = f"{PREFIX_TRANS}:then"
-Q_HAS_CLAUSE = f"{PREFIX_TRANS}:has-clause"
-Q_HAS_OBJECT = f"{PREFIX_TRANS}:has-object"
-Q_HAS_WS = f"{PREFIX_TRANS}:has-workspace"
-Q_HAS_AGENT = f"{PREFIX_TRANS}:has-agent"
 Q_HAS_EVENT = f"{PREFIX_TRANS}:has-event"
 Q_HAS_EL_CONN = f"{PREFIX_TRANS}:has-el-conn"
 Q_HAS_ROOT = f"{PREFIX_TRANS}:has-root"
@@ -101,17 +85,6 @@ Q_PY_MODULE = f"{Q_PREFIX_PY}:module"
 Q_PY_CLASS = f"{Q_PREFIX_PY}:class-name"
 Q_PY_ARG_NAME = f"{Q_PREFIX_PY}:ArgName"
 Q_PY_ARG_VAL = f"{Q_PREFIX_PY}:ArgValue"
-
-# Task concepts and relations
-Q_PREFIX_TASK = "mm_task"
-Q_TASK_HAS_VARIATION = f"{Q_PREFIX_TASK}:has-variation"
-
-# Environment concepts and relations
-Q_ENV_HAS_OBJ = f"{PREFIX_ENV}:has-object"
-
-# Agent concepts and relations
-Q_PREFIX_AGENT = "mm_agn"
-Q_AGN_HAS_AGENT = f"{Q_PREFIX_AGENT}:has-agent"
 
 # BDD concepts & relations
 Q_PREFIX_BDD = "mm_bdd"
@@ -222,83 +195,6 @@ WHERE {{
         }}
     }}
 
-}}
-"""
-
-BDD_QUERY = f"""
-PREFIX {PREFIX_TRANS}: <{URI_TRANS}>
-PREFIX {Q_PREFIX_TASK}: <{URI_MM_TASK}>
-PREFIX {PREFIX_ENV}: <{URI_MM_ENV}>
-PREFIX {Q_PREFIX_AGENT}: <{URI_MM_AGENT}>
-PREFIX {Q_PREFIX_BDD}: <{URI_MM_BDD}>
-
-CONSTRUCT {{
-    ?us {Q_HAS_AC} ?scenarioVar .
-    ?scenarioVar
-        {Q_OF_SCENARIO} ?scenario ;
-        {Q_HAS_IN_SCENE} ?scene ;
-        {Q_HAS_VARIATION} ?variation .
-    ?scenario
-        {Q_GIVEN} ?given ;
-        {Q_WHEN} ?when ;
-        {Q_THEN} ?then .
-    ?when {Q_HAS_EVENT} ?event .
-    ?scene a ?sceneType ;
-        {Q_HAS_OBJECT} ?scenarioObject ;
-        {Q_HAS_AGENT} ?scenarioAgent .
-    ?variation
-        {Q_OF_VARIABLE} ?variable ;
-        {Q_BDD_CAN_BE} ?entity .
-    ?clauseOrigin {Q_HAS_CLAUSE} ?clause .
-    ?clause
-        {Q_BDD_HOLDS} ?predicate ;
-        {Q_HAS_OBJECT} ?taskObject ;
-        {Q_HAS_WS} ?taskWorkspace ;
-        {Q_HAS_AGENT} ?taskAgent .
-    ?predicate a ?predicateType .
-}}
-WHERE {{
-    ?us a {Q_BDD_US} ;
-        {Q_BDD_HAS_AC} ?scenarioVar .
-    ?scenarioVar a {Q_BDD_SCENARIO_VARIANT} ;
-        {Q_BDD_OF_SCENARIO} ?scenario ;
-        {Q_BDD_HAS_IN_SCENE} ?scene ;
-        {Q_TASK_HAS_VARIATION} ?variation .
-
-    ?scenario a {Q_BDD_SCENARIO} ;
-        {Q_BDD_GIVEN} ?given ;
-        {Q_BDD_WHEN} ?when ;
-        {Q_BDD_THEN} ?then .
-
-    ?scene a ?sceneType .
-    OPTIONAL {{
-        ?scene a {Q_BDD_SCENE_HAS_OBJ} ;
-            {Q_BDD_OF_SCENARIO} ?scenario ;
-            {Q_ENV_HAS_OBJ} ?scenarioObject .
-    }}
-    OPTIONAL {{
-        ?scene a {Q_BDD_SCENE_HAS_AGN} ;
-            {Q_BDD_OF_SCENARIO} ?scenario ;
-            {Q_AGN_HAS_AGENT} ?scenarioAgent .
-    }}
-
-    ?variation
-        {Q_BDD_OF_VARIABLE} ?variable ;
-        {Q_BDD_CAN_BE} ?entity .
-
-    ?variable a {Q_BDD_SCENARIO_TASK_VARIABLE} .
-    ?when a {Q_BDD_WHEN_CLAUSE} .
-
-    OPTIONAL {{ ?when ^{Q_BDD_OF_CLAUSE} / {Q_CRDN_HAS_EVENT} ?event }}
-
-    ?clause a {Q_BDD_FLUENT_CLAUSE} ;
-        {Q_BDD_HOLDS} ?predicate ;
-        {Q_BDD_CLAUSE_OF} ?clauseOrigin .
-    OPTIONAL {{ ?clause {Q_BDD_REF_OBJECT} ?taskObject }}
-    OPTIONAL {{ ?clause {Q_BDD_REF_WS} ?taskWorkspace }}
-    OPTIONAL {{ ?clause {Q_BDD_REF_AGENT} ?taskAgent }}
-
-    ?predicate a ?predicateType ;
 }}
 """
 
