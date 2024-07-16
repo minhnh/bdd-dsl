@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from bdd_dsl.models.namespace import PREFIX_TRANS, PREFIX_ENV
+from bdd_dsl.models.namespace import PREFIX_TRANS
 from bdd_dsl.models.uri import (
     URI_TRANS,
     URI_MM_EVENT,
