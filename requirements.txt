@@ -1,5 +1,7 @@
+numpy
 rdflib
 pyld
 pyshacl
 jinja2
 platformdirs
+py_trees

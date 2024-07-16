@@ -20,11 +20,13 @@ classifiers = [
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
 ]
 dependencies = [
+  'numpy',
   'rdflib',
   'pyld',
   'pyshacl',
   'jinja2',
   'platformdirs',
+  'py_trees',
 ]
 
 [project.urls]
