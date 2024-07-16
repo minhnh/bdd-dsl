@@ -24,6 +24,7 @@ dependencies = [
   'pyld',
   'pyshacl',
   'jinja2',
+  'platformdirs',
 ]
 
 [project.urls]

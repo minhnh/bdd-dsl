@@ -2,3 +2,4 @@ rdflib
 pyld
 pyshacl
 jinja2
+platformdirs
