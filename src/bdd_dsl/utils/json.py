@@ -1,6 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from importlib import import_module
 from typing import List, Optional, Tuple, Type, Union
+from socket import _GLOBAL_DEFAULT_TIMEOUT
 import itertools
 import json
 import numpy as np
@@ -107,8 +108,8 @@ def query_graph_with_file(graph: rdflib.Graph, query_file: str):
     return query_graph(graph, query_str)
 
 
-def query_graph_with_url(graph: rdflib.Graph, url: str):
-    query_str = read_url_and_cache(url)
+def query_graph_with_url(graph: rdflib.Graph, url: str, timeout=_GLOBAL_DEFAULT_TIMEOUT):
+    query_str = read_url_and_cache(url, timeout=timeout)
     return query_graph(graph, query_str)
 
 
@@ -120,8 +121,8 @@ def frame_model_with_file(model: dict, frame_file: str) -> dict:
     return framed_res
 
 
-def frame_model_with_url(model: dict, url: str) -> dict:
-    frame_str = read_url_and_cache(url)
+def frame_model_with_url(model: dict, url: str, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> dict:
+    frame_str = read_url_and_cache(url, timeout=timeout)
     frame_dict = json.loads(frame_str)
     framed_res = jsonld.frame(model, frame_dict)
     assert isinstance(framed_res, dict)
@@ -436,7 +437,7 @@ def process_bdd_us_from_data(us_data: dict):
     return us_data
 
 
-def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
+def process_bdd_us_from_graph(graph: rdflib.Graph, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> List:
     """Query and process all UserStory in the JSON-LD graph"""
     # checking conformance against SHACL shape constraints
     shacl_g = load_bdd_shacl_constraints()
@@ -450,8 +451,8 @@ def process_bdd_us_from_graph(graph: rdflib.Graph) -> List:
     if not conforms:
         raise SHACLViolation(report_text)
 
-    bdd_result = query_graph_with_url(graph, __BDD_QUERY_US_URL)
-    model_framed = frame_model_with_url(bdd_result, __BDD_FRAME_US_URL)
+    bdd_result = query_graph_with_url(graph, __BDD_QUERY_US_URL, timeout=timeout)
+    model_framed = frame_model_with_url(bdd_result, __BDD_FRAME_US_URL, timeout=timeout)
 
     assert isinstance(
         model_framed, dict

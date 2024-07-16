@@ -35,7 +35,7 @@ class BDD(unittest.TestCase):
             self.graph.parse(url, format=fmt)
 
     def test_bdd(self):
-        bdd_result = process_bdd_us_from_graph(self.graph)
+        bdd_result = process_bdd_us_from_graph(self.graph, timeout=10)
         self.assertIsInstance(bdd_result, list)
         for us_data in bdd_result:
             prepare_gherkin_feature_data(us_data)

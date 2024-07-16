@@ -1,6 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import re
 import signal
+from socket import _GLOBAL_DEFAULT_TIMEOUT
 import urllib.request
 from importlib.metadata import version
 
@@ -38,11 +39,11 @@ def read_file_and_cache(filepath: str) -> str:
     return file_content
 
 
-def read_url_and_cache(url: str, timeout=None) -> str:
+def read_url_and_cache(url: str, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> str:
     """Read and cache text responses from URL
 
     `timeout` specifies duration in seconds to wait for response. Only works for HTTP, HTTPS & FTP.
-    A 'None' value means `socket._GLOBAL_DEFAULT_TIMEOUT` will be used, which usually means no timeout.
+    By default `socket._GLOBAL_DEFAULT_TIMEOUT` will be used, which usually means no timeout.
     """
     if url in __URL_CONTENT_CACHE:
         return __URL_CONTENT_CACHE[url]
