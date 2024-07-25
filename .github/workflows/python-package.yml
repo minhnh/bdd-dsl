@@ -22,16 +22,17 @@ jobs:
     - name: Checkout rdf-utils
       uses: actions/checkout@v4
       with:
-        name: minhnh/rdf-utils
+        repository: minhnh/rdf-utils
         ref: main
+        path: rdf-utils
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-      working-directory: ${{ vars.GITHUB_WORKSPACE }}/rdf-utils
+      working-directory: ./rdf-utils
     - name: Install rdf-utils package
       run: pip install .
-      working-directory: ${{ vars.GITHUB_WORKSPACE }}/rdf-utils
+      working-directory: ./rdf-utils
     - uses: actions/checkout@v4
       with:
         submodules: true
