@@ -1,9 +1,8 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-URL_COMP_ROB2B = "https://comp-rob2b.github.io"
+from rdf_utils.uri import URL_COMP_ROB2B, URL_SECORO, URL_SECORO_MM, URL_SECORO_M
+
+
 URL_SESAME = "https://hbrs-sesame.github.io"
-URL_SECORO = "https://secorolab.github.io"
-URL_SECORO_MM = f"{URL_SECORO}/metamodels"
-URL_SECORO_M = f"{URL_SECORO}/models"
 
 URI_TRANS = f"{URL_SECORO}/transformations/"
 

@@ -60,7 +60,7 @@ from bdd_dsl.models.frames import (
     FR_UPPER,
     FR_LOWER,
 )
-from bdd_dsl.models.uri import URL_SECORO_M, URL_SECORO_MM
+from rdf_utils.uri import URL_SECORO_M, URL_SECORO_MM
 from bdd_dsl.models.urirefs import (
     URI_GEOM_POSE_FROM_POS_ORN,
     URI_PROB_SAMPLED_QUANTITY,
