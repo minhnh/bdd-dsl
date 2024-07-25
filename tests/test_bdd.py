@@ -2,7 +2,7 @@
 import unittest
 import rdflib
 from bdd_dsl.utils.json import process_bdd_us_from_graph
-from bdd_dsl.utils.resolver import install_resolver
+from rdf_utils.resolver import install_resolver
 from bdd_dsl.models.uri import URL_SECORO_M
 from bdd_dsl.models.frames import (
     FR_CRITERIA,

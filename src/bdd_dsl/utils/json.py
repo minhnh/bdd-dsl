@@ -84,7 +84,7 @@ __BDD_FRAME_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/frames/user-story.
 def load_bdd_shacl_constraints() -> rdflib.Graph:
     """Load BDD SHACL constraints into an `rdflib.Graph`.
 
-    If `bdd_dsl.utils.resolver.IriToFileResolver` is installed, this will cache files to
+    If `rdf_utils.resolver.IriToFileResolver` is installed, this will cache files to
     the user's cache directory (e.g. `$HOME/.cache/bdd-dsl` in Linux).
     """
     graph = rdflib.ConjunctiveGraph()
