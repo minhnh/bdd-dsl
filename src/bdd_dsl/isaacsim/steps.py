@@ -1,5 +1,5 @@
+from rdf_utils.naming import get_valid_var_name
 from bdd_dsl.isaacsim.utils import ModelType, PathType, SimpleShape
-from bdd_dsl.utils.common import get_valid_var_name
 from bdd_dsl.utils.json import get_pose_coordinates
 from bdd_dsl.models.frames import FR_POSE, FR_WRT, FR_NAME, FR_POSITION, FR_ORIENTATION
 

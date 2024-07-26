@@ -2,6 +2,7 @@
 from jinja2 import Environment, FileSystemLoader, Template
 from typing import List
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
+from rdf_utils.naming import get_valid_var_name
 from bdd_dsl.models.queries import (
     Q_BDD_PRED_LOCATED_AT,
     Q_BDD_PRED_IS_NEAR,
@@ -23,7 +24,6 @@ from bdd_dsl.models.frames import (
     FR_HOLDS,
     FR_CLAUSES_DATA,
 )
-from bdd_dsl.utils.common import get_valid_var_name
 from bdd_dsl.exception import BDDConstraintViolation
 
 

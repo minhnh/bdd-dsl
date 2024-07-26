@@ -11,6 +11,7 @@ import py_trees as pt
 import rdflib
 from rdf_utils.uri import URL_SECORO_M, URL_SECORO_MM
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
+from rdf_utils.naming import get_valid_var_name
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
 from bdd_dsl.models.queries import (
@@ -71,7 +72,6 @@ from bdd_dsl.models.urirefs import (
 )
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.exception import BDDConstraintViolation, SHACLViolation
-from bdd_dsl.utils.common import get_valid_var_name
 
 
 __BDD_SHACL_URLS = {
