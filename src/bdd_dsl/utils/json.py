@@ -75,8 +75,9 @@ from bdd_dsl.exception import BDDConstraintViolation, SHACLViolation
 
 
 __BDD_SHACL_URLS = {
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd-shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/time-shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd.shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/time.shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/languages/python.shacl.ttl": "turtle",
 }
 __BDD_QUERY_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/user-story.rq"
 __BDD_FRAME_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/frames/user-story.frame.json"
