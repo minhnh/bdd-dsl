@@ -1,9 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from rdf_utils.uri import URI_MM_GEOM, URI_MM_GEOM_REL, URI_MM_GEOM_COORD
 from bdd_dsl.models.uri import (
     URI_TRANS,
-    URI_MM_GEOM,
-    URI_MM_GEOM_REL,
-    URI_MM_GEOM_COORD,
     URI_MM_GEOM_EXT,
     URI_MM_PROB,
     URI_MM_EVENT,

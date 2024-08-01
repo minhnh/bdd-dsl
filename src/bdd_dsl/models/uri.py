@@ -1,14 +1,10 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.uri import URL_COMP_ROB2B, URL_SECORO, URL_SECORO_MM, URL_SECORO_M
+from rdf_utils.uri import URL_SECORO, URL_SECORO_MM, URL_SECORO_M
 
 
 URL_SESAME = "https://hbrs-sesame.github.io"
 
 URI_TRANS = f"{URL_SECORO}/transformations/"
-
-URI_MM_GEOM = f"{URL_COMP_ROB2B}/metamodels/geometry/structural-entities#"
-URI_MM_GEOM_REL = f"{URL_COMP_ROB2B}/metamodels/geometry/spatial-relations#"
-URI_MM_GEOM_COORD = f"{URL_COMP_ROB2B}/metamodels/geometry/coordinates#"
 
 URI_MM_GEOM_EXT = f"{URL_SESAME}/metamodels/geometry#"
 URI_MM_PROB = f"{URL_SESAME}/metamodels/variation/probability#"

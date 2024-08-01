@@ -27,7 +27,7 @@ MODEL_URLS = {
 }
 
 
-class BDD(unittest.TestCase):
+class BDDTest(unittest.TestCase):
     def setUp(self):
         install_resolver()
         self.graph = rdflib.ConjunctiveGraph()
