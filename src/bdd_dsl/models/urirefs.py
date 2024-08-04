@@ -1,9 +1,8 @@
-from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD
+from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV
 from bdd_dsl.models.namespace import (
     NS_TRANS,
     NS_MM_GEOM_EXT,
     NS_MM_PROB,
-    NS_MM_ENV,
 )
 
 # Transformation

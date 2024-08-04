@@ -9,7 +9,7 @@ from pyld import jsonld
 import pyshacl
 import py_trees as pt
 import rdflib
-from rdf_utils.uri import URL_SECORO_M, URL_SECORO_MM
+from rdf_utils.uri import URL_SECORO_M, URL_SECORO_MM, URL_MM_PYTHON_SHACL
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
 from rdf_utils.naming import get_valid_var_name
 from bdd_dsl.behaviours.actions import ActionWithEvents
@@ -77,7 +77,7 @@ from bdd_dsl.exception import BDDConstraintViolation, SHACLViolation
 __BDD_SHACL_URLS = {
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd.shacl.ttl": "turtle",
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/time.shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/languages/python.shacl.ttl": "turtle",
+    URL_MM_PYTHON_SHACL: "turtle",
 }
 __BDD_QUERY_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/user-story.rq"
 __BDD_FRAME_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/frames/user-story.frame.json"
