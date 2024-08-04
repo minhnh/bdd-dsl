@@ -1,9 +1,8 @@
 from rdflib import Namespace, Graph
-from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD
+from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV
 from bdd_dsl.models.uri import (
     URI_MM_GEOM_EXT,
     URI_MM_PROB,
-    URI_MM_ENV,
     URI_M_SIM,
     URI_TRANS,
 )
@@ -11,7 +10,6 @@ from bdd_dsl.models.uri import (
 # Namespaces
 NS_MM_GEOM_EXT = Namespace(URI_MM_GEOM_EXT)
 NS_MM_PROB = Namespace(URI_MM_PROB)
-NS_MM_ENV = Namespace(URI_MM_ENV)
 
 NS_M_SIM = Namespace(URI_M_SIM)
 
