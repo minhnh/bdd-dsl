@@ -2,10 +2,10 @@
 import sys
 from timeit import default_timer as timer
 from urllib.request import HTTPError
+from pprint import pprint
+from rdflib import ConjunctiveGraph, URIRef
 import pyshacl
 from rdf_utils.uri import URL_SECORO_M
-from rdflib import ConjunctiveGraph, URIRef
-
 from rdf_utils.resolver import install_resolver
 from bdd_dsl.geometry import ObjPoseCoordLoader
 from bdd_dsl.models.uri import URL_MM_DISTRIB_SHACL, URL_MM_GEOM_EXTS_SHACL
@@ -56,6 +56,7 @@ def main():
     end = timer()
     print(obj_pose_loader.obj_pose_coord_graph.serialize(format="json-ld"))
     print(f"graph querying time: {end - start:.5f}")
+
     start = timer()
     obj_pose_data = obj_pose_loader.get_obj_pose_coord(
         g, URIRef("https://secorolab.github.io/models/environments/secorolab/box")
@@ -66,8 +67,11 @@ def main():
         f"pose of '{obj_pose_data.id}' (of={obj_pose_data.target_frame}, wrt={obj_pose_data.origin_frame})"
     )
 
-    # obj_poses = get_object_poses(g)
-    # pprint(obj_poses)
+    start = timer()
+    obj_poses = obj_pose_data.get_coord_values(resample=True)
+    end = timer()
+    print(f"pose coordinate values loading time: {end - start:.5f}")
+    pprint(obj_poses)
 
 
 if __name__ == "__main__":
