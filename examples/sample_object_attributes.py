@@ -3,7 +3,7 @@ import sys
 from timeit import default_timer as timer
 from urllib.request import HTTPError
 from pprint import pprint
-from rdflib import ConjunctiveGraph, URIRef
+from rdflib import ConjunctiveGraph
 import pyshacl
 from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
@@ -54,24 +54,24 @@ def main():
     start = timer()
     obj_pose_loader = ObjPoseCoordLoader(g)
     end = timer()
-    print(obj_pose_loader.obj_pose_coord_graph.serialize(format="json-ld"))
     print(f"graph querying time: {end - start:.5f}")
 
-    start = timer()
-    obj_pose_data = obj_pose_loader.get_obj_pose_coord(
-        g, URIRef("https://secorolab.github.io/models/environments/secorolab/box")
-    )
-    end = timer()
-    print(f"object pose coordinate loading time: {end - start:.5f}")
-    print(
-        f"pose of '{obj_pose_data.id}' (of={obj_pose_data.target_frame}, wrt={obj_pose_data.origin_frame})"
-    )
+    for obj_id in obj_pose_loader.get_object_ids():
+        try:
+            obj_pose_data = obj_pose_loader.get_obj_pose_coord(graph=g, obj_id=obj_id)
+        except Exception as e:
+            print(f"skipping '{obj_id}':\n{e}")
+            continue
 
-    start = timer()
-    obj_poses = obj_pose_data.get_coord_values(resample=True)
-    end = timer()
-    print(f"pose coordinate values loading time: {end - start:.5f}")
-    pprint(obj_poses)
+        print(
+            f"pose of '{obj_pose_data.id}' (of={obj_pose_data.target_frame}, wrt={obj_pose_data.origin_frame})"
+        )
+
+        start = timer()
+        obj_poses = obj_pose_data.get_coord_values(resample=True)
+        end = timer()
+        print(f"pose coordinate values loading time: {end - start:.5f}")
+        pprint(obj_poses)
 
 
 if __name__ == "__main__":
