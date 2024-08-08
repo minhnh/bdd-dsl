@@ -6,10 +6,10 @@ import rdflib
 
 from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
+from rdf_utils.naming import get_valid_filename
 from bdd_dsl.utils.json import process_bdd_us_from_graph
 from bdd_dsl.utils.jinja import load_template_from_url, prepare_gherkin_feature_data
 from bdd_dsl.models.frames import FR_NAME
-from bdd_dsl.utils.common import get_valid_filename
 
 
 PKG_ROOT = join(dirname(__file__), "..")

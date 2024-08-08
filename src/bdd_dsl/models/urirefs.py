@@ -3,6 +3,7 @@ from bdd_dsl.models.namespace import (
     NS_TRANS,
     NS_MM_GEOM_EXT,
     NS_MM_PROB,
+    NS_MM_DISTRIB,
 )
 
 # Transformation
@@ -43,6 +44,12 @@ URI_GEOM_OF_ORIENTATION = NS_MM_GEOM_COORD["of-orientation"]
 
 # Geometry extension
 URI_GEOM_POSE_FROM_POS_ORN = NS_MM_GEOM_EXT["PoseFromPositionOrientation"]
+URI_GEOM_FROM_POSITION = NS_MM_GEOM_EXT["from-position"]
+URI_GEOM_FROM_ORIENTATION = NS_MM_GEOM_EXT["from-orientation"]
+
+# Distribution
+URI_DISTRIB_SAMPLED_QUANTITY = NS_MM_DISTRIB["SampledQuantity"]
+URI_DISTRIB_FROM_DISTRIBUTION = NS_MM_DISTRIB["from-distribution"]
 
 # Probability
 URI_PROB_SAMPLED_QUANTITY = NS_MM_PROB["SampledQuantity"]
