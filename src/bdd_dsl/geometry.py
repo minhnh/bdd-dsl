@@ -163,11 +163,18 @@ class ObjPoseCoordLoader(object):
         self._obj_pose_coord_g = q_result.graph
         self._obj_pose_id_cache = {}
         self._obj_pose_coord_data_cache = {}
+        self._object_ids = None
 
-    def _get_obj_pose_coord_g(self) -> Graph:
-        return self._obj_pose_coord_g
+    def get_object_ids(self) -> list:
+        if self._object_ids is not None:
+            return self._object_ids
 
-    obj_pose_coord_graph = property(fget=_get_obj_pose_coord_g, doc="read only graph query result")
+        self._object_ids = []
+        for obj_id, _ in self._obj_pose_coord_g.subject_objects(predicate=URI_TRANS_HAS_POSE):
+            assert isinstance(obj_id, URIRef)
+            self._object_ids.append(obj_id)
+
+        return self._object_ids
 
     def _get_cached_obj_pose_coord_id(self, obj_id: URIRef) -> URIRef:
         if obj_id in self._obj_pose_id_cache:
