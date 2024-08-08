@@ -1,4 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from abc import abstractmethod
+from typing import Any
 from urllib.request import HTTPError
 from rdflib import Graph, URIRef, RDF
 from rdf_utils.uri import URL_SECORO_M
@@ -21,6 +23,9 @@ from bdd_dsl.models.urirefs import (
 
 URL_Q_OBJ_POSE_COORD = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/object-pose-coord.rq"
 URL_Q_SAMPLED_POSE_COORD = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/sampled-quantities.rq"
+
+KEY_POSITION = "position"
+KEY_ORIENTATION = "orientation"
 
 
 class GeomRelCoordData(object):
@@ -52,10 +57,34 @@ class GeomRelCoordData(object):
         self.handled_type = None
         self.coord_data = {}
 
+    @abstractmethod
+    def get_coord_values(self, **kwargs) -> Any:
+        raise NotImplementedError(f"GeomRelCoordData: abstract method callded for '{self.id}'")
+
 
 class OrientationCoordData(GeomRelCoordData):
     def __init__(self, graph: Graph, orn_id: URIRef) -> None:
         super().__init__(graph=graph, rel_id=orn_id, rel_coord_path=URI_GEOM_OF_ORIENTATION)
+
+        for c_type in self.types:
+            if c_type == URI_DISTRIB_SAMPLED_QUANTITY:
+                self.handled_type = c_type
+                self.coord_data[KEY_SAMPLED_QTY] = SampledQuantityData(
+                    graph=graph, quantity_id=self.id
+                )
+
+        # if none of the types returns, raise an exception
+        assert (
+            self.handled_type is not None
+        ), f"PositionCoordinate '{self.id}' has unexpected types: {self.types}"
+
+    def get_coord_values(self, **kwargs) -> dict:
+        if self.handled_type == URI_DISTRIB_SAMPLED_QUANTITY:
+            return self.coord_data[KEY_SAMPLED_QTY].sample_quantity(**kwargs)
+
+        raise RuntimeError(
+            f"OrientationCoordinate '{self.id}' has unhandled type: {self.handled_type}"
+        )
 
 
 class PositionCoordData(GeomRelCoordData):
@@ -74,6 +103,14 @@ class PositionCoordData(GeomRelCoordData):
             self.handled_type is not None
         ), f"PositionCoordinate '{self.id}' has unexpected types: {self.types}"
 
+    def get_coord_values(self, **kwargs) -> Any:
+        if self.handled_type == URI_DISTRIB_SAMPLED_QUANTITY:
+            return self.coord_data[KEY_SAMPLED_QTY].sample_quantity(**kwargs)
+
+        raise RuntimeError(
+            f"PositionCoordinate '{self.id}' has unhandled type: {self.handled_type}"
+        )
+
 
 class PoseCoordData(GeomRelCoordData):
     def __init__(self, graph: Graph, obj_pose_coord_graph: Graph, pose_id: URIRef) -> None:
@@ -88,19 +125,28 @@ class PoseCoordData(GeomRelCoordData):
                 position_id = graph.value(self.id, URI_GEOM_FROM_POSITION)
                 assert position_id is not None, f"pose '{self.id}' does not map to a Position"
                 assert isinstance(position_id, URIRef)
-                self.coord_data["position"] = PositionCoordData(graph, position_id)
+                self.coord_data[KEY_POSITION] = PositionCoordData(graph, position_id)
 
                 orn_id = graph.value(self.id, URI_GEOM_FROM_ORIENTATION)
                 assert (
                     orn_id is not None
                 ), f"pose '{self.id}' does not map to aOrientationCoordinate"
                 assert isinstance(orn_id, URIRef)
-                self.coord_data["orientation"] = OrientationCoordData(graph, orn_id)
+                self.coord_data[KEY_ORIENTATION] = OrientationCoordData(graph, orn_id)
 
         # If none of the types return a dictionary of coordinate data, raise an exception
         assert (
             self.handled_type is not None
         ), f"PoseCoordinate '{self.id}' has unexpected types: {self.types}"
+
+    def get_coord_values(self, **kwargs) -> dict:
+        if self.handled_type == URI_GEOM_POSE_FROM_POS_ORN:
+            return {
+                KEY_POSITION: self.coord_data[KEY_POSITION].get_coord_values(**kwargs),
+                KEY_ORIENTATION: self.coord_data[KEY_ORIENTATION].get_coord_values(**kwargs),
+            }
+
+        raise RuntimeError(f"PoseCoordinate '{self.id}' has unhandled type: {self.handled_type}")
 
 
 class ObjPoseCoordLoader(object):
