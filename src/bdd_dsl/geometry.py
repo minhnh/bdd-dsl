@@ -22,7 +22,6 @@ from bdd_dsl.models.urirefs import (
 
 
 URL_Q_OBJ_POSE_COORD = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/object-pose-coord.rq"
-URL_Q_SAMPLED_POSE_COORD = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/sampled-quantities.rq"
 
 KEY_POSITION = "position"
 KEY_ORIENTATION = "orientation"
