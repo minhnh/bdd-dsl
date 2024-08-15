@@ -1,5 +1,7 @@
 from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV
 from bdd_dsl.models.namespace import (
+    NS_MM_BDD,
+    NS_MM_BHV,
     NS_TRANS,
     NS_MM_GEOM_EXT,
     NS_MM_PROB,
@@ -76,3 +78,12 @@ URI_ENV_OBJECT = NS_MM_ENV["Object"]
 URI_ENV_HAS_OBJ = NS_MM_ENV["has-object"]
 URI_ENV_OF_OBJ = NS_MM_ENV["of-object"]
 URI_ENV_RIGID_OBJ = NS_MM_ENV["RigidObject"]
+
+# Behaviour
+URI_BHV_TYPE_BHV = NS_MM_BHV["Behaviour"]
+URI_BHV_PRED_OF_BHV = NS_MM_BHV["of-behaviour"]
+
+# BDD
+URI_BDD_TYPE_SCENARIO_EXEC = NS_MM_BDD["ScenarioExecution"]
+URI_BDD_TYPE_BHV_IMPL = NS_MM_BDD["BehaviourImplementation"]
+URI_BDD_PRED_HAS_BHV_IMPL = NS_MM_BDD["has-behaviour-impl"]

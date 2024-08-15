@@ -1,12 +1,17 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from time import sleep
+from typing import Any
 from behave.runner import Context
 from behave import given, then, when
+from bdd_dsl.execution.common import Behaviour, ExecutionModel
 
 
 def before_all_mockup(context: Context):
     g = getattr(context, "model_graph", None)
-
     assert g is not None, "'model_graph' attribute not found in context"
+
+    exec_model = ExecutionModel(graph=g)
+    context.execution_model = exec_model
 
 
 @given("a set of objects")
@@ -53,6 +58,36 @@ def is_located_at_mockup_given(context: Context, pick_obj: str, pick_ws: str):
     assert pick_ws in context.workspaces, f"object '{pick_ws}' unrecognized"
 
 
+class PickplaceBehaviourMockup(Behaviour):
+    def __init__(self, context: Any, **kwargs) -> None:
+        self.max_count = kwargs.get("max_count", 5)
+        self.counter = self.max_count
+
+    def is_finished(self, context: Context, **kwargs: Any) -> bool:
+        return self.counter <= 0
+
+    def reset(self, context: Context, **kwargs: Any) -> None:
+        self.counter = self.max_count
+
+    def step(self, context: Context, **kwargs: Any) -> Any:
+        print(self.counter)
+        self.counter -= 1
+        sleep(0.1)
+
+
 @when('behaviour "{bhv_name}" occurs')
 def behaviour_mockup(context: Context, bhv_name: str):
-    pass
+    behaviour_model = getattr(context, "behaviour_model", None)
+    if behaviour_model is None:
+        exec_model = getattr(context, "execution_model", None)
+        assert exec_model is not None, "no 'execution_model' added to the context"
+        assert isinstance(exec_model, ExecutionModel)
+
+        behaviour_model = exec_model.load_behaviour_impl(context=context, bhv_id=bhv_name)
+        context.behaviour_model = behaviour_model
+
+    bhv = behaviour_model.behaviour
+    assert bhv is not None
+    bhv.reset(context=context)
+    while not bhv.is_finished(context=context):
+        bhv.step(context=context)
