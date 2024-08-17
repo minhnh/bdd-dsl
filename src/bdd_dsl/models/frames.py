@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.uri import URI_MM_GEOM, URI_MM_GEOM_REL, URI_MM_GEOM_COORD
+from rdf_utils.uri import URI_MM_GEOM, URI_MM_GEOM_REL, URI_MM_GEOM_COORD, URL_SECORO_M
 from bdd_dsl.models.uri import (
     URI_TRANS,
     URI_MM_GEOM_EXT,
@@ -50,6 +50,8 @@ from bdd_dsl.models.urirefs import (
     URI_TRANS_DIM,
 )
 
+# URLs to public JSON-LD frames
+FR_URL_BDD_FRAME_US = f"{URL_SECORO_M}/acceptance-criteria/bdd/frames/user-story.frame.json"
 
 FR_NAME = "name"
 FR_DATA = "data"

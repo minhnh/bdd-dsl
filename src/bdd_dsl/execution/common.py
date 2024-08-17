@@ -72,17 +72,12 @@ class ExecutionModel(object):
     def scenario_exec_graph(self) -> Graph:
         return self._scenario_exec_graph
 
-    def load_behaviour_impl(self, context: Context, bhv_id: str) -> BehaviourImplModel:
+    def load_behaviour_impl(self, context: Context, bhv_id: URIRef) -> BehaviourImplModel:
         if bhv_id in self._bhv_impl:
             return self._bhv_impl[bhv_id]
 
-        try:
-            bhv_uri = self._scenario_exec_graph.namespace_manager.expand_curie(bhv_id)
-        except ValueError as e:
-            raise RuntimeError(f"can't parse behaviour URI '{bhv_id}': {e}")
-
         bhv_impl_ids = list(
-            self._scenario_exec_graph.subjects(object=bhv_uri, predicate=URI_BHV_PRED_OF_BHV)
+            self._scenario_exec_graph.subjects(object=bhv_id, predicate=URI_BHV_PRED_OF_BHV)
         )
         assert (
             len(bhv_impl_ids) == 1

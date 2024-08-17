@@ -1,4 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from rdf_utils.uri import URL_SECORO_M
 from bdd_dsl.models.namespace import PREFIX_TRANS
 from bdd_dsl.models.uri import (
     URI_TRANS,
@@ -7,6 +8,20 @@ from bdd_dsl.models.uri import (
     URI_MM_PY,
 )
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_GIVEN,
+    URI_BDD_PRED_HAS_AC,
+    URI_BDD_PRED_HAS_SCENE,
+    URI_BDD_PRED_HAS_VARIATION,
+    URI_BDD_PRED_OF_SCENARIO,
+    URI_BDD_PRED_OF_SCENE,
+    URI_BDD_PRED_OF_TMPL,
+    URI_BDD_PRED_THEN,
+    URI_BDD_PRED_WHEN,
+    URI_BDD_TYPE_SCENARIO,
+    URI_BDD_TYPE_SCENARIO_TMPL,
+    URI_BDD_TYPE_SCENARIO_VARIANT,
+    URI_BDD_TYPE_US,
+    URI_BHV_PRED_OF_BHV,
     URI_GEOM_RIGID_BODY,
     URI_GEOM_SIMPLICES,
     URI_GEOM_FRAME,
@@ -38,6 +53,9 @@ from bdd_dsl.models.urirefs import (
     URI_TRANS_UPPER,
     URI_TRANS_LOWER,
 )
+
+# URLs to public queries
+URL_Q_BDD_US = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/user-story.rq"
 
 # transformation concepts and relations
 Q_HAS_EVENT = f"{PREFIX_TRANS}:has-event"
@@ -272,5 +290,39 @@ WHERE {{
             ?orientationDistr a ?orientationDistrType .
         }}
     }}
+}}
+"""
+
+Q_USER_STORY = f"""
+CONSTRUCT {{
+    ?us {URI_BDD_PRED_HAS_AC.n3()} ?scenarioVar .
+    ?scenarioVar
+        {URI_BHV_PRED_OF_BHV.n3()} ?behaviour ;
+        {URI_BDD_PRED_OF_TMPL.n3()} ?scenarioTmpl ;
+        {URI_BDD_PRED_OF_SCENARIO.n3()} ?scenario ;
+        {URI_BDD_PRED_HAS_SCENE.n3()} ?scene .
+    ?scene a ?sceneElemType .
+}}
+WHERE {{
+    ?us a {URI_BDD_TYPE_US.n3()};
+        {URI_BDD_PRED_HAS_AC.n3()} ?scenarioVar .
+
+    ?scenarioVar a {URI_BDD_TYPE_SCENARIO_VARIANT.n3()} ;
+        {URI_BDD_PRED_OF_TMPL.n3()} ?scenarioTmpl ;
+        {URI_BDD_PRED_HAS_SCENE.n3()} ?sceneElem ;
+        {URI_BDD_PRED_HAS_VARIATION.n3()} ?taskVariation .
+
+    ?scenarioTmpl a {URI_BDD_TYPE_SCENARIO_TMPL.n3()} ;
+        {URI_BDD_PRED_OF_SCENARIO.n3()} ?scenario ;
+        {URI_BDD_PRED_HAS_SCENE.n3()} ?scene .
+
+    ?sceneElem a ?sceneElemType ;
+        {URI_BDD_PRED_OF_SCENE.n3()} ?scene .
+
+    ?scenario a {URI_BDD_TYPE_SCENARIO.n3()} ;
+        {URI_BHV_PRED_OF_BHV.n3()} ?behaviour ;
+        {URI_BDD_PRED_GIVEN.n3()} ?given ;
+        {URI_BDD_PRED_WHEN.n3()} ?when ;
+        {URI_BDD_PRED_THEN.n3()} ?then .
 }}
 """
