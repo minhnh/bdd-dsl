@@ -2,8 +2,10 @@
 from time import sleep
 from typing import Any
 from behave.runner import Context
+from behave.model import Scenario
 from behave import given, then, when
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
+from bdd_dsl.user_story import UserStoryLoader
 
 
 def before_all_mockup(context: Context):
@@ -12,6 +14,29 @@ def before_all_mockup(context: Context):
 
     exec_model = ExecutionModel(graph=g)
     context.execution_model = exec_model
+    context.us_model = UserStoryLoader(graph=g)
+
+
+def before_scenario(context: Context, scenario: Scenario):
+    model_graph = getattr(context, "model_graph", None)
+    assert model_graph is not None
+    # scenario outline renders each scenario as
+    #   SCHEMA: "{outline_name} -- {examples.name}@{row.id}"
+    scr_name_splits = scenario.name.split(" -- ")
+    assert len(scr_name_splits) > 0, f"unexpected scenario name: {scenario.name}"
+    scr_name = scr_name_splits[0]
+    try:
+        scenario_var_uri = model_graph.namespace_manager.expand_curie(scr_name)
+    except ValueError as e:
+        raise RuntimeError(
+            f"can't parse behaviour URI '{scr_name}' from scenario '{scenario.name}': {e}"
+        )
+
+    us_model = getattr(context, "us_model", None)
+    assert us_model is not None and isinstance(us_model, UserStoryLoader)
+
+    scenario_var_model = us_model.load_scenario_variant(scenario_var_uri)
+    print(scenario_var_model.bhv_id)
 
 
 @given("a set of objects")
@@ -83,7 +108,15 @@ def behaviour_mockup(context: Context, bhv_name: str):
         assert exec_model is not None, "no 'execution_model' added to the context"
         assert isinstance(exec_model, ExecutionModel)
 
-        behaviour_model = exec_model.load_behaviour_impl(context=context, bhv_id=bhv_name)
+        model_graph = getattr(context, "model_graph", None)
+        assert model_graph is not None
+
+        try:
+            bhv_uri = model_graph.namespace_manager.expand_curie(bhv_name)
+        except ValueError as e:
+            raise RuntimeError(f"can't parse behaviour URI '{bhv_name}': {e}")
+
+        behaviour_model = exec_model.load_behaviour_impl(context=context, bhv_id=bhv_uri)
         context.behaviour_model = behaviour_model
 
     bhv = behaviour_model.behaviour

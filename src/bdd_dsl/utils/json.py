@@ -9,7 +9,7 @@ from pyld import jsonld
 import pyshacl
 import py_trees as pt
 import rdflib
-from rdf_utils.uri import URL_SECORO_M, URL_SECORO_MM, URL_MM_PYTHON_SHACL
+from rdf_utils.uri import URL_SECORO_MM, URL_MM_PYTHON_SHACL
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
 from rdf_utils.naming import get_valid_var_name
 from bdd_dsl.behaviours.actions import ActionWithEvents
@@ -18,12 +18,14 @@ from bdd_dsl.models.queries import (
     EVENT_LOOP_QUERY,
     BEHAVIOUR_TREE_QUERY,
     OBJ_POSE_COORD_QUERY,
+    URL_Q_BDD_US,
     Q_BT_SEQUENCE,
     Q_BT_PARALLEL,
     Q_BDD_SCENARIO_VARIANT,
     Q_BDD_SCENARIO_TASK_VARIABLE,
 )
 from bdd_dsl.models.frames import (
+    FR_URL_BDD_FRAME_US,
     EVENT_LOOP_FRAME,
     BEHAVIOUR_TREE_FRAME,
     FR_HOLDS,
@@ -79,8 +81,6 @@ __BDD_SHACL_URLS = {
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/time.shacl.ttl": "turtle",
     URL_MM_PYTHON_SHACL: "turtle",
 }
-__BDD_QUERY_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/user-story.rq"
-__BDD_FRAME_US_URL = f"{URL_SECORO_M}/acceptance-criteria/bdd/frames/user-story.frame.json"
 
 
 def load_bdd_shacl_constraints() -> rdflib.Graph:
@@ -453,8 +453,8 @@ def process_bdd_us_from_graph(graph: rdflib.Graph, timeout=_GLOBAL_DEFAULT_TIMEO
     if not conforms:
         raise SHACLViolation(report_text)
 
-    bdd_result = query_graph_with_url(graph, __BDD_QUERY_US_URL, timeout=timeout)
-    model_framed = frame_model_with_url(bdd_result, __BDD_FRAME_US_URL, timeout=timeout)
+    bdd_result = query_graph_with_url(graph, URL_Q_BDD_US, timeout=timeout)
+    model_framed = frame_model_with_url(bdd_result, FR_URL_BDD_FRAME_US, timeout=timeout)
 
     assert isinstance(
         model_framed, dict
