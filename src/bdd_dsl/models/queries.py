@@ -41,7 +41,7 @@ from bdd_dsl.models.urirefs import (
     URI_PROB_LOWER,
     URI_PROB_UPPER,
     URI_PROB_FROM_DISTRIBUTION,
-    URI_ENV_OF_OBJ,
+    URI_ENV_PRED_OF_OBJ,
     URI_TRANS_HAS_BODY,
     URI_TRANS_HAS_POSE,
     URI_TRANS_HAS_POSITION,
@@ -246,7 +246,7 @@ CONSTRUCT {{
 }}
 WHERE {{
     ?body a {URI_GEOM_RIGID_BODY.n3()} ;
-        {URI_ENV_OF_OBJ.n3()} ?obj ;
+        {URI_ENV_PRED_OF_OBJ.n3()} ?obj ;
         {URI_GEOM_SIMPLICES.n3()} ?frame .
     ?frame a {URI_GEOM_FRAME.n3()} ;
         ^{URI_GEOM_OF.n3()} ?pose .
@@ -301,7 +301,8 @@ CONSTRUCT {{
         {URI_BDD_PRED_OF_TMPL.n3()} ?scenarioTmpl ;
         {URI_BDD_PRED_OF_SCENARIO.n3()} ?scenario ;
         {URI_BDD_PRED_HAS_SCENE.n3()} ?scene .
-    ?scene a ?sceneElemType .
+    ?scene {URI_BDD_PRED_HAS_SCENE.n3()} ?sceneElem .
+    ?sceneElem a ?sceneElemType .
 }}
 WHERE {{
     ?us a {URI_BDD_TYPE_US.n3()};

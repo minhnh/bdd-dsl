@@ -5,7 +5,7 @@ from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
-from bdd_dsl.user_story import UserStoryLoader
+from bdd_dsl.user_story import ScenarioVariantModel, UserStoryLoader
 
 
 def before_all_mockup(context: Context):
@@ -35,8 +35,19 @@ def before_scenario(context: Context, scenario: Scenario):
     us_model = getattr(context, "us_model", None)
     assert us_model is not None and isinstance(us_model, UserStoryLoader)
 
-    scenario_var_model = us_model.load_scenario_variant(scenario_var_uri)
-    print(scenario_var_model.bhv_id)
+    scenario_var_model = us_model.load_scenario_variant(
+        full_graph=model_graph, variant_id=scenario_var_uri
+    )
+    assert isinstance(scenario_var_model, ScenarioVariantModel)
+    assert (
+        len(scenario_var_model.scene.objects) > 0
+    ), f"scene '{scenario_var_model.scene.id}' has no object"
+    assert (
+        len(scenario_var_model.scene.workspaces) > 0
+    ), f"scene '{scenario_var_model.scene.id}' has no workspace"
+    assert (
+        len(scenario_var_model.scene.agents) > 0
+    ), f"scene '{scenario_var_model.scene.id}' has no agent"
 
 
 @given("a set of objects")

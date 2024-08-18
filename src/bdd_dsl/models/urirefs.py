@@ -1,4 +1,4 @@
-from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV
+from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV, NS_MM_AGN
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
@@ -74,10 +74,18 @@ URI_PROB_UPPER = NS_MM_PROB["upper-bound"]
 URI_PROB_FROM_DISTRIBUTION = NS_MM_PROB["from-distribution"]
 
 # Environment
-URI_ENV_OBJECT = NS_MM_ENV["Object"]
-URI_ENV_HAS_OBJ = NS_MM_ENV["has-object"]
-URI_ENV_OF_OBJ = NS_MM_ENV["of-object"]
-URI_ENV_RIGID_OBJ = NS_MM_ENV["RigidObject"]
+URI_ENV_TYPE_OBJ = NS_MM_ENV["Object"]
+URI_ENV_TYPE_WS = NS_MM_ENV["Workspace"]
+URI_ENV_TYPE_RIGID_OBJ = NS_MM_ENV["RigidObject"]
+URI_ENV_PRED_HAS_OBJ = NS_MM_ENV["has-object"]
+URI_ENV_PRED_OF_OBJ = NS_MM_ENV["of-object"]
+URI_ENV_PRED_HAS_WS = NS_MM_ENV["has-workspace"]
+URI_ENV_PRED_OF_WS = NS_MM_ENV["of-workspace"]
+
+# Agent
+URI_AGN_TYPE_AGN = NS_MM_AGN["Agent"]
+URI_AGN_PRED_OF_AGN = NS_MM_AGN["of-agent"]
+URI_AGN_PRED_HAS_AGN = NS_MM_AGN["has-agent"]
 
 # Behaviour
 URI_BHV_TYPE_BHV = NS_MM_BHV["Behaviour"]
@@ -89,6 +97,9 @@ URI_BDD_TYPE_SCENARIO = NS_MM_BDD["Scenario"]
 URI_BDD_TYPE_SCENARIO_TMPL = NS_MM_BDD["ScenarioTemplate"]
 URI_BDD_TYPE_SCENARIO_VARIANT = NS_MM_BDD["ScenarioVariant"]
 URI_BDD_TYPE_SCENE = NS_MM_BDD["Scene"]
+URI_BDD_TYPE_SCENE_OBJ = NS_MM_BDD["SceneHasObjects"]
+URI_BDD_TYPE_SCENE_WS = NS_MM_BDD["SceneHasWorkspaces"]
+URI_BDD_TYPE_SCENE_AGN = NS_MM_BDD["SceneHasAgents"]
 URI_BDD_TYPE_SCENARIO_EXEC = NS_MM_BDD["ScenarioExecution"]
 URI_BDD_TYPE_BHV_IMPL = NS_MM_BDD["BehaviourImplementation"]
 URI_BDD_PRED_GIVEN = NS_MM_BDD["given"]
