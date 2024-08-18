@@ -6,7 +6,7 @@ import pyshacl
 from rdf_utils.uri import URL_SECORO_M, URL_MM_PYTHON_SHACL
 from rdf_utils.python import URI_PY_TYPE_MODULE_ATTR, URI_PY_PRED_ATTR_NAME, URI_PY_PRED_MODULE_NAME
 from rdf_utils.resolver import install_resolver
-from bdd_dsl.models.urirefs import URI_ENV_OF_OBJ
+from bdd_dsl.models.urirefs import URI_ENV_PRED_OF_OBJ
 from bdd_dsl.simulation.common import (
     URI_SIM_TYPE_ISAAC_RES,
     URI_SIM_TYPE_SYS_RES,
@@ -83,7 +83,7 @@ class BDDSimTest(unittest.TestCase):
         self.assertTrue(conforms, f"SHACL violation:\n{report_text}")
 
         obj_res_loader = ObjModelLoader(graph, obj_loader_func=load_obj_mockup)
-        for _, obj_id in graph.subject_objects(predicate=URI_ENV_OF_OBJ):
+        for _, obj_id in graph.subject_objects(predicate=URI_ENV_PRED_OF_OBJ):
             assert isinstance(obj_id, URIRef)
             obj_inst = obj_res_loader.load_object_model(obj_id)
 
