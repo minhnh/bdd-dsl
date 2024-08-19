@@ -1,15 +1,12 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import unittest
-from typing import Any, Optional
-from rdflib import URIRef, Graph, ConjunctiveGraph
+from rdflib import URIRef, ConjunctiveGraph
 import pyshacl
 from rdf_utils.uri import URL_SECORO_M, URL_MM_PYTHON_SHACL
 from rdf_utils.python import URI_PY_TYPE_MODULE_ATTR, URI_PY_PRED_ATTR_NAME, URI_PY_PRED_MODULE_NAME
 from rdf_utils.resolver import install_resolver
-from bdd_dsl.models.urirefs import URI_ENV_PRED_OF_OBJ
+from bdd_dsl.models.urirefs import URI_ENV_PRED_OF_OBJ, URI_SIM_TYPE_SYS_RES
 from bdd_dsl.simulation.common import (
-    URI_SIM_TYPE_ISAAC_RES,
-    URI_SIM_TYPE_SYS_RES,
     URL_MM_SIM_SHACL,
     ObjModelLoader,
     get_path_of_node,
@@ -25,40 +22,6 @@ SHACL_URLS = {
     URL_MM_SIM_SHACL: "turtle",
     URL_MM_PYTHON_SHACL: "turtle",
 }
-
-
-class MockupObject(object):
-    def __init__(self, obj_type: URIRef, obj_configs: Optional[dict], **kwargs: Any) -> None:
-        self.obj_type = obj_type
-        self.configs = obj_configs
-        self.path = kwargs.get("path")
-        self.module_name = kwargs.get("module_name")
-        self.attr_name = kwargs.get("attr_name")
-
-
-def load_obj_mockup(
-    obj_res_g: Graph, obj_model_id: URIRef, obj_configs: Optional[dict], **kwargs: Any
-) -> Any:
-    for obj_model_type in obj_res_g.objects(subject=obj_model_id):
-        assert isinstance(obj_model_type, URIRef)
-        if obj_model_type == URI_SIM_TYPE_SYS_RES or obj_model_type == URI_SIM_TYPE_ISAAC_RES:
-            path = get_path_of_node(obj_res_g, obj_model_id)
-            return MockupObject(
-                obj_type=obj_model_type, obj_configs=obj_configs, path=path, **kwargs
-            )
-
-        if obj_model_type == URI_PY_TYPE_MODULE_ATTR:
-            module_name = obj_res_g.value(subject=obj_model_id, predicate=URI_PY_PRED_MODULE_NAME)
-            attr_name = obj_res_g.value(subject=obj_model_id, predicate=URI_PY_PRED_ATTR_NAME)
-            return MockupObject(
-                obj_type=obj_model_type,
-                obj_configs=obj_configs,
-                module_name=module_name,
-                attr_name=attr_name,
-                **kwargs,
-            )
-
-    raise RuntimeError(f"unhandled type for object model '{obj_model_id}'")
 
 
 class BDDSimTest(unittest.TestCase):
@@ -82,19 +45,18 @@ class BDDSimTest(unittest.TestCase):
         )
         self.assertTrue(conforms, f"SHACL violation:\n{report_text}")
 
-        obj_res_loader = ObjModelLoader(graph, obj_loader_func=load_obj_mockup)
+        obj_res_loader = ObjModelLoader(graph)
         for _, obj_id in graph.subject_objects(predicate=URI_ENV_PRED_OF_OBJ):
             assert isinstance(obj_id, URIRef)
             obj_inst = obj_res_loader.load_object_model(obj_id)
 
-            assert isinstance(obj_inst, MockupObject)
-            if (
-                obj_inst.obj_type == URI_SIM_TYPE_SYS_RES
-                or obj_inst.obj_type == URI_SIM_TYPE_ISAAC_RES
-            ):
-                assert obj_inst.path is not None
-            elif obj_inst.obj_type == URI_PY_TYPE_MODULE_ATTR:
-                assert obj_inst.module_name is not None and obj_inst.attr_name is not None
+            if URI_SIM_TYPE_SYS_RES in obj_inst.types:
+                _ = get_path_of_node(graph=graph, node_id=obj_inst.id)
+
+            elif URI_PY_TYPE_MODULE_ATTR in obj_inst.types:
+                module_name = graph.value(subject=obj_inst.id, predicate=URI_PY_PRED_MODULE_NAME)
+                attr_name = graph.value(subject=obj_inst.id, predicate=URI_PY_PRED_ATTR_NAME)
+                assert module_name is not None and attr_name is not None
 
 
 if __name__ == "__main__":

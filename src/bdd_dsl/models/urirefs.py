@@ -2,6 +2,8 @@ from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
+    NS_MM_SIM,
+    NS_MM_TASK,
     NS_TRANS,
     NS_MM_GEOM_EXT,
     NS_MM_PROB,
@@ -90,6 +92,18 @@ URI_AGN_PRED_HAS_AGN = NS_MM_AGN["has-agent"]
 # Behaviour
 URI_BHV_TYPE_BHV = NS_MM_BHV["Behaviour"]
 URI_BHV_PRED_OF_BHV = NS_MM_BHV["of-behaviour"]
+
+# Task
+URI_TASK_TYPE_TASK = NS_MM_TASK["Task"]
+URI_TASK_PRED_OF_TASK = NS_MM_TASK["of-task"]
+
+# Simulation
+URI_SIM_TYPE_SIM_OBJ = NS_MM_SIM["SimulatedObject"]
+URI_SIM_TYPE_OBJ_MODEL = NS_MM_SIM["ObjectModel"]
+URI_SIM_TYPE_SYS_RES = NS_MM_SIM["SystemResource"]
+URI_SIM_PRED_OBJ_MODEL = NS_MM_SIM["object-model"]
+URI_SIM_PRED_HAS_CONFIG = NS_MM_SIM["has-config"]
+URI_SIM_PRED_PATH = NS_MM_SIM["path"]
 
 # BDD
 URI_BDD_TYPE_US = NS_MM_BDD["UserStory"]

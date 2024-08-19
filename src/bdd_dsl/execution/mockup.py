@@ -14,12 +14,16 @@ def before_all_mockup(context: Context):
 
     exec_model = ExecutionModel(graph=g)
     context.execution_model = exec_model
-    context.us_model = UserStoryLoader(graph=g)
+    context.us_loader = UserStoryLoader(graph=g)
 
 
 def before_scenario(context: Context, scenario: Scenario):
     model_graph = getattr(context, "model_graph", None)
     assert model_graph is not None
+
+    us_loader = getattr(context, "us_loader", None)
+    assert us_loader is not None and isinstance(us_loader, UserStoryLoader)
+
     # scenario outline renders each scenario as
     #   SCHEMA: "{outline_name} -- {examples.name}@{row.id}"
     scr_name_splits = scenario.name.split(" -- ")
@@ -32,10 +36,7 @@ def before_scenario(context: Context, scenario: Scenario):
             f"can't parse behaviour URI '{scr_name}' from scenario '{scenario.name}': {e}"
         )
 
-    us_model = getattr(context, "us_model", None)
-    assert us_model is not None and isinstance(us_model, UserStoryLoader)
-
-    scenario_var_model = us_model.load_scenario_variant(
+    scenario_var_model = us_loader.load_scenario_variant(
         full_graph=model_graph, variant_id=scenario_var_uri
     )
     assert isinstance(scenario_var_model, ScenarioVariantModel)
