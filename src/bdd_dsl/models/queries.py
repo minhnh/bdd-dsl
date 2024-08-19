@@ -17,11 +17,19 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_TMPL,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_WHEN,
+    URI_BHV_TYPE_BHV,
+    URI_ENV_TYPE_OBJ,
+    URI_SIM_PRED_HAS_CONFIG,
+    URI_SIM_PRED_OBJ_MODEL,
+    URI_SIM_TYPE_OBJ_MODEL,
+    URI_SIM_TYPE_SIM_OBJ,
+    URI_TASK_TYPE_TASK,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENARIO_TMPL,
     URI_BDD_TYPE_SCENARIO_VARIANT,
     URI_BDD_TYPE_US,
     URI_BHV_PRED_OF_BHV,
+    URI_TASK_PRED_OF_TASK,
     URI_GEOM_RIGID_BODY,
     URI_GEOM_SIMPLICES,
     URI_GEOM_FRAME,
@@ -297,6 +305,7 @@ Q_USER_STORY = f"""
 CONSTRUCT {{
     ?us {URI_BDD_PRED_HAS_AC.n3()} ?scenarioVar .
     ?scenarioVar
+        {URI_TASK_PRED_OF_TASK.n3()} ?task ;
         {URI_BHV_PRED_OF_BHV.n3()} ?behaviour ;
         {URI_BDD_PRED_OF_TMPL.n3()} ?scenarioTmpl ;
         {URI_BDD_PRED_OF_SCENARIO.n3()} ?scenario ;
@@ -322,8 +331,32 @@ WHERE {{
 
     ?scenario a {URI_BDD_TYPE_SCENARIO.n3()} ;
         {URI_BHV_PRED_OF_BHV.n3()} ?behaviour ;
+        {URI_TASK_PRED_OF_TASK.n3()} ?task ;
         {URI_BDD_PRED_GIVEN.n3()} ?given ;
         {URI_BDD_PRED_WHEN.n3()} ?when ;
         {URI_BDD_PRED_THEN.n3()} ?then .
+
+    ?behaviour a {URI_BHV_TYPE_BHV.n3()} .
+    ?task a {URI_TASK_TYPE_TASK.n3()} .
+}}
+"""
+
+Q_SIMULATED_OBJECT = f"""
+CONSTRUCT {{
+    ?obj {URI_SIM_PRED_OBJ_MODEL.n3()} ?objModel ;
+        {URI_SIM_PRED_HAS_CONFIG.n3()} ?objConfigs .
+    ?objModel a ?objModelType .
+}}
+WHERE {{
+    ?simObj a {URI_SIM_TYPE_SIM_OBJ.n3()} ;
+        {URI_SIM_PRED_OBJ_MODEL.n3()} ?objModel ;
+        {URI_ENV_PRED_OF_OBJ.n3()} ?obj .
+    OPTIONAL {{
+        ?simObj {URI_SIM_PRED_HAS_CONFIG.n3()} ?objConfigs .
+    }}
+    ?obj a {URI_ENV_TYPE_OBJ.n3()} .
+
+    ?objModel a {URI_SIM_TYPE_OBJ_MODEL.n3() } ;
+        a ?objModelType .
 }}
 """

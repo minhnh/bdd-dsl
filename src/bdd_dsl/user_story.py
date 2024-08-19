@@ -1,5 +1,4 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any
 from rdflib import RDF, Graph, URIRef
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
@@ -11,6 +10,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_AC,
     URI_BDD_TYPE_SCENE_WS,
     URI_BHV_PRED_OF_BHV,
+    URI_TASK_PRED_OF_TASK,
     URI_ENV_PRED_HAS_OBJ,
     URI_ENV_PRED_HAS_WS,
     URI_AGN_PRED_HAS_AGN,
@@ -49,21 +49,38 @@ class SceneModel(object):
 class ScenarioVariantModel(object):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
+    scenario_id: URIRef
+    tmpl_id: URIRef
+    bhv_id: URIRef
+    task_id: URIRef
+    scene: SceneModel
+
     def __init__(self, us_graph: Graph, full_graph: Graph, var_id: URIRef) -> None:
         self.id = var_id
 
-        self.scenario_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
-        assert (
-            self.scenario_id is not None
+        node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
+        assert node_val is not None and isinstance(
+            node_val, URIRef
         ), f"ScenarioVariant '{var_id}' does not refer to a Scenario"
+        self.scenario_id = node_val
 
-        self.tmpl_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_TMPL)
-        assert (
-            self.tmpl_id is not None
+        node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_TMPL)
+        assert node_val is not None and isinstance(
+            node_val, URIRef
         ), f"ScenarioVariant '{var_id}' does not refer to a ScenarioTemplate"
+        self.tmpl_id = node_val
 
-        self.bhv_id = us_graph.value(subject=var_id, predicate=URI_BHV_PRED_OF_BHV)
-        assert self.bhv_id is not None, f"ScenarioVariant '{var_id}' does not refer to a Behaviour"
+        node_val = us_graph.value(subject=var_id, predicate=URI_BHV_PRED_OF_BHV)
+        assert node_val is not None and isinstance(
+            node_val, URIRef
+        ), f"ScenarioVariant '{var_id}' does not refer to a Behaviour"
+        self.bhv_id = node_val
+
+        node_val = us_graph.value(subject=var_id, predicate=URI_TASK_PRED_OF_TASK)
+        assert node_val is not None and isinstance(
+            node_val, URIRef
+        ), f"ScenarioVariant '{var_id}' does not refer to a Task"
+        self.task_id = node_val
 
         scene_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_HAS_SCENE)
         assert scene_id is not None, f"ScenarioVariant '{var_id}' does not refer to a Scene"
@@ -78,7 +95,7 @@ class ScenarioVariantModel(object):
 
 
 class UserStoryLoader(object):
-    def __init__(self, graph: Graph, **kwargs: Any) -> None:
+    def __init__(self, graph: Graph) -> None:
         q_result = graph.query(Q_USER_STORY)
         assert q_result.type == "CONSTRUCT" and q_result.graph is not None
         self._us_graph = q_result.graph

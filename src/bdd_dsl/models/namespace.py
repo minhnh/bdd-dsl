@@ -3,6 +3,8 @@ from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS
 from bdd_dsl.models.uri import (
     URI_MM_BDD,
     URI_MM_BHV,
+    URI_MM_SIM,
+    URI_MM_TASK,
     URI_MM_GEOM_EXT,
     URI_MM_PROB,
     URI_MM_DISTRIB,
@@ -16,6 +18,8 @@ NS_MM_PROB = Namespace(URI_MM_PROB)
 NS_MM_DISTRIB = Namespace(URI_MM_DISTRIB)
 NS_MM_BDD = Namespace(URI_MM_BDD)
 NS_MM_BHV = Namespace(URI_MM_BHV)
+NS_MM_TASK = Namespace(URI_MM_TASK)
+NS_MM_SIM = Namespace(URI_MM_SIM)
 
 NS_M_SIM = Namespace(URI_M_SIM)
 
