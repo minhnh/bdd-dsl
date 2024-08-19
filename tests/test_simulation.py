@@ -50,12 +50,14 @@ class BDDSimTest(unittest.TestCase):
             assert isinstance(obj_id, URIRef)
             obj_inst = obj_res_loader.load_object_model(obj_id)
 
-            if URI_SIM_TYPE_SYS_RES in obj_inst.types:
-                _ = get_path_of_node(graph=graph, node_id=obj_inst.id)
+            if URI_SIM_TYPE_SYS_RES in obj_inst.model_types:
+                _ = get_path_of_node(graph=graph, node_id=obj_inst.model_id)
 
-            elif URI_PY_TYPE_MODULE_ATTR in obj_inst.types:
-                module_name = graph.value(subject=obj_inst.id, predicate=URI_PY_PRED_MODULE_NAME)
-                attr_name = graph.value(subject=obj_inst.id, predicate=URI_PY_PRED_ATTR_NAME)
+            elif URI_PY_TYPE_MODULE_ATTR in obj_inst.model_types:
+                module_name = graph.value(
+                    subject=obj_inst.model_id, predicate=URI_PY_PRED_MODULE_NAME
+                )
+                attr_name = graph.value(subject=obj_inst.model_id, predicate=URI_PY_PRED_ATTR_NAME)
                 assert module_name is not None and attr_name is not None
 
 
