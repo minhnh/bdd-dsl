@@ -14,14 +14,24 @@ URL_MM_SIM_SHACL = f"{URL_SECORO_MM}/acceptance-criteria/bdd/simulation.shacl.tt
 
 
 class ObjectModel(object):
-    def __init__(self, graph: Graph, model_id: URIRef):
-        self.id = model_id
-        self.types = set(graph.objects(subject=model_id, predicate=RDF.type))
-        config_data = graph.value(subject=model_id, predicate=URI_SIM_PRED_HAS_CONFIG)
+    id: URIRef
+    configs: dict
+    model_id: URIRef
+    model_types: set
+
+    def __init__(self, graph: Graph, obj_id: URIRef):
+        self.id = obj_id
+        config_data = graph.value(subject=obj_id, predicate=URI_SIM_PRED_HAS_CONFIG)
         if config_data is None:
             self.configs = {}
         else:
             self.configs = json.loads(str(config_data))
+
+        obj_models = list(graph.objects(subject=obj_id, predicate=URI_SIM_PRED_OBJ_MODEL))
+        assert len(obj_models) == 1, f"expected 1 object model for '{obj_id}', got: {obj_models}"
+        assert isinstance(obj_models[0], URIRef)
+        self.model_id = obj_models[0]
+        self.model_types = set(graph.objects(subject=self.model_id, predicate=RDF.type))
 
 
 class ObjModelLoader(object):
@@ -30,29 +40,15 @@ class ObjModelLoader(object):
         assert q_result.type == "CONSTRUCT"
         assert q_result.graph is not None
 
-        self._obj_resource_graph = q_result.graph
-        self._obj_to_model_map = {}  # obj URI -> obj model URI
-        self._obj_models = {}  # obj model URI -> ObjectModel instance
+        self._sim_obj_graph = q_result.graph
+        self._obj_models = {}  # Object URI -> ObjectModel instance
 
     def load_object_model(self, obj_id: URIRef) -> ObjectModel:
-        if obj_id in self._obj_to_model_map:
-            obj_model_id = self._obj_to_model_map[obj_id]
-        else:
-            obj_models = list(
-                self._obj_resource_graph.objects(subject=obj_id, predicate=URI_SIM_PRED_OBJ_MODEL)
-            )
-            assert (
-                len(obj_models) == 1
-            ), f"expected 1 object model for '{obj_id}', got: {obj_models}"
-            obj_model_id = obj_models[0]
-            assert isinstance(obj_model_id, URIRef)
-            self._obj_to_model_map[obj_id] = obj_model_id
+        if obj_id in self._obj_models:
+            return self._obj_models[obj_id]
 
-        if obj_model_id in self._obj_models:
-            return self._obj_models[obj_model_id]
-
-        obj_model = ObjectModel(graph=self._obj_resource_graph, model_id=obj_model_id)
-        self._obj_models[obj_model_id] = obj_model
+        obj_model = ObjectModel(graph=self._sim_obj_graph, obj_id=obj_id)
+        self._obj_models[obj_id] = obj_model
         return obj_model
 
 
