@@ -99,7 +99,6 @@ class UserStoryLoader(object):
         q_result = graph.query(Q_USER_STORY)
         assert q_result.type == "CONSTRUCT" and q_result.graph is not None
         self._us_graph = q_result.graph
-        print(self._us_graph.serialize(format="json-ld"))
 
         # add namespaces from given graph to ensure consistent parsing of short URIs
         for prefix, uri in graph.namespaces():

@@ -356,7 +356,7 @@ WHERE {{
     }}
     ?obj a {URI_ENV_TYPE_OBJ.n3()} .
 
-    ?objModel a {URI_SIM_TYPE_OBJ_MODEL.n3() } ;
+    ?objModel a {URI_SIM_TYPE_OBJ_MODEL.n3()} ;
         a ?objModelType .
 }}
 """

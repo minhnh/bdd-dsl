@@ -29,7 +29,7 @@ class ObjectModel(object):
 
         obj_models = list(graph.objects(subject=obj_id, predicate=URI_SIM_PRED_OBJ_MODEL))
         assert len(obj_models) == 1, f"expected 1 object model for '{obj_id}', got: {obj_models}"
-        assert isinstance(obj_models[0], URIRef)
+        assert isinstance(obj_models[0], URIRef), f"'{obj_models[0]}' is not of type URIRef"
         self.model_id = obj_models[0]
         self.model_types = set(graph.objects(subject=self.model_id, predicate=RDF.type))
 
@@ -37,8 +37,9 @@ class ObjectModel(object):
 class ObjModelLoader(object):
     def __init__(self, graph: Graph):
         q_result = graph.query(Q_SIMULATED_OBJECT)
-        assert q_result.type == "CONSTRUCT"
-        assert q_result.graph is not None
+        assert (
+            q_result.type == "CONSTRUCT" and q_result.graph is not None
+        ), "querying simulated objects failed"
 
         self._sim_obj_graph = q_result.graph
         self._obj_models = {}  # Object URI -> ObjectModel instance

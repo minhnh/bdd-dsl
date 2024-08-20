@@ -5,6 +5,7 @@ from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
+from bdd_dsl.simulation.common import ObjModelLoader
 from bdd_dsl.user_story import ScenarioVariantModel, UserStoryLoader
 
 
@@ -15,6 +16,7 @@ def before_all_mockup(context: Context):
     exec_model = ExecutionModel(graph=g)
     context.execution_model = exec_model
     context.us_loader = UserStoryLoader(graph=g)
+    context.obj_model_loader = ObjModelLoader(graph=g)
 
 
 def before_scenario(context: Context, scenario: Scenario):
@@ -56,7 +58,13 @@ def given_objects_mockup(context: Context):
     object_set = set()
     assert context.table is not None, "no table added to context, expected a list of objects"
     for row in context.table:
-        object_set.add(row["name"])
+        obj_id_str = row["name"]
+        object_set.add(obj_id_str)
+        try:
+            obj_uri = context.model_graph.namespace_manager.expand_curie(obj_id_str)
+        except ValueError as e:
+            raise RuntimeError(f"can't parse object URI '{obj_id_str}': {e}")
+        _ = context.obj_model_loader.load_object_model(obj_uri)
 
     context.objects = object_set
 
