@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV, NS_MM_AGN
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
@@ -79,6 +80,8 @@ URI_PROB_FROM_DISTRIBUTION = NS_MM_PROB["from-distribution"]
 URI_ENV_TYPE_OBJ = NS_MM_ENV["Object"]
 URI_ENV_TYPE_WS = NS_MM_ENV["Workspace"]
 URI_ENV_TYPE_RIGID_OBJ = NS_MM_ENV["RigidObject"]
+URI_ENV_TYPE_OBJ_MODEL = NS_MM_ENV["ObjectModel"]
+URI_ENV_PRED_OBJ_MODEL = NS_MM_ENV["object-model"]
 URI_ENV_PRED_HAS_OBJ = NS_MM_ENV["has-object"]
 URI_ENV_PRED_OF_OBJ = NS_MM_ENV["of-object"]
 URI_ENV_PRED_HAS_WS = NS_MM_ENV["has-workspace"]
@@ -99,9 +102,7 @@ URI_TASK_PRED_OF_TASK = NS_MM_TASK["of-task"]
 
 # Simulation
 URI_SIM_TYPE_SIM_OBJ = NS_MM_SIM["SimulatedObject"]
-URI_SIM_TYPE_OBJ_MODEL = NS_MM_SIM["ObjectModel"]
 URI_SIM_TYPE_SYS_RES = NS_MM_SIM["SystemResource"]
-URI_SIM_PRED_OBJ_MODEL = NS_MM_SIM["object-model"]
 URI_SIM_PRED_HAS_CONFIG = NS_MM_SIM["has-config"]
 URI_SIM_PRED_PATH = NS_MM_SIM["path"]
 
