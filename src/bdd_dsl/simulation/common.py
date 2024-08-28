@@ -4,7 +4,7 @@ from rdflib import Graph, URIRef, RDF
 from rdf_utils.uri import URL_SECORO_MM
 from bdd_dsl.models.queries import Q_SIMULATED_OBJECT
 from bdd_dsl.models.urirefs import (
-    URI_ENV_PRED_OBJ_MODEL,
+    URI_ENV_PRED_HAS_OBJ_MODEL,
     URI_SIM_PRED_PATH,
     URI_SIM_PRED_HAS_CONFIG,
 )
@@ -27,7 +27,7 @@ class ObjectModel(object):
         else:
             self.configs = json.loads(str(config_data))
 
-        obj_models = list(graph.objects(subject=obj_id, predicate=URI_ENV_PRED_OBJ_MODEL))
+        obj_models = list(graph.objects(subject=obj_id, predicate=URI_ENV_PRED_HAS_OBJ_MODEL))
         assert len(obj_models) == 1, f"expected 1 object model for '{obj_id}', got: {obj_models}"
         assert isinstance(obj_models[0], URIRef), f"'{obj_models[0]}' is not of type URIRef"
         self.model_id = obj_models[0]
