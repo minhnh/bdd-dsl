@@ -3,6 +3,9 @@ from jinja2 import Environment, FileSystemLoader, Template
 from typing import List
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
 from rdf_utils.naming import get_valid_var_name
+from rdflib import Graph
+from rdflib.namespace import NamespaceManager
+from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import (
     Q_BDD_PRED_LOCATED_AT,
     Q_BDD_PRED_IS_NEAR,
@@ -10,6 +13,9 @@ from bdd_dsl.models.queries import (
     Q_HAS_EVENT,
 )
 from bdd_dsl.models.frames import (
+    FR_AGENTS,
+    FR_OBJECTS,
+    FR_SCENE,
     FR_TYPE,
     FR_FLUENTS,
     FR_NAME,
@@ -23,7 +29,9 @@ from bdd_dsl.models.frames import (
     FR_THEN,
     FR_HOLDS,
     FR_CLAUSES_DATA,
+    FR_WS,
 )
+from bdd_dsl.models.user_story import UserStoryLoader
 from bdd_dsl.exception import BDDConstraintViolation
 
 
@@ -138,3 +146,62 @@ def prepare_gherkin_feature_data(us_data: dict):
         )
         if Q_HAS_EVENT in scenario_data[FR_SCENARIO][FR_WHEN]:
             scenario_data["when_event"] = scenario_data[FR_SCENARIO][FR_WHEN][Q_HAS_EVENT][FR_NAME]
+
+
+def prepare_jinja2_template_data(
+    us_loader: UserStoryLoader, full_graph: Graph, ns_manager: NamespaceManager = NS_MANAGER
+) -> list[dict]:
+    """TODO(minhnh): specify which template"""
+    us_var_dict = us_loader.get_us_scenario_variants()
+    jinja_data = []
+    for us_id, scr_var_set in us_var_dict.items():
+        us_id_str = us_id.n3(namespace_manager=ns_manager)
+        us_data = {FR_NAME: us_id_str, FR_CRITERIA: []}
+
+        # TODO(minhnh): handles a UserStory having multiple scenes, since scenes are linked to
+        # a ScenarioTemplate, multiple of which can appear in a UserStory. This can perhaps be
+        # a constraint on USs, but for now just raise an error
+        scene_data = {}
+
+        for scr_var_id in scr_var_set:
+            scr_var = us_loader.load_scenario_variant(full_graph=full_graph, variant_id=scr_var_id)
+
+            # Scene data
+            scene_id_str = scr_var.scene.id.n3(namespace_manager=ns_manager)
+            if FR_NAME not in scene_data:
+                scene_data[FR_NAME] = scene_id_str
+
+                obj_list = []
+                for obj_id in scr_var.scene.objects.keys():
+                    obj_list.append(obj_id.n3(namespace_manager=ns_manager))
+                if len(obj_list) > 0:
+                    scene_data[FR_OBJECTS] = obj_list
+
+                ws_list = []
+                for ws_id in scr_var.scene.workspaces.keys():
+                    ws_list.append(ws_id.n3(namespace_manager=ns_manager))
+                if len(ws_list) > 0:
+                    scene_data[FR_WS] = ws_list
+
+                agn_list = []
+                for agn_id in scr_var.scene.agents.keys():
+                    agn_list.append(agn_id.n3(namespace_manager=ns_manager))
+                if len(agn_list) > 0:
+                    scene_data[FR_AGENTS] = agn_list
+            else:
+                if scene_id_str != scene_data[FR_NAME]:
+                    raise ValueError(
+                        f"can't handle multiple scenes for US '{us_id_str}': {scene_data[FR_NAME]}, {scene_id_str}"
+                    )
+
+            # ScenarioVariant data
+            scr_var_id_str = scr_var_id.n3(namespace_manager=ns_manager)
+            scr_var_data = {FR_NAME: scr_var_id_str}
+
+            us_data[FR_CRITERIA].append(scr_var_data)
+
+        us_data[FR_SCENE] = scene_data
+
+        jinja_data.append(us_data)
+
+    return jinja_data
