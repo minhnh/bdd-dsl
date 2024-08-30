@@ -1,5 +1,12 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV, NS_MM_AGN
+from rdf_utils.namespace import (
+    NS_MM_GEOM,
+    NS_MM_GEOM_REL,
+    NS_MM_GEOM_COORD,
+    NS_MM_ENV,
+    NS_MM_AGN,
+    NS_MM_TIME,
+)
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
@@ -97,6 +104,11 @@ URI_AGN_PRED_HAS_AGN = NS_MM_AGN["has-agent"]
 URI_BHV_TYPE_BHV = NS_MM_BHV["Behaviour"]
 URI_BHV_PRED_OF_BHV = NS_MM_BHV["of-behaviour"]
 
+# Time
+URI_TIME_TYPE_BEFORE_EVT = NS_MM_TIME["BeforeEventConstraint"]
+URI_TIME_TYPE_AFTER_EVT = NS_MM_TIME["AfterEventConstraint"]
+URI_TIME_PRED_REF_EVT = NS_MM_TIME["ref-event"]
+
 # Task
 URI_TASK_TYPE_TASK = NS_MM_TASK["Task"]
 URI_TASK_PRED_OF_TASK = NS_MM_TASK["of-task"]
@@ -124,6 +136,10 @@ URI_BDD_PRED_OF_SCENARIO = NS_MM_BDD["of-scenario"]
 URI_BDD_PRED_OF_TMPL = NS_MM_BDD["of-template"]
 URI_BDD_PRED_OF_SCENE = NS_MM_BDD["of-scene"]
 URI_BDD_PRED_HAS_SCENE = NS_MM_BDD["has-scene"]
+URI_BDD_PRED_HAS_CLAUSE = NS_MM_BDD["has-clause"]
+URI_BDD_PRED_CLAUSE_OF = NS_MM_BDD["clause-of"]
+URI_BDD_PRED_HOLDS = NS_MM_BDD["holds"]
+URI_BDD_PRED_HOLDS_AT = NS_MM_BDD["holds-at"]
 URI_BDD_PRED_HAS_VARIATION = NS_MM_BDD["has-variation"]
 URI_BDD_PRED_HAS_AC = NS_MM_BDD["has-criteria"]
 URI_BDD_PRED_HAS_BHV_IMPL = NS_MM_BDD["has-behaviour-impl"]

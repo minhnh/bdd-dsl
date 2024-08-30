@@ -5,8 +5,8 @@ from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
-from bdd_dsl.simulation.common import ObjModelLoader
-from bdd_dsl.user_story import ScenarioVariantModel, UserStoryLoader
+from bdd_dsl.simulation.common import ObjModelLoader, ObjectModel
+from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
 
 def before_all_mockup(context: Context):
@@ -64,7 +64,9 @@ def given_objects_mockup(context: Context):
             obj_uri = context.model_graph.namespace_manager.expand_curie(obj_id_str)
         except ValueError as e:
             raise RuntimeError(f"can't parse object URI '{obj_id_str}': {e}")
-        _ = context.obj_model_loader.load_object_model(obj_uri)
+
+        obj_model = context.obj_model_loader.load_object_model(obj_uri)
+        assert isinstance(obj_model, ObjectModel)
 
     context.objects = object_set
 
