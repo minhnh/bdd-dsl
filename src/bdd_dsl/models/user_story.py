@@ -1,7 +1,8 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Dict, Iterable, Set
+from typing import Dict, Generator, Iterable, Set
 from rdflib import RDF, Graph, URIRef
 from rdflib.query import ResultRow
+from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_CLAUSE_OF,
@@ -9,8 +10,13 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_CLAUSE,
     URI_BDD_PRED_HOLDS,
     URI_BDD_PRED_HOLDS_AT,
+    URI_BDD_PRED_REF_AGN,
+    URI_BDD_PRED_REF_OBJ,
+    URI_BDD_PRED_REF_WS,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_WHEN,
+    URI_BDD_TYPE_IS_HELD,
+    URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_SCENE_AGN,
     URI_BDD_TYPE_SCENE_OBJ,
     URI_BDD_PRED_HAS_SCENE,
@@ -24,6 +30,9 @@ from bdd_dsl.models.urirefs import (
     URI_ENV_PRED_HAS_OBJ,
     URI_ENV_PRED_HAS_WS,
     URI_AGN_PRED_HAS_AGN,
+    URI_TIME_PRED_REF_EVT,
+    URI_TIME_TYPE_AFTER_EVT,
+    URI_TIME_TYPE_BEFORE_EVT,
 )
 
 
@@ -33,26 +42,95 @@ SELECT DISTINCT ?us ?var WHERE {{
     ?us {URI_BDD_PRED_HAS_AC.n3()} ?var .
 }}
 """
+KEY_OBJ_ID = "object_id"
+KEY_WS_ID = "workspace_id"
+KEY_AGN_ID = "agent_id"
+KEY_EVT_ID = "event_id"
 
 
 class FluentModel(object):
     id: URIRef
     types: set
+    attributes: dict
 
     def __init__(self, full_graph: Graph, fluent_id: URIRef) -> None:
         self.id = fluent_id
         self.types = set(full_graph.objects(subject=fluent_id, predicate=RDF.type))
         assert len(self.types) > 0
 
+        self.attributes = {}
+
 
 class TimeConstraintModel(object):
     id: URIRef
     types: set
+    attributes: dict
 
     def __init__(self, full_graph: Graph, tc_id: URIRef) -> None:
         self.id = tc_id
         self.types = set(full_graph.objects(subject=tc_id, predicate=RDF.type))
         assert len(self.types) > 0
+
+        self.attributes = {}
+
+
+def process_fluent_model(clause_id: URIRef, fluent: FluentModel, full_graph: Graph):
+    if URI_BDD_TYPE_LOCATED_AT in fluent.types:
+        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_OBJ))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'LocatedAt',"
+                f" does not refer to exactly 1 object: {var_ids}"
+            )
+        assert KEY_OBJ_ID not in fluent.attributes
+        fluent.attributes[KEY_OBJ_ID] = var_ids[0]
+
+        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_WS))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'LocatedAt',"
+                f" does not refer to exactly 1 workspace: {var_ids}"
+            )
+        assert KEY_WS_ID not in fluent.attributes
+        fluent.attributes[KEY_WS_ID] = var_ids[0]
+        return
+
+    if URI_BDD_TYPE_IS_HELD in fluent.types:
+        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_OBJ))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'IsHeld',"
+                f" does not refer to exactly 1 object: {var_ids}"
+            )
+        assert KEY_OBJ_ID not in fluent.attributes
+        fluent.attributes[KEY_OBJ_ID] = var_ids[0]
+
+        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_AGN))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'IsHeld',"
+                f" does not refer to exactly 1 agent: {var_ids}"
+            )
+        assert KEY_AGN_ID not in fluent.attributes
+        fluent.attributes[KEY_AGN_ID] = var_ids[0]
+        return
+
+    raise RuntimeError(
+        f"process_fluent_model: unhandled types for fluent '{fluent.id}' of clause '{clause_id}': {fluent.types}"
+    )
+
+
+def process_time_constraint_model(constraint: TimeConstraintModel, full_graph: Graph):
+    if URI_TIME_TYPE_BEFORE_EVT in constraint.types or URI_TIME_TYPE_AFTER_EVT in constraint.types:
+        event_ids = list(full_graph.objects(subject=constraint.id, predicate=URI_TIME_PRED_REF_EVT))
+        if len(event_ids) != 1:
+            raise BDDConstraintViolation(
+                f"TimeConstraint '{constraint.id}' of  type '{constraint.types}'"
+                f" does not refer to exactly 1 event: {event_ids}"
+            )
+        assert isinstance(event_ids[0], URIRef)
+        assert KEY_EVT_ID not in constraint.attributes
+        constraint.attributes[KEY_EVT_ID] = event_ids[0]
 
 
 class FluentClauseModel(object):
@@ -70,11 +148,15 @@ class FluentClauseModel(object):
 
         fluent_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS)
         assert isinstance(fluent_id, URIRef)
-        self.fluent = FluentModel(full_graph=full_graph, fluent_id=fluent_id)
+        fluent = FluentModel(full_graph=full_graph, fluent_id=fluent_id)
+        process_fluent_model(clause_id=self.id, fluent=fluent, full_graph=full_graph)
+        self.fluent = fluent
 
         tc_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS_AT)
         assert isinstance(tc_id, URIRef)
-        self.time_constraint = TimeConstraintModel(full_graph=full_graph, tc_id=tc_id)
+        tc = TimeConstraintModel(full_graph=full_graph, tc_id=tc_id)
+        process_time_constraint_model(constraint=tc, full_graph=full_graph)
+        self.time_constraint = tc
 
 
 class SceneModel(object):
@@ -205,8 +287,18 @@ class ScenarioVariantModel(object):
         assert (
             clause.clause_of in self._clauses_by_role
         ), f"Clause '{clause_id}' not connected to Given, When, Then of Scenario '{self.scenario_id}'"
+        assert clause_id not in self._clauses_by_role[clause.clause_of]
 
         self._clauses[clause_id] = clause
+        self._clauses_by_role[clause.clause_of].add(clause_id)
+
+    def get_given_clause_models(self) -> Generator[FluentClauseModel, None, None]:
+        for given_clause_id in self._clauses_by_role[self.given_id]:
+            yield self._clauses[given_clause_id]
+
+    def get_then_clause_models(self) -> Generator[FluentClauseModel, None, None]:
+        for then_clause_id in self._clauses_by_role[self.then_id]:
+            yield self._clauses[then_clause_id]
 
 
 class UserStoryLoader(object):
