@@ -3,7 +3,7 @@ from jinja2 import Environment, FileSystemLoader, Template
 from typing import List
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
 from rdf_utils.naming import get_valid_var_name
-from rdflib import Graph, URIRef
+from rdflib import Graph
 from rdflib.namespace import NamespaceManager
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import (
@@ -31,14 +31,10 @@ from bdd_dsl.models.frames import (
     FR_CLAUSES_DATA,
     FR_WS,
 )
-from bdd_dsl.models.urirefs import URI_BDD_TYPE_IS_HELD, URI_BDD_TYPE_LOCATED_AT
 from bdd_dsl.models.user_story import (
-    KEY_AGN_ID,
-    KEY_OBJ_ID,
-    KEY_WS_ID,
-    FluentModel,
     ScenarioVariantModel,
     UserStoryLoader,
+    get_clause_str,
 )
 from bdd_dsl.exception import BDDConstraintViolation
 
@@ -154,36 +150,6 @@ def prepare_gherkin_feature_data(us_data: dict):
         )
         if Q_HAS_EVENT in scenario_data[FR_SCENARIO][FR_WHEN]:
             scenario_data["when_event"] = scenario_data[FR_SCENARIO][FR_WHEN][Q_HAS_EVENT][FR_NAME]
-
-
-def get_clause_str(fluent: FluentModel, ns_manager: NamespaceManager = NS_MANAGER) -> str:
-    if URI_BDD_TYPE_LOCATED_AT in fluent.types:
-        assert KEY_OBJ_ID in fluent.attributes
-        obj_id = fluent.attributes[KEY_OBJ_ID]
-        assert isinstance(obj_id, URIRef)
-        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
-
-        assert KEY_WS_ID in fluent.attributes
-        ws_id = fluent.attributes[KEY_WS_ID]
-        assert isinstance(ws_id, URIRef)
-        ws_id_str = get_valid_var_name(ws_id.n3(ns_manager))
-
-        return f'"<{obj_id_str}>" is located at "<{ws_id_str}>"'
-
-    if URI_BDD_TYPE_IS_HELD in fluent.types:
-        assert KEY_OBJ_ID in fluent.attributes
-        obj_id = fluent.attributes[KEY_OBJ_ID]
-        assert isinstance(obj_id, URIRef)
-        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
-
-        assert KEY_AGN_ID in fluent.attributes
-        agn_id = fluent.attributes[KEY_AGN_ID]
-        assert isinstance(agn_id, URIRef)
-        agn_id_str = get_valid_var_name(agn_id.n3(ns_manager))
-
-        return f'"<{obj_id_str}>" is held by "<{agn_id_str}>"'
-
-    raise RuntimeError(f"get_clause_str: unhandled types for fluent '{fluent.id}': {fluent.types}")
 
 
 def prepare_scenario_variant_date(

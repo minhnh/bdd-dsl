@@ -1,8 +1,11 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Dict, Generator, Iterable, Set
+from rdf_utils.naming import get_valid_var_name
 from rdflib import RDF, Graph, URIRef
+from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
 from bdd_dsl.exception import BDDConstraintViolation
+from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_CLAUSE_OF,
@@ -61,19 +64,6 @@ class FluentModel(object):
         self.attributes = {}
 
 
-class TimeConstraintModel(object):
-    id: URIRef
-    types: set
-    attributes: dict
-
-    def __init__(self, full_graph: Graph, tc_id: URIRef) -> None:
-        self.id = tc_id
-        self.types = set(full_graph.objects(subject=tc_id, predicate=RDF.type))
-        assert len(self.types) > 0
-
-        self.attributes = {}
-
-
 def process_fluent_model(clause_id: URIRef, fluent: FluentModel, full_graph: Graph):
     if URI_BDD_TYPE_LOCATED_AT in fluent.types:
         var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_OBJ))
@@ -118,6 +108,49 @@ def process_fluent_model(clause_id: URIRef, fluent: FluentModel, full_graph: Gra
     raise RuntimeError(
         f"process_fluent_model: unhandled types for fluent '{fluent.id}' of clause '{clause_id}': {fluent.types}"
     )
+
+
+def get_clause_str(fluent: FluentModel, ns_manager: NamespaceManager = NS_MANAGER) -> str:
+    if URI_BDD_TYPE_LOCATED_AT in fluent.types:
+        assert KEY_OBJ_ID in fluent.attributes
+        obj_id = fluent.attributes[KEY_OBJ_ID]
+        assert isinstance(obj_id, URIRef)
+        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
+
+        assert KEY_WS_ID in fluent.attributes
+        ws_id = fluent.attributes[KEY_WS_ID]
+        assert isinstance(ws_id, URIRef)
+        ws_id_str = get_valid_var_name(ws_id.n3(ns_manager))
+
+        return f'"<{obj_id_str}>" is located at "<{ws_id_str}>"'
+
+    if URI_BDD_TYPE_IS_HELD in fluent.types:
+        assert KEY_OBJ_ID in fluent.attributes
+        obj_id = fluent.attributes[KEY_OBJ_ID]
+        assert isinstance(obj_id, URIRef)
+        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
+
+        assert KEY_AGN_ID in fluent.attributes
+        agn_id = fluent.attributes[KEY_AGN_ID]
+        assert isinstance(agn_id, URIRef)
+        agn_id_str = get_valid_var_name(agn_id.n3(ns_manager))
+
+        return f'"<{obj_id_str}>" is held by "<{agn_id_str}>"'
+
+    raise RuntimeError(f"get_clause_str: unhandled types for fluent '{fluent.id}': {fluent.types}")
+
+
+class TimeConstraintModel(object):
+    id: URIRef
+    types: set
+    attributes: dict
+
+    def __init__(self, full_graph: Graph, tc_id: URIRef) -> None:
+        self.id = tc_id
+        self.types = set(full_graph.objects(subject=tc_id, predicate=RDF.type))
+        assert len(self.types) > 0
+
+        self.attributes = {}
 
 
 def process_time_constraint_model(constraint: TimeConstraintModel, full_graph: Graph):
