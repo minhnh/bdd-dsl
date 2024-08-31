@@ -25,6 +25,7 @@ from bdd_dsl.models.frames import (
     FR_CRITERIA,
     FR_SCENARIO,
     FR_GIVEN,
+    FR_VARIABLES,
     FR_WHEN,
     FR_THEN,
     FR_HOLDS,
@@ -181,6 +182,9 @@ def prepare_scenario_variant_date(
 
     scr_var_data["given_clauses"] = given_clause_strings
     scr_var_data["then_clauses"] = then_clause_strings
+    scr_var_data[FR_VARIABLES] = []
+    for var_id in scr_var_model.variables:
+        scr_var_data[FR_VARIABLES].append(get_valid_var_name(var_id.n3(ns_manager)))
 
 
 def prepare_jinja2_template_data(

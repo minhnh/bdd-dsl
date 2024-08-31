@@ -245,6 +245,7 @@ class ScenarioVariantModel(object):
     bhv_id: URIRef
     task_id: URIRef
     scene: SceneModel
+    variables: set[URIRef]  # set of ScenarioVariables referred to by clauses
 
     def __init__(self, us_graph: Graph, full_graph: Graph, var_id: URIRef) -> None:
         self.id = var_id
@@ -307,6 +308,7 @@ class ScenarioVariantModel(object):
         self._clauses_by_role = {self.given_id: set(), self.when_id: set(), self.then_id: set()}
         self._tmpl_clauses = set()
         self._variant_clauses = set()
+        self.variables = set()
         self._load_clauses(full_graph)
 
     def _load_clauses(self, full_graph: Graph) -> None:
@@ -336,6 +338,8 @@ class ScenarioVariantModel(object):
 
         self._clauses[clause_id] = clause
         self._clauses_by_role[clause.clause_of].add(clause_id)
+        for var_id in clause.role_by_variable.keys():
+            self.variables.add(var_id)
 
     def get_given_clause_models(self) -> Generator[FluentClauseModel, None, None]:
         for given_clause_id in self._clauses_by_role[self.given_id]:
