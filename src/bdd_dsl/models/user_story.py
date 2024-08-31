@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Dict, Generator, Iterable, Set
+from typing import Dict, Generator, Iterable
 from rdf_utils.naming import get_valid_var_name
 from rdflib import RDF, Graph, URIRef
 from rdflib.namespace import NamespaceManager
@@ -45,9 +45,6 @@ SELECT DISTINCT ?us ?var WHERE {{
     ?us {URI_BDD_PRED_HAS_AC.n3()} ?var .
 }}
 """
-KEY_OBJ_ID = "object_id"
-KEY_WS_ID = "workspace_id"
-KEY_AGN_ID = "agent_id"
 KEY_EVT_ID = "event_id"
 
 
@@ -92,7 +89,8 @@ class FluentClauseModel(object):
     clause_of: URIRef
     fluent: FluentModel
     time_constraint: TimeConstraintModel
-    attributes: dict
+    variable_by_role: Dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
+    role_by_variable: Dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
 
     def __init__(self, full_graph: Graph, clause_id: URIRef) -> None:
         self.id = clause_id
@@ -105,8 +103,9 @@ class FluentClauseModel(object):
         assert isinstance(fluent_id, URIRef)
         self.fluent = FluentModel(full_graph=full_graph, fluent_id=fluent_id)
 
-        self.attributes = {}
-        process_fluent_model(clause=self, full_graph=full_graph)
+        self.variable_by_role = {}
+        self.role_by_variable = {}
+        self.process_builtin_fluent_types(full_graph=full_graph)
 
         tc_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS_AT)
         assert isinstance(tc_id, URIRef)
@@ -114,76 +113,86 @@ class FluentClauseModel(object):
         process_time_constraint_model(constraint=tc, full_graph=full_graph)
         self.time_constraint = tc
 
+    def add_variable_role(self, full_graph: Graph, role_pred: URIRef):
+        if role_pred not in self.variable_by_role:
+            self.variable_by_role[role_pred] = []
 
-def process_fluent_model(clause: FluentClauseModel, full_graph: Graph):
-    if URI_BDD_TYPE_LOCATED_AT in clause.fluent.types:
-        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_OBJ))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'LocatedAt',"
-                f" does not refer to exactly 1 object: {var_ids}"
-            )
-        assert KEY_OBJ_ID not in clause.attributes
-        clause.attributes[KEY_OBJ_ID] = var_ids[0]
+        for var_id in full_graph.objects(subject=self.id, predicate=role_pred):
+            assert isinstance(var_id, URIRef)
 
-        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_WS))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'LocatedAt',"
-                f" does not refer to exactly 1 workspace: {var_ids}"
-            )
-        assert KEY_WS_ID not in clause.attributes
-        clause.attributes[KEY_WS_ID] = var_ids[0]
-        return
+            self.variable_by_role[role_pred].append(var_id)
 
-    if URI_BDD_TYPE_IS_HELD in clause.fluent.types:
-        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_OBJ))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'IsHeld',"
-                f" does not refer to exactly 1 object: {var_ids}"
-            )
-        assert KEY_OBJ_ID not in clause.attributes
-        clause.attributes[KEY_OBJ_ID] = var_ids[0]
+            if var_id not in self.role_by_variable:
+                self.role_by_variable[var_id] = []
+            self.role_by_variable[var_id].append(var_id)
 
-        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_AGN))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'IsHeld',"
-                f" does not refer to exactly 1 agent: {var_ids}"
-            )
-        assert KEY_AGN_ID not in clause.attributes
-        clause.attributes[KEY_AGN_ID] = var_ids[0]
-        return
+        assert (
+            len(self.variable_by_role[role_pred]) > 0
+        ), f"clause '{self.id}' does link to a variable via '{role_pred}'"
 
-    raise RuntimeError(
-        f"process_fluent_model: unhandled types for fluent '{clause.fluent.id}' of clause '{clause.id}':"
-        f" {clause.fluent.types}"
-    )
+    def process_builtin_fluent_types(self, full_graph: Graph):
+        if URI_BDD_TYPE_LOCATED_AT in self.fluent.types:
+            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_OBJ)
+            if len(self.variable_by_role[URI_BDD_PRED_REF_OBJ]) != 1:
+                raise BDDConstraintViolation(
+                    f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'LocatedAt',"
+                    f" does not refer to exactly 1 object: {self.variable_by_role[URI_BDD_PRED_REF_OBJ]}"
+                )
+
+            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_WS)
+            if len(self.variable_by_role[URI_BDD_PRED_REF_WS]) != 1:
+                raise BDDConstraintViolation(
+                    f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'LocatedAt',"
+                    f" does not refer to exactly 1 workspace: {self.variable_by_role[URI_BDD_PRED_REF_WS]}"
+                )
+
+            return
+
+        if URI_BDD_TYPE_IS_HELD in self.fluent.types:
+            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_OBJ)
+            if len(self.variable_by_role[URI_BDD_PRED_REF_OBJ]) != 1:
+                raise BDDConstraintViolation(
+                    f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'IsHeld',"
+                    f" does not refer to exactly 1 object: {self.variable_by_role[URI_BDD_PRED_REF_OBJ]}"
+                )
+
+            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_AGN)
+            if len(self.variable_by_role[URI_BDD_PRED_REF_AGN]) != 1:
+                raise BDDConstraintViolation(
+                    f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'IsHeld',"
+                    f" does not refer to exactly 1 agent: {self.variable_by_role[URI_BDD_PRED_REF_AGN]}"
+                )
+
+            return
+
+        raise RuntimeError(
+            f"process_builtin_fluent_types: unhandled types for fluent '{self.fluent.id}' of clause '{self.id}':"
+            f" {self.fluent.types}"
+        )
 
 
 def get_clause_str(clause: FluentClauseModel, ns_manager: NamespaceManager = NS_MANAGER) -> str:
     if URI_BDD_TYPE_LOCATED_AT in clause.fluent.types:
-        assert KEY_OBJ_ID in clause.attributes
-        obj_id = clause.attributes[KEY_OBJ_ID]
+        assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role
+        obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
         assert isinstance(obj_id, URIRef)
         obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
 
-        assert KEY_WS_ID in clause.attributes
-        ws_id = clause.attributes[KEY_WS_ID]
+        assert URI_BDD_PRED_REF_WS in clause.variable_by_role
+        ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
         assert isinstance(ws_id, URIRef)
         ws_id_str = get_valid_var_name(ws_id.n3(ns_manager))
 
         return f'"<{obj_id_str}>" is located at "<{ws_id_str}>"'
 
     if URI_BDD_TYPE_IS_HELD in clause.fluent.types:
-        assert KEY_OBJ_ID in clause.attributes
-        obj_id = clause.attributes[KEY_OBJ_ID]
+        assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role
+        obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
         assert isinstance(obj_id, URIRef)
         obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
 
-        assert KEY_AGN_ID in clause.attributes
-        agn_id = clause.attributes[KEY_AGN_ID]
+        assert URI_BDD_PRED_REF_AGN in clause.variable_by_role
+        agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
         assert isinstance(agn_id, URIRef)
         agn_id_str = get_valid_var_name(agn_id.n3(ns_manager))
 
@@ -361,7 +370,7 @@ class UserStoryLoader(object):
         self._scenario_variants[variant_id] = var_model
         return var_model
 
-    def get_us_scenario_variants(self) -> Dict[URIRef, Set[URIRef]]:
+    def get_us_scenario_variants(self) -> Dict[URIRef, set[URIRef]]:
         """
         returns { <UserStory URI> : [ <list of ScenarioVariant URIs> ] }
         """
