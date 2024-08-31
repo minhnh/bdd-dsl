@@ -6,12 +6,12 @@ import itertools
 import json
 import numpy as np
 from pyld import jsonld
-import pyshacl
 import py_trees as pt
 import rdflib
-from rdf_utils.uri import URL_SECORO_MM, URL_MM_PYTHON_SHACL
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
 from rdf_utils.naming import get_valid_var_name
+from rdf_utils.constraints import check_shacl_constraints
+from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
 from bdd_dsl.models.queries import (
@@ -73,28 +73,7 @@ from bdd_dsl.models.urirefs import (
     URI_PROB_CONTINUOUS,
 )
 from bdd_dsl.models.namespace import NS_MANAGER
-from bdd_dsl.exception import BDDConstraintViolation, SHACLViolation
-
-
-__BDD_SHACL_URLS = {
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd.shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/time.shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/environment.shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/simulation.shacl.ttl": "turtle",
-    URL_MM_PYTHON_SHACL: "turtle",
-}
-
-
-def load_bdd_shacl_constraints() -> rdflib.Graph:
-    """Load BDD SHACL constraints into an `rdflib.Graph`.
-
-    If `rdf_utils.resolver.IriToFileResolver` is installed, this will cache files to
-    the user's cache directory (e.g. `$HOME/.cache/bdd-dsl` in Linux).
-    """
-    graph = rdflib.ConjunctiveGraph()
-    for mm_url, fmt in __BDD_SHACL_URLS.items():
-        graph.parse(mm_url, format=fmt)
-    return graph
+from bdd_dsl.models.user_story import BDD_SHACL_URLS
 
 
 def query_graph(graph: rdflib.Graph, query_str: str) -> dict:
@@ -444,16 +423,7 @@ def process_bdd_us_from_data(us_data: dict):
 def process_bdd_us_from_graph(graph: rdflib.Graph, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> List:
     """Query and process all UserStory in the JSON-LD graph"""
     # checking conformance against SHACL shape constraints
-    shacl_g = load_bdd_shacl_constraints()
-    conforms, _, report_text = pyshacl.validate(
-        graph,
-        shacl_graph=shacl_g,
-        data_graph_format="json-ld",
-        shacl_graph_format="ttl",
-        inference="rdfs",
-    )
-    if not conforms:
-        raise SHACLViolation(report_text)
+    check_shacl_constraints(graph=graph, shacl_dict=BDD_SHACL_URLS)
 
     bdd_result = query_graph_with_url(graph, URL_Q_BDD_US, timeout=timeout)
     model_framed = frame_model_with_url(bdd_result, FR_URL_BDD_FRAME_US, timeout=timeout)

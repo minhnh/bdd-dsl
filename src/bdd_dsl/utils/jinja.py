@@ -1,10 +1,11 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from jinja2 import Environment, FileSystemLoader, Template
 from typing import List
-from rdf_utils.caching import read_file_and_cache, read_url_and_cache
-from rdf_utils.naming import get_valid_var_name
 from rdflib import Graph
 from rdflib.namespace import NamespaceManager
+from rdf_utils.caching import read_file_and_cache, read_url_and_cache
+from rdf_utils.naming import get_valid_var_name
+from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import (
     Q_BDD_PRED_LOCATED_AT,
@@ -37,7 +38,6 @@ from bdd_dsl.models.user_story import (
     UserStoryLoader,
     get_clause_str,
 )
-from bdd_dsl.exception import BDDConstraintViolation
 
 
 def load_template_from_file(file_path: str) -> Template:
