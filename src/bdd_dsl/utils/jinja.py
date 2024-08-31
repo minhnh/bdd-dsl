@@ -165,7 +165,7 @@ def prepare_scenario_variant_date(
             first_clause = False
         else:
             clause_str = "And "
-        clause_str += get_clause_str(fluent=given_model.fluent, ns_manager=ns_manager)
+        clause_str += get_clause_str(clause=given_model, ns_manager=ns_manager)
         given_clause_strings.append(clause_str)
 
     first_clause = True
@@ -176,7 +176,7 @@ def prepare_scenario_variant_date(
             clause_str = "Then "
         else:
             clause_str = "And "
-        clause_str += get_clause_str(fluent=then_model.fluent, ns_manager=ns_manager)
+        clause_str += get_clause_str(clause=then_model, ns_manager=ns_manager)
         then_clause_strings.append(clause_str)
 
     scr_var_data["given_clauses"] = given_clause_strings

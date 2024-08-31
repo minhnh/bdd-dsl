@@ -51,95 +51,6 @@ KEY_AGN_ID = "agent_id"
 KEY_EVT_ID = "event_id"
 
 
-class FluentModel(object):
-    id: URIRef
-    types: set
-    attributes: dict
-
-    def __init__(self, full_graph: Graph, fluent_id: URIRef) -> None:
-        self.id = fluent_id
-        self.types = set(full_graph.objects(subject=fluent_id, predicate=RDF.type))
-        assert len(self.types) > 0
-
-        self.attributes = {}
-
-
-def process_fluent_model(clause_id: URIRef, fluent: FluentModel, full_graph: Graph):
-    if URI_BDD_TYPE_LOCATED_AT in fluent.types:
-        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_OBJ))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'LocatedAt',"
-                f" does not refer to exactly 1 object: {var_ids}"
-            )
-        assert KEY_OBJ_ID not in fluent.attributes
-        fluent.attributes[KEY_OBJ_ID] = var_ids[0]
-
-        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_WS))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'LocatedAt',"
-                f" does not refer to exactly 1 workspace: {var_ids}"
-            )
-        assert KEY_WS_ID not in fluent.attributes
-        fluent.attributes[KEY_WS_ID] = var_ids[0]
-        return
-
-    if URI_BDD_TYPE_IS_HELD in fluent.types:
-        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_OBJ))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'IsHeld',"
-                f" does not refer to exactly 1 object: {var_ids}"
-            )
-        assert KEY_OBJ_ID not in fluent.attributes
-        fluent.attributes[KEY_OBJ_ID] = var_ids[0]
-
-        var_ids = list(full_graph.objects(subject=clause_id, predicate=URI_BDD_PRED_REF_AGN))
-        if len(var_ids) != 1:
-            raise BDDConstraintViolation(
-                f"Fluent '{fluent.id}' of clause '{clause_id}', type 'IsHeld',"
-                f" does not refer to exactly 1 agent: {var_ids}"
-            )
-        assert KEY_AGN_ID not in fluent.attributes
-        fluent.attributes[KEY_AGN_ID] = var_ids[0]
-        return
-
-    raise RuntimeError(
-        f"process_fluent_model: unhandled types for fluent '{fluent.id}' of clause '{clause_id}': {fluent.types}"
-    )
-
-
-def get_clause_str(fluent: FluentModel, ns_manager: NamespaceManager = NS_MANAGER) -> str:
-    if URI_BDD_TYPE_LOCATED_AT in fluent.types:
-        assert KEY_OBJ_ID in fluent.attributes
-        obj_id = fluent.attributes[KEY_OBJ_ID]
-        assert isinstance(obj_id, URIRef)
-        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
-
-        assert KEY_WS_ID in fluent.attributes
-        ws_id = fluent.attributes[KEY_WS_ID]
-        assert isinstance(ws_id, URIRef)
-        ws_id_str = get_valid_var_name(ws_id.n3(ns_manager))
-
-        return f'"<{obj_id_str}>" is located at "<{ws_id_str}>"'
-
-    if URI_BDD_TYPE_IS_HELD in fluent.types:
-        assert KEY_OBJ_ID in fluent.attributes
-        obj_id = fluent.attributes[KEY_OBJ_ID]
-        assert isinstance(obj_id, URIRef)
-        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
-
-        assert KEY_AGN_ID in fluent.attributes
-        agn_id = fluent.attributes[KEY_AGN_ID]
-        assert isinstance(agn_id, URIRef)
-        agn_id_str = get_valid_var_name(agn_id.n3(ns_manager))
-
-        return f'"<{obj_id_str}>" is held by "<{agn_id_str}>"'
-
-    raise RuntimeError(f"get_clause_str: unhandled types for fluent '{fluent.id}': {fluent.types}")
-
-
 class TimeConstraintModel(object):
     id: URIRef
     types: set
@@ -166,11 +77,22 @@ def process_time_constraint_model(constraint: TimeConstraintModel, full_graph: G
         constraint.attributes[KEY_EVT_ID] = event_ids[0]
 
 
+class FluentModel(object):
+    id: URIRef
+    types: set
+
+    def __init__(self, full_graph: Graph, fluent_id: URIRef) -> None:
+        self.id = fluent_id
+        self.types = set(full_graph.objects(subject=fluent_id, predicate=RDF.type))
+        assert len(self.types) > 0
+
+
 class FluentClauseModel(object):
     id: URIRef
     clause_of: URIRef
     fluent: FluentModel
     time_constraint: TimeConstraintModel
+    attributes: dict
 
     def __init__(self, full_graph: Graph, clause_id: URIRef) -> None:
         self.id = clause_id
@@ -181,15 +103,96 @@ class FluentClauseModel(object):
 
         fluent_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS)
         assert isinstance(fluent_id, URIRef)
-        fluent = FluentModel(full_graph=full_graph, fluent_id=fluent_id)
-        process_fluent_model(clause_id=self.id, fluent=fluent, full_graph=full_graph)
-        self.fluent = fluent
+        self.fluent = FluentModel(full_graph=full_graph, fluent_id=fluent_id)
+
+        self.attributes = {}
+        process_fluent_model(clause=self, full_graph=full_graph)
 
         tc_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS_AT)
         assert isinstance(tc_id, URIRef)
         tc = TimeConstraintModel(full_graph=full_graph, tc_id=tc_id)
         process_time_constraint_model(constraint=tc, full_graph=full_graph)
         self.time_constraint = tc
+
+
+def process_fluent_model(clause: FluentClauseModel, full_graph: Graph):
+    if URI_BDD_TYPE_LOCATED_AT in clause.fluent.types:
+        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_OBJ))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'LocatedAt',"
+                f" does not refer to exactly 1 object: {var_ids}"
+            )
+        assert KEY_OBJ_ID not in clause.attributes
+        clause.attributes[KEY_OBJ_ID] = var_ids[0]
+
+        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_WS))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'LocatedAt',"
+                f" does not refer to exactly 1 workspace: {var_ids}"
+            )
+        assert KEY_WS_ID not in clause.attributes
+        clause.attributes[KEY_WS_ID] = var_ids[0]
+        return
+
+    if URI_BDD_TYPE_IS_HELD in clause.fluent.types:
+        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_OBJ))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'IsHeld',"
+                f" does not refer to exactly 1 object: {var_ids}"
+            )
+        assert KEY_OBJ_ID not in clause.attributes
+        clause.attributes[KEY_OBJ_ID] = var_ids[0]
+
+        var_ids = list(full_graph.objects(subject=clause.id, predicate=URI_BDD_PRED_REF_AGN))
+        if len(var_ids) != 1:
+            raise BDDConstraintViolation(
+                f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'IsHeld',"
+                f" does not refer to exactly 1 agent: {var_ids}"
+            )
+        assert KEY_AGN_ID not in clause.attributes
+        clause.attributes[KEY_AGN_ID] = var_ids[0]
+        return
+
+    raise RuntimeError(
+        f"process_fluent_model: unhandled types for fluent '{clause.fluent.id}' of clause '{clause.id}':"
+        f" {clause.fluent.types}"
+    )
+
+
+def get_clause_str(clause: FluentClauseModel, ns_manager: NamespaceManager = NS_MANAGER) -> str:
+    if URI_BDD_TYPE_LOCATED_AT in clause.fluent.types:
+        assert KEY_OBJ_ID in clause.attributes
+        obj_id = clause.attributes[KEY_OBJ_ID]
+        assert isinstance(obj_id, URIRef)
+        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
+
+        assert KEY_WS_ID in clause.attributes
+        ws_id = clause.attributes[KEY_WS_ID]
+        assert isinstance(ws_id, URIRef)
+        ws_id_str = get_valid_var_name(ws_id.n3(ns_manager))
+
+        return f'"<{obj_id_str}>" is located at "<{ws_id_str}>"'
+
+    if URI_BDD_TYPE_IS_HELD in clause.fluent.types:
+        assert KEY_OBJ_ID in clause.attributes
+        obj_id = clause.attributes[KEY_OBJ_ID]
+        assert isinstance(obj_id, URIRef)
+        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
+
+        assert KEY_AGN_ID in clause.attributes
+        agn_id = clause.attributes[KEY_AGN_ID]
+        assert isinstance(agn_id, URIRef)
+        agn_id_str = get_valid_var_name(agn_id.n3(ns_manager))
+
+        return f'"<{obj_id_str}>" is held by "<{agn_id_str}>"'
+
+    raise RuntimeError(
+        f"get_clause_str: unhandled types for fluent '{clause.fluent.id}' of clasue '{clause.id}':"
+        f" {clause.fluent.types}"
+    )
 
 
 class SceneModel(object):
