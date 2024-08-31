@@ -1,16 +1,20 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Dict, Generator, Iterable
-from rdf_utils.naming import get_valid_var_name
 from rdflib import RDF, Graph, URIRef
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
+from rdf_utils.naming import get_valid_var_name
+from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
+from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.exception import BDDConstraintViolation
+from bdd_dsl.models.common import ModelBase
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_CLAUSE_OF,
     URI_BDD_PRED_GIVEN,
     URI_BDD_PRED_HAS_CLAUSE,
+    URI_BDD_PRED_HAS_VARIATION,
     URI_BDD_PRED_HOLDS,
     URI_BDD_PRED_HOLDS_AT,
     URI_BDD_PRED_REF_AGN,
@@ -39,6 +43,14 @@ from bdd_dsl.models.urirefs import (
 )
 
 
+BDD_SHACL_URLS = {
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd.shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/time.shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/environment.shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/agent.shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/simulation.shacl.ttl": "turtle",
+    URL_MM_PYTHON_SHACL: "turtle",
+}
 Q_US_VAR = f"""
 SELECT DISTINCT ?us ?var WHERE {{
     ?us a {URI_BDD_TYPE_US.n3()} .
@@ -48,16 +60,11 @@ SELECT DISTINCT ?us ?var WHERE {{
 KEY_EVT_ID = "event_id"
 
 
-class TimeConstraintModel(object):
-    id: URIRef
-    types: set
+class TimeConstraintModel(ModelBase):
     attributes: dict
 
     def __init__(self, full_graph: Graph, tc_id: URIRef) -> None:
-        self.id = tc_id
-        self.types = set(full_graph.objects(subject=tc_id, predicate=RDF.type))
-        assert len(self.types) > 0
-
+        super().__init__(graph=full_graph, node_id=tc_id)
         self.attributes = {}
 
 
@@ -74,26 +81,15 @@ def process_time_constraint_model(constraint: TimeConstraintModel, full_graph: G
         constraint.attributes[KEY_EVT_ID] = event_ids[0]
 
 
-class FluentModel(object):
-    id: URIRef
-    types: set
-
-    def __init__(self, full_graph: Graph, fluent_id: URIRef) -> None:
-        self.id = fluent_id
-        self.types = set(full_graph.objects(subject=fluent_id, predicate=RDF.type))
-        assert len(self.types) > 0
-
-
-class FluentClauseModel(object):
-    id: URIRef
+class FluentClauseModel(ModelBase):
     clause_of: URIRef
-    fluent: FluentModel
+    fluent: ModelBase
     time_constraint: TimeConstraintModel
     variable_by_role: Dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
     role_by_variable: Dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
 
     def __init__(self, full_graph: Graph, clause_id: URIRef) -> None:
-        self.id = clause_id
+        super().__init__(graph=full_graph, node_id=clause_id)
 
         clause_of_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_CLAUSE_OF)
         assert isinstance(clause_of_id, URIRef)
@@ -101,7 +97,7 @@ class FluentClauseModel(object):
 
         fluent_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS)
         assert isinstance(fluent_id, URIRef)
-        self.fluent = FluentModel(full_graph=full_graph, fluent_id=fluent_id)
+        self.fluent = ModelBase(graph=full_graph, node_id=fluent_id)
 
         self.variable_by_role = {}
         self.role_by_variable = {}
@@ -204,14 +200,18 @@ def get_clause_str(clause: FluentClauseModel, ns_manager: NamespaceManager = NS_
     )
 
 
-class SceneModel(object):
+class SceneModel(ModelBase):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
+    objects: Dict[URIRef, set]  # object URI -> obj types
+    workspaces: Dict[URIRef, set]  # workspace URI -> ws types
+    agents: Dict[URIRef, set]  # agent URI -> agn types
+
     def __init__(self, us_graph: Graph, full_graph: Graph, scene_id: URIRef) -> None:
-        self.id = scene_id
-        self.objects = {}  # object URI -> obj types
-        self.workspaces = {}  # workspace URI -> ws types
-        self.agents = {}  # agent URI -> agn types
+        super().__init__(graph=full_graph, node_id=scene_id)
+        self.objects = {}
+        self.workspaces = {}
+        self.agents = {}
 
         for comp_id in us_graph.objects(subject=scene_id, predicate=URI_BDD_PRED_HAS_SCENE):
             comp_types = set(us_graph.objects(subject=comp_id, predicate=RDF.type))
@@ -220,20 +220,28 @@ class SceneModel(object):
             if URI_BDD_TYPE_SCENE_OBJ in comp_types:
                 for obj_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_OBJ):
                     obj_types = set(full_graph.objects(subject=obj_id, predicate=RDF.type))
+                    assert isinstance(obj_id, URIRef)
                     self.objects[obj_id] = obj_types
 
             if URI_BDD_TYPE_SCENE_WS in comp_types:
                 for ws_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_WS):
+                    assert isinstance(ws_id, URIRef)
                     ws_types = set(full_graph.objects(subject=ws_id, predicate=RDF.type))
                     self.workspaces[ws_id] = ws_types
 
             if URI_BDD_TYPE_SCENE_AGN in comp_types:
                 for agn_id in full_graph.objects(subject=comp_id, predicate=URI_AGN_PRED_HAS_AGN):
+                    assert isinstance(agn_id, URIRef)
                     agn_types = set(full_graph.objects(subject=agn_id, predicate=RDF.type))
                     self.agents[agn_id] = agn_types
 
 
-class ScenarioVariantModel(object):
+class TaskVariationModel(ModelBase):
+    def __init__(self, us_graph: Graph, full_graph: Graph, task_var_id: URIRef) -> None:
+        super().__init__(graph=us_graph, node_id=task_var_id)
+
+
+class ScenarioVariantModel(ModelBase):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
     us_id: URIRef
@@ -245,10 +253,15 @@ class ScenarioVariantModel(object):
     bhv_id: URIRef
     task_id: URIRef
     scene: SceneModel
+    task_variation: TaskVariationModel
     variables: set[URIRef]  # set of ScenarioVariables referred to by clauses
+    _clauses: Dict[URIRef, FluentClauseModel]
+    _clauses_by_role: Dict[URIRef, set[URIRef]]  # given/when/then URI -> clause URI
+    _tmpl_clauses: set[URIRef]
+    _variant_clauses: set[URIRef]
 
     def __init__(self, us_graph: Graph, full_graph: Graph, var_id: URIRef) -> None:
-        self.id = var_id
+        super().__init__(graph=us_graph, node_id=var_id)
 
         node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
         assert node_val is not None and isinstance(
@@ -309,9 +322,22 @@ class ScenarioVariantModel(object):
         self._tmpl_clauses = set()
         self._variant_clauses = set()
         self.variables = set()
+
         self._load_clauses(full_graph)
 
+        task_var_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_HAS_VARIATION)
+        assert task_var_id is not None and isinstance(
+            task_var_id, URIRef
+        ), f"ScenarioVariant '{var_id}' does not refer to a TaskVariation"
+        self.task_variation = TaskVariationModel(
+            us_graph=us_graph, full_graph=full_graph, task_var_id=task_var_id
+        )
+
     def _load_clauses(self, full_graph: Graph) -> None:
+        """
+        Load all fluent clauses attached to both the ScenarioVariant and ScenarioTemplate in the graph.
+        This will also update the set of variables referred to by these clauses
+        """
         # template clauses
         for clause_id in full_graph.objects(
             subject=self.tmpl_id, predicate=URI_BDD_PRED_HAS_CLAUSE
@@ -351,7 +377,10 @@ class ScenarioVariantModel(object):
 
 
 class UserStoryLoader(object):
-    def __init__(self, graph: Graph) -> None:
+    def __init__(self, graph: Graph, shacl_check=True, quiet=False) -> None:
+        if shacl_check:
+            check_shacl_constraints(graph=graph, shacl_dict=BDD_SHACL_URLS, quiet=quiet)
+
         q_result = graph.query(Q_USER_STORY)
         assert (
             q_result.type == "CONSTRUCT" and q_result.graph is not None and len(q_result.graph) > 0

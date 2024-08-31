@@ -17,6 +17,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_TMPL,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_WHEN,
+    URI_BDD_TYPE_TASK_VAR,
     URI_BHV_TYPE_BHV,
     URI_ENV_TYPE_OBJ,
     URI_SIM_PRED_HAS_CONFIG,
@@ -305,8 +306,9 @@ Q_USER_STORY = f"""
 CONSTRUCT {{
     ?us a ?usType ;
         {URI_BDD_PRED_HAS_AC.n3()} ?scenarioVar .
-    ?scenarioVar
+    ?scenarioVar a ?scenarioVarType ;
         {URI_TASK_PRED_OF_TASK.n3()} ?task ;
+        {URI_BDD_PRED_HAS_VARIATION.n3()} ?taskVariation ;
         {URI_BHV_PRED_OF_BHV.n3()} ?behaviour ;
         {URI_BDD_PRED_HAS_SCENE.n3()} ?scene ;
         {URI_BDD_PRED_OF_TMPL.n3()} ?scenarioTmpl ;
@@ -314,6 +316,7 @@ CONSTRUCT {{
         {URI_BDD_PRED_GIVEN.n3()} ?given ;
         {URI_BDD_PRED_WHEN.n3()} ?when ;
         {URI_BDD_PRED_THEN.n3()} ?then .
+    ?taskVariation a ?varType .
     ?scene {URI_BDD_PRED_HAS_SCENE.n3()} ?sceneElem .
     ?sceneElem a ?sceneElemType .
 }}
@@ -323,6 +326,7 @@ WHERE {{
         {URI_BDD_PRED_HAS_AC.n3()} ?scenarioVar .
 
     ?scenarioVar a {URI_BDD_TYPE_SCENARIO_VARIANT.n3()} ;
+        a ?scenarioVarType ;
         {URI_BDD_PRED_OF_TMPL.n3()} ?scenarioTmpl ;
         {URI_BDD_PRED_HAS_SCENE.n3()} ?sceneElem ;
         {URI_BDD_PRED_HAS_VARIATION.n3()} ?taskVariation .
@@ -340,6 +344,10 @@ WHERE {{
         {URI_BDD_PRED_GIVEN.n3()} ?given ;
         {URI_BDD_PRED_WHEN.n3()} ?when ;
         {URI_BDD_PRED_THEN.n3()} ?then .
+
+    ?taskVariation a {URI_BDD_TYPE_TASK_VAR.n3()} ;
+        a ?varType ;
+        {URI_TASK_PRED_OF_TASK.n3()} ?task .
 
     ?behaviour a {URI_BHV_TYPE_BHV.n3()} .
     ?task a {URI_TASK_TYPE_TASK.n3()} .
