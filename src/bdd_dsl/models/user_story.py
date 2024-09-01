@@ -1,6 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Dict, Generator, Iterable
-from rdflib import RDF, Graph, URIRef
+from itertools import combinations
+from typing import Any, Dict, Generator, Iterable
+from rdflib import RDF, Graph, Literal, URIRef
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
 from rdf_utils.naming import get_valid_var_name
@@ -12,16 +13,24 @@ from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_CLAUSE_OF,
+    URI_BDD_PRED_FROM,
     URI_BDD_PRED_GIVEN,
     URI_BDD_PRED_HAS_CLAUSE,
     URI_BDD_PRED_HAS_VARIATION,
     URI_BDD_PRED_HOLDS,
     URI_BDD_PRED_HOLDS_AT,
+    URI_BDD_PRED_OF_SETS,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
+    URI_BDD_PRED_REP_ALLOWED,
+    URI_BDD_PRED_ROWS,
+    URI_BDD_PRED_SELECT,
     URI_BDD_PRED_THEN,
+    URI_BDD_PRED_VAR_LIST,
     URI_BDD_PRED_WHEN,
+    URI_BDD_TYPE_CART_PRODUCT,
+    URI_BDD_TYPE_COMBINATION,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_SCENE_AGN,
@@ -31,6 +40,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_TMPL,
     URI_BDD_PRED_HAS_AC,
     URI_BDD_TYPE_SCENE_WS,
+    URI_BDD_TYPE_TABLE_VAR,
     URI_BDD_TYPE_US,
     URI_BHV_PRED_OF_BHV,
     URI_TASK_PRED_OF_TASK,
@@ -109,7 +119,7 @@ class FluentClauseModel(ModelBase):
         process_time_constraint_model(constraint=tc, full_graph=full_graph)
         self.time_constraint = tc
 
-    def add_variable_role(self, full_graph: Graph, role_pred: URIRef):
+    def add_variables_by_role(self, full_graph: Graph, role_pred: URIRef):
         if role_pred not in self.variable_by_role:
             self.variable_by_role[role_pred] = []
 
@@ -128,14 +138,14 @@ class FluentClauseModel(ModelBase):
 
     def process_builtin_fluent_types(self, full_graph: Graph):
         if URI_BDD_TYPE_LOCATED_AT in self.fluent.types:
-            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_OBJ)
+            self.add_variables_by_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_OBJ)
             if len(self.variable_by_role[URI_BDD_PRED_REF_OBJ]) != 1:
                 raise BDDConstraintViolation(
                     f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'LocatedAt',"
                     f" does not refer to exactly 1 object: {self.variable_by_role[URI_BDD_PRED_REF_OBJ]}"
                 )
 
-            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_WS)
+            self.add_variables_by_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_WS)
             if len(self.variable_by_role[URI_BDD_PRED_REF_WS]) != 1:
                 raise BDDConstraintViolation(
                     f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'LocatedAt',"
@@ -145,14 +155,14 @@ class FluentClauseModel(ModelBase):
             return
 
         if URI_BDD_TYPE_IS_HELD in self.fluent.types:
-            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_OBJ)
+            self.add_variables_by_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_OBJ)
             if len(self.variable_by_role[URI_BDD_PRED_REF_OBJ]) != 1:
                 raise BDDConstraintViolation(
                     f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'IsHeld',"
                     f" does not refer to exactly 1 object: {self.variable_by_role[URI_BDD_PRED_REF_OBJ]}"
                 )
 
-            self.add_variable_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_AGN)
+            self.add_variables_by_role(full_graph=full_graph, role_pred=URI_BDD_PRED_REF_AGN)
             if len(self.variable_by_role[URI_BDD_PRED_REF_AGN]) != 1:
                 raise BDDConstraintViolation(
                     f"Fluent '{self.fluent.id}' of clause '{self.id}', type 'IsHeld',"
@@ -237,8 +247,164 @@ class SceneModel(ModelBase):
 
 
 class TaskVariationModel(ModelBase):
+    task_id: URIRef
+    variables: set[URIRef]
+    attributes: dict[URIRef, Any]
+
     def __init__(self, us_graph: Graph, full_graph: Graph, task_var_id: URIRef) -> None:
         super().__init__(graph=us_graph, node_id=task_var_id)
+        task_id = us_graph.value(subject=task_var_id, predicate=URI_TASK_PRED_OF_TASK)
+        assert isinstance(task_id, URIRef)
+        self.task_id = task_id
+        self.variables = set()
+        self.attributes = {}
+
+        self._process_builtin_task_types(full_graph)
+
+    def _process_builtin_task_types(self, full_graph: Graph) -> None:
+        if URI_BDD_TYPE_CART_PRODUCT in self.types:
+            var_list = self._get_variable_list(graph=full_graph)
+
+            of_sets_list_node = full_graph.value(subject=self.id, predicate=URI_BDD_PRED_OF_SETS)
+            assert (
+                of_sets_list_node is not None
+            ), f"CartesianProductVariation '{self.id}' does not have 'of-sets' property"
+
+            sets_list = []
+            for set_node in full_graph.items(list=of_sets_list_node):
+                # rdflib doesn't handle container of URIs nicely, so elements are always Literal
+                assert isinstance(set_node, Literal)
+                set_data = set_node.toPython()
+                if isinstance(set_data, list):
+                    uri_list = get_uris_from_strings(
+                        uri_strings=set_data, ns_manager=full_graph.namespace_manager
+                    )
+                    sets_list.append(uri_list)
+                elif isinstance(set_data, str):
+                    try:
+                        set_uri = full_graph.namespace_manager.expand_curie(set_data)
+                    except ValueError as e:
+                        raise ValueError(f"failed to parse '{set_data}' as URI: {e}")
+                    sets_list.append(generate_set_values(graph=full_graph, set_uri=set_uri))
+                else:
+                    raise RuntimeError(f"unhandled type for '{set_node}', type='{type(set_data)}'")
+
+            assert (
+                len(sets_list) == len(var_list)
+            ), f"length mismatch 'variable-list' (len={len(var_list)}) != 'of-sets' (len={len(sets_list)})"
+
+            self.attributes[URI_BDD_PRED_VAR_LIST] = var_list
+            self.attributes[URI_BDD_PRED_OF_SETS] = sets_list
+
+            return
+
+        if URI_BDD_TYPE_TABLE_VAR in self.types:
+            var_list = self._get_variable_list(graph=full_graph)
+            rows_head = full_graph.value(subject=self.id, predicate=URI_BDD_PRED_ROWS)
+            assert (
+                rows_head is not None
+            ), f"TableVariation '{self.id}' does not have 'rows' property"
+
+            rows = []
+            for row_node in full_graph.items(list=rows_head):
+                assert isinstance(row_node, Literal)
+                row_data = row_node.toPython()
+                assert isinstance(
+                    row_data, list
+                ), f"TableVariation '{self.id}': row data not a list: {row_data}"
+                assert (
+                    len(row_data) == len(var_list)
+                ), f"TableVariation '{self.id}': row length does not match variable list: {row_data}"
+
+                row_uris = []
+                for uri_str in row_data:
+                    try:
+                        uri = full_graph.namespace_manager.expand_curie(uri_str)
+                    except ValueError as e:
+                        raise ValueError(f"failed to parse '{uri_str}' as URI: {e}")
+
+                    row_uris.append(uri)
+
+                rows.append(row_uris)
+
+            self.attributes[URI_BDD_PRED_VAR_LIST] = var_list
+            self.attributes[URI_BDD_PRED_ROWS] = rows
+
+            return
+
+        raise RuntimeError(f"TaskVariation '{self.id}' has unhandled types: {self.types}")
+
+    def _get_variable_list(self, graph: Graph) -> list[URIRef]:
+        var_list_first_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_VAR_LIST)
+        assert (
+            var_list_first_node is not None
+        ), f"TaskVariation '{self.id}' does not have 'variable-list' property"
+
+        var_list = []
+        for var_id in graph.items(list=var_list_first_node):
+            assert isinstance(var_id, URIRef)
+            self.variables.add(var_id)
+            var_list.append(var_id)
+
+        return var_list
+
+
+def generate_set_values(graph: Graph, set_uri: URIRef) -> list[URIRef]:
+    set_types = set(graph.objects(subject=set_uri, predicate=RDF.type))
+    if URI_BDD_TYPE_COMBINATION in set_types:
+        rep_allowed = graph.value(subject=set_uri, predicate=URI_BDD_PRED_REP_ALLOWED)
+        assert (
+            rep_allowed is not None
+            and isinstance(rep_allowed, Literal)
+            and isinstance(rep_allowed.value, bool)
+        ), f"Combination '{set_uri}' does not have bool literal 'repetition-allowed' property: {rep_allowed}"
+        rep_allowed = rep_allowed.value
+
+        select_num = graph.value(subject=set_uri, predicate=URI_BDD_PRED_SELECT)
+        assert (
+            select_num is not None
+            and isinstance(select_num, Literal)
+            and isinstance(select_num.value, int)
+        ), f"Combination '{set_uri}' does not have int literal 'select' property: {select_num}"
+        select_num = select_num.value
+        assert (
+            select_num > 0
+        ), f"Combination '{set_uri}': 'select' property is non-positive: {select_num}"
+
+        from_list_head = graph.value(subject=set_uri, predicate=URI_BDD_PRED_FROM)
+        assert from_list_head is not None, f"Combination '{set_uri}' does not have 'from' property"
+        from_list = []
+        for uri in graph.items(list=from_list_head):
+            assert isinstance(uri, URIRef)
+            from_list.append(uri)
+
+        assert (
+            select_num <= len(from_list)
+        ), f"Combination '{set_uri}': 'select'(={select_num}) is larger than length of 'from' (len={len(from_list)})"
+        set_values = []
+        for comb in combinations(from_list, select_num):
+            # TODO(minhnh): itertool does not consider repetitions, rep_allowed is unused
+            if select_num == 1:
+                set_values.append(comb[0])
+            else:
+                set_values.append(comb)
+
+        return set_values
+
+    raise RuntimeError(f"unhandled types for set '{set_uri}': {set_types}")
+
+
+def get_uris_from_strings(uri_strings: list, ns_manager: NamespaceManager) -> list[URIRef]:
+    uri_list = []
+    for uri_str in uri_strings:
+        try:
+            uri = ns_manager.expand_curie(uri_str)
+        except ValueError as e:
+            raise ValueError(f"failed to parse '{uri_str}' as URI: {e}")
+
+        uri_list.append(uri)
+
+    return uri_list
 
 
 class ScenarioVariantModel(ModelBase):
