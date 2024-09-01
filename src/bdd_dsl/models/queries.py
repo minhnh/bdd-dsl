@@ -141,7 +141,6 @@ Q_BDD_OF_VARIABLE = f"{Q_PREFIX_BDD}:of-variable"
 Q_BDD_REF_OBJECT = f"{Q_PREFIX_BDD}:ref-object"
 Q_BDD_REF_WS = f"{Q_PREFIX_BDD}:ref-workspace"
 Q_BDD_REF_AGENT = f"{Q_PREFIX_BDD}:ref-agent"
-Q_BDD_CAN_BE = f"{Q_PREFIX_BDD}:can-be"
 
 # Query for event loops from graph
 EVENT_LOOP_QUERY = f"""
@@ -316,7 +315,8 @@ CONSTRUCT {{
         {URI_BDD_PRED_GIVEN.n3()} ?given ;
         {URI_BDD_PRED_WHEN.n3()} ?when ;
         {URI_BDD_PRED_THEN.n3()} ?then .
-    ?taskVariation a ?varType .
+    ?taskVariation a ?varType ;
+        {URI_TASK_PRED_OF_TASK.n3()} ?task .
     ?scene {URI_BDD_PRED_HAS_SCENE.n3()} ?sceneElem .
     ?sceneElem a ?sceneElemType .
 }}

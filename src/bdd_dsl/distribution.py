@@ -2,7 +2,6 @@
 import numpy as np
 from typing import Any, Optional
 from rdflib import Graph, Literal, URIRef, RDF
-from rdflib.paths import ZeroOrMore
 from rdflib.term import Node
 from bdd_dsl.models.urirefs import (
     URI_DISTRIB_DIM,
@@ -49,33 +48,26 @@ def load_distribution_data(graph: Graph, distrib_id: URIRef):
             dimension is not None
         ), f"distribution '{distrib_id}' has invalid dimension '{dimension_literal}'"
 
-        upper_bound_gen = graph.objects(
-            subject=distrib_id, predicate=(URI_DISTRIB_UPPER / (RDF.rest * ZeroOrMore) / RDF.first)
-        )
+        upper_bound_list_node = graph.value(subject=distrib_id, predicate=URI_DISTRIB_UPPER)
         assert (
-            upper_bound_gen is not None
+            upper_bound_list_node is not None
         ), f"Uniform distribution '{distrib_id}' does not have upper-bound property"
 
         upper_bounds = []
-        for bound_literal in upper_bound_gen:
+        for bound_literal in graph.items(list=upper_bound_list_node):
             upper_bound_val = load_node_as_literal(bound_literal)
             assert (
                 upper_bound_val is not None
             ), f"distribution '{distrib_id}' has invalid upper bound '{bound_literal}'"
             upper_bounds.append(upper_bound_val)
 
-        lower_bound_gen = list(
-            graph.objects(
-                subject=distrib_id,
-                predicate=(URI_DISTRIB_LOWER / (RDF.rest * ZeroOrMore) / RDF.first),
-            )
-        )
+        lower_bound_list_node = graph.value(subject=distrib_id, predicate=URI_DISTRIB_LOWER)
         assert (
-            lower_bound_gen is not None
+            lower_bound_list_node is not None
         ), f"Uniform distribution '{distrib_id}' does not have lower-bound property"
 
         lower_bounds = []
-        for bound_literal in lower_bound_gen:
+        for bound_literal in graph.items(list=lower_bound_list_node):
             lower_bound_val = load_node_as_literal(bound_literal)
             assert (
                 lower_bound_val is not None
