@@ -42,7 +42,7 @@ def main():
     print(f"UserStoryLoader init time: {end - start:.5f} seconds")
 
     start = timer()
-    processed_bdd_data = prepare_jinja2_template_data(us_loader, g, ns_manager=g.namespace_manager)
+    processed_bdd_data = prepare_jinja2_template_data(us_loader, g)
     end = timer()
     print(f"Jinja template data preparation time: {end - start:.5f} seconds")
 
