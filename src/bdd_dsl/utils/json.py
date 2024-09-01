@@ -2,33 +2,24 @@
 from importlib import import_module
 from typing import List, Optional, Tuple, Type, Union
 from socket import _GLOBAL_DEFAULT_TIMEOUT
-import itertools
 import json
 import numpy as np
 from pyld import jsonld
 import py_trees as pt
 import rdflib
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
-from rdf_utils.naming import get_valid_var_name
-from rdf_utils.constraints import check_shacl_constraints
-from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
 from bdd_dsl.models.queries import (
     EVENT_LOOP_QUERY,
     BEHAVIOUR_TREE_QUERY,
     OBJ_POSE_COORD_QUERY,
-    URL_Q_BDD_US,
     Q_BT_SEQUENCE,
     Q_BT_PARALLEL,
-    Q_BDD_SCENARIO_VARIANT,
-    Q_BDD_SCENARIO_TASK_VARIABLE,
 )
 from bdd_dsl.models.frames import (
-    FR_URL_BDD_FRAME_US,
     EVENT_LOOP_FRAME,
     BEHAVIOUR_TREE_FRAME,
-    FR_HOLDS,
     OBJ_POSE_FRAME,
     FR_NAME,
     FR_DATA,
@@ -44,16 +35,6 @@ from bdd_dsl.models.frames import (
     FR_IMPL_ARG_NAMES,
     FR_IMPL_ARG_VALS,
     FR_EL,
-    FR_SCENARIO,
-    FR_GIVEN,
-    FR_THEN,
-    FR_CRITERIA,
-    FR_SCENE,
-    FR_CLAUSES_DATA,
-    FR_FLUENTS,
-    FR_VARIABLES,
-    FR_CAN_BE,
-    FR_VARIATIONS,
     FR_BODY,
     FR_POSE,
     FR_POSITION,
@@ -73,7 +54,6 @@ from bdd_dsl.models.urirefs import (
     URI_PROB_CONTINUOUS,
 )
 from bdd_dsl.models.namespace import NS_MANAGER
-from bdd_dsl.models.user_story import BDD_SHACL_URLS
 
 
 def query_graph(graph: rdflib.Graph, query_str: str) -> dict:
@@ -294,146 +274,6 @@ def create_bt_from_graph(
         els_and_bts.append((event_handler, bt_root_node))
 
     return els_and_bts
-
-
-def process_bdd_scenario_from_data(
-    scenario_data: dict, var_dict: dict, var_set: set, clause_dict: dict, scene_dict: dict
-):
-    scenario_name = scenario_data[FR_NAME]
-
-    # scene TODO(minhnh): for some reason agents are not showing up in the query result
-    if FR_SCENE in scenario_data:
-        if not isinstance(scenario_data[FR_SCENE], list):
-            scenario_data[FR_SCENE] = [scenario_data[FR_SCENE]]
-
-        for scene_data in scenario_data[FR_SCENE]:
-            scene_name = scene_data[FR_NAME]
-            # one scene can be shared by multiple scenarios
-            if scene_name in scene_dict["scene-scenario-map"]:
-                scene_dict["scene-scenario-map"][scene_name].add(scenario_name)
-            else:
-                scene_dict["scene-scenario-map"][scene_name] = {scenario_name}
-            # one scenario can have multiple scene clauses
-            if scenario_name in scene_dict["scenario-scene-map"]:
-                scene_dict["scenario-scene-map"][scenario_name].add(scene_name)
-            else:
-                scene_dict["scenario-scene-map"][scenario_name] = {scene_name}
-            # add scene data
-            if scene_name not in scene_dict["data"]:
-                scene_dict["data"][scene_name] = scene_data
-            else:
-                scene_dict["data"][scene_name].update(scene_data)
-
-    # variable connections
-    if FR_VARIATIONS not in scenario_data:
-        raise BDDConstraintViolation(
-            f"{Q_BDD_SCENARIO_VARIANT} '{scenario_name}' has no connection"
-        )
-    for var_data in scenario_data[FR_VARIATIONS]:
-        if FR_CAN_BE not in var_data:
-            continue
-        var_name = var_data[FR_NAME]
-        var_dict[var_name] = var_data
-        if var_name in var_set:
-            raise BDDConstraintViolation(
-                f"multiple connections for {Q_BDD_SCENARIO_TASK_VARIABLE} '{var_name}'"
-            )
-        var_set.add(var_name)
-
-    # fluent clauses
-    clauses_data = []
-    given_clauses_data = scenario_data[FR_SCENARIO][FR_GIVEN]
-    if not isinstance(given_clauses_data, list):
-        scenario_data[FR_SCENARIO][FR_GIVEN] = [given_clauses_data]
-    clauses_data.extend(scenario_data[FR_SCENARIO][FR_GIVEN])
-
-    then_clauses_data = scenario_data[FR_SCENARIO][FR_THEN]
-    if not isinstance(then_clauses_data, list):
-        scenario_data[FR_SCENARIO][FR_THEN] = [then_clauses_data]
-    clauses_data.extend(scenario_data[FR_SCENARIO][FR_THEN])
-
-    for clause_data in clauses_data:
-        if FR_HOLDS not in clause_data:
-            continue
-
-        # cache clause info
-        clause_id = clause_data[FR_NAME]
-        if clause_id in clause_dict:
-            continue
-        clause_dict[clause_id] = clause_data
-
-        # cache fluent info
-        fluent_id = clause_data[FR_HOLDS][FR_NAME]
-        if fluent_id in clause_dict[FR_FLUENTS]:
-            continue
-        clause_dict[FR_FLUENTS][fluent_id] = clause_data[FR_HOLDS]
-
-
-def create_scenario_variations(scenario_data: dict, var_dict: dict) -> Tuple[list, list]:
-    var_names = []
-    entities_list = []
-    for var_data in scenario_data[FR_VARIATIONS]:
-        var_name = var_data[FR_NAME]
-        var_names.append(get_valid_var_name(var_name))
-        var_entities = var_dict[var_name][FR_CAN_BE]
-        if isinstance(var_entities, dict):
-            entities_list.append([var_entities[FR_NAME]])
-        elif isinstance(var_entities, list):
-            entities_list.append([ent_data[FR_NAME] for ent_data in var_entities])
-        else:
-            raise (
-                ValueError(
-                    "unhandled entity collection type '{}' for variable '{}'".format(
-                        type(var_entities), var_name
-                    )
-                )
-            )
-    return var_names, list(itertools.product(*entities_list))
-
-
-def process_bdd_us_from_data(us_data: dict):
-    var_dict = {}
-    clause_dict = {FR_FLUENTS: {}}
-    scene_dict = {
-        FR_DATA: {},  # map from scene ID to scene data
-        "scene-scenario-map": {},  # map from scene ID to scenario variant ID
-        "scenario-scene-map": {},  # map from scenario variant ID to scene ID
-    }
-    var_set = set()
-    if not isinstance(us_data[FR_CRITERIA], list):
-        us_data[FR_CRITERIA] = [us_data[FR_CRITERIA]]
-
-    # framing will include child concepts once for the same entity within one match,
-    # so need to collect data for variable connections and fluent clauses to refer to later
-    for scenario_data in us_data[FR_CRITERIA]:
-        process_bdd_scenario_from_data(scenario_data, var_dict, var_set, clause_dict, scene_dict)
-
-    for scenario_data in us_data[FR_CRITERIA]:
-        # create variations for each scenario
-        scenario_data[FR_VARIABLES], scenario_data[FR_CAN_BE] = create_scenario_variations(
-            scenario_data, var_dict
-        )
-
-    if len(scene_dict[FR_DATA]) > 0:
-        us_data[FR_SCENE] = scene_dict
-    us_data[FR_CLAUSES_DATA] = clause_dict
-    return us_data
-
-
-def process_bdd_us_from_graph(graph: rdflib.Graph, timeout=_GLOBAL_DEFAULT_TIMEOUT) -> List:
-    """Query and process all UserStory in the JSON-LD graph"""
-    # checking conformance against SHACL shape constraints
-    check_shacl_constraints(graph=graph, shacl_dict=BDD_SHACL_URLS)
-
-    bdd_result = query_graph_with_url(graph, URL_Q_BDD_US, timeout=timeout)
-    model_framed = frame_model_with_url(bdd_result, FR_URL_BDD_FRAME_US, timeout=timeout)
-
-    assert isinstance(
-        model_framed, dict
-    ), f"expected framed model to be a dictionary, got type {type(model_framed)}"
-    if FR_DATA in model_framed:
-        return [process_bdd_us_from_data(us_data) for us_data in model_framed[FR_DATA]]
-    return [process_bdd_us_from_data(model_framed)]
 
 
 def sample_from_distribution_data(distr_data: dict):

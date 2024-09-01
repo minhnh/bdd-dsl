@@ -3,19 +3,9 @@ import unittest
 import rdflib
 from rdf_utils.resolver import install_resolver
 from rdf_utils.uri import URL_SECORO_M
-from bdd_dsl.utils.json import process_bdd_us_from_graph
-from bdd_dsl.models.frames import (
-    FR_CRITERIA,
-    FR_SCENARIO,
-    FR_GIVEN,
-    FR_THEN,
-    FR_CLAUSES_DATA,
-)
-from bdd_dsl.utils.jinja import (
-    create_given_clauses_strings,
-    create_then_clauses_strings,
-    prepare_gherkin_feature_data,
-)
+from bdd_dsl.models.user_story import UserStoryLoader
+from bdd_dsl.models.frames import FR_CRITERIA, FR_VARIABLES, FR_VARIATIONS
+from bdd_dsl.utils.jinja import prepare_jinja2_template_data
 
 MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/environments/secorolab.env.json": "json-ld",
@@ -35,22 +25,17 @@ class BDDTest(unittest.TestCase):
             self.graph.parse(url, format=fmt)
 
     def test_bdd(self):
-        bdd_result = process_bdd_us_from_graph(self.graph, timeout=10)
-        self.assertIsInstance(bdd_result, list)
-        for us_data in bdd_result:
-            prepare_gherkin_feature_data(us_data)
-
+        us_loader = UserStoryLoader(self.graph)
+        processed_bdd_data = prepare_jinja2_template_data(us_loader, self.graph)
+        for us_data in processed_bdd_data:
             for scenario_data in us_data[FR_CRITERIA]:
-                given_clause_strings = create_given_clauses_strings(
-                    scenario_data[FR_SCENARIO][FR_GIVEN], us_data[FR_CLAUSES_DATA]
+                self.assertTrue(len(scenario_data["given_clauses"]) > 0)
+                self.assertTrue(len(scenario_data["then_clauses"]) > 0)
+                self.assertTrue(len(scenario_data[FR_VARIABLES]) > 0)
+                self.assertTrue(len(scenario_data[FR_VARIATIONS]) > 0)
+                self.assertTrue(
+                    len(scenario_data[FR_VARIATIONS][0]) == len(scenario_data[FR_VARIABLES])
                 )
-                self.assertTrue(len(given_clause_strings) > 0)
-                self.assertTrue(len(given_clause_strings) == len(scenario_data["given_clauses"]))
-                then_clause_strings = create_then_clauses_strings(
-                    scenario_data[FR_SCENARIO][FR_THEN], us_data[FR_CLAUSES_DATA]
-                )
-                self.assertTrue(len(then_clause_strings) > 0)
-                self.assertTrue(len(then_clause_strings) == len(scenario_data["then_clauses"]))
 
 
 if __name__ == "__main__":
