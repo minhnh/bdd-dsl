@@ -259,9 +259,9 @@ class TaskVariationModel(ModelBase):
         self.variables = set()
         self.attributes = {}
 
-        self._process_builtin_task_types(full_graph)
+        self._process_builtin_task_var_types(full_graph)
 
-    def _process_builtin_task_types(self, full_graph: Graph) -> None:
+    def _process_builtin_task_var_types(self, full_graph: Graph) -> None:
         if URI_BDD_TYPE_CART_PRODUCT in self.types:
             var_list = self._get_variable_list(graph=full_graph)
 
@@ -284,7 +284,9 @@ class TaskVariationModel(ModelBase):
                     try:
                         set_uri = full_graph.namespace_manager.expand_curie(set_data)
                     except ValueError as e:
-                        raise ValueError(f"failed to parse '{set_data}' as URI: {e}")
+                        raise ValueError(
+                            f"process_task_var: product: failed to parse '{set_data}' as URI: {e}"
+                        )
                     sets_list.append(generate_set_values(graph=full_graph, set_uri=set_uri))
                 else:
                     raise RuntimeError(f"unhandled type for '{set_node}', type='{type(set_data)}'")
@@ -321,7 +323,9 @@ class TaskVariationModel(ModelBase):
                     try:
                         uri = full_graph.namespace_manager.expand_curie(uri_str)
                     except ValueError as e:
-                        raise ValueError(f"failed to parse '{uri_str}' as URI: {e}")
+                        raise ValueError(
+                            f"process_task_var: table: failed to parse '{uri_str}' as URI: {e}"
+                        )
 
                     row_uris.append(uri)
 
@@ -400,7 +404,7 @@ def get_uris_from_strings(uri_strings: list, ns_manager: NamespaceManager) -> li
         try:
             uri = ns_manager.expand_curie(uri_str)
         except ValueError as e:
-            raise ValueError(f"failed to parse '{uri_str}' as URI: {e}")
+            raise ValueError(f"uri_from_strings: failed to parse '{uri_str}' as URI: {e}")
 
         uri_list.append(uri)
 
@@ -497,6 +501,11 @@ class ScenarioVariantModel(ModelBase):
         ), f"ScenarioVariant '{var_id}' does not refer to a TaskVariation"
         self.task_variation = TaskVariationModel(
             us_graph=us_graph, full_graph=full_graph, task_var_id=task_var_id
+        )
+        assert self.task_variation.variables == self.variables, (
+            f"variables referred to by clauses in ScenarioVariant '{self.id}'"
+            f" does not match that of TaskVariation '{self.task_variation.id}':\n"
+            f"clause vars: {self.variables}\ntask variation vars: {self.task_variation.variables}"
         )
 
     def _load_clauses(self, full_graph: Graph) -> None:
