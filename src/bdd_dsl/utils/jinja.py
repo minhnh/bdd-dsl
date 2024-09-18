@@ -170,7 +170,7 @@ def prepare_jinja2_template_data(
                 scene_data[FR_NAME] = scene_id_str
 
                 obj_list = []
-                for obj_id in scr_var.scene.objects.keys():
+                for obj_id in scr_var.scene.objects:
                     obj_list.append(obj_id.n3(namespace_manager=ns_manager))
                 if len(obj_list) > 0:
                     scene_data[FR_OBJECTS] = obj_list

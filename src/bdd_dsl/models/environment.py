@@ -1,8 +1,8 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Dict, Any
 from rdflib import Graph, URIRef
-from rdf_utils.models import ModelBase, ModelLoader
-from bdd_dsl.models.queries import Q_SIMULATED_OBJECT
+from rdf_utils.models import AttrLoaderProtocol, ModelBase, ModelLoader
+from bdd_dsl.models.queries import Q_MODELLED_OBJECT
 from bdd_dsl.models.urirefs import URI_ENV_PRED_HAS_OBJ_MODEL
 
 
@@ -36,20 +36,20 @@ class ObjectModel(ModelBase):
 
 
 class ObjModelLoader(object):
-    model_loader: ModelLoader
-    _sim_obj_graph: Graph
+    _model_loader: ModelLoader
+    _modelled_obj_g: Graph
     _obj_models: Dict[URIRef, ObjectModel]
 
     def __init__(self, graph: Graph):
-        q_result = graph.query(Q_SIMULATED_OBJECT)
+        q_result = graph.query(Q_MODELLED_OBJECT)
         assert (
             q_result.type == "CONSTRUCT" and q_result.graph is not None
         ), "querying simulated objects failed"
 
-        self._sim_obj_graph = q_result.graph
+        self._modelled_obj_g = q_result.graph
         self._obj_models = {}  # Object URI -> ObjectModel instance
 
-        self.model_loader = ModelLoader()
+        self._model_loader = ModelLoader()
 
     def load_object_model(
         self, graph: Graph, obj_id: URIRef, override: bool = False, **kwargs: Any
@@ -57,7 +57,11 @@ class ObjModelLoader(object):
         if obj_id in self._obj_models and not override:
             return self._obj_models[obj_id]
 
-        obj_model = ObjectModel(graph=self._sim_obj_graph, obj_id=obj_id)
-        self.model_loader.load_attributes(graph=graph, model=obj_model, **kwargs)
+        obj_model = ObjectModel(graph=self._modelled_obj_g, obj_id=obj_id)
+        self._model_loader.load_attributes(graph=graph, model=obj_model, **kwargs)
         self._obj_models[obj_id] = obj_model
         return obj_model
+
+    def register_attr_loaders(self, *loaders: AttrLoaderProtocol) -> None:
+        for ldr in loaders:
+            self._model_loader.register(loader=ldr)

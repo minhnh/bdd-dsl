@@ -20,7 +20,6 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_TASK_VAR,
     URI_BHV_TYPE_BHV,
     URI_ENV_TYPE_OBJ,
-    URI_SIM_PRED_HAS_CONFIG,
     URI_ENV_PRED_HAS_OBJ_MODEL,
     URI_ENV_TYPE_OBJ_MODEL,
     URI_ENV_TYPE_MOD_OBJ,
@@ -354,20 +353,16 @@ WHERE {{
 }}
 """
 
-Q_SIMULATED_OBJECT = f"""
+Q_MODELLED_OBJECT = f"""
 CONSTRUCT {{
     ?obj a ?objType ;
-        {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
-        {URI_SIM_PRED_HAS_CONFIG.n3()} ?objConfigs .
+        {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel .
     ?objModel a ?objModelType .
 }}
 WHERE {{
     ?simObj a {URI_ENV_TYPE_MOD_OBJ.n3()} ;
         {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
         {URI_ENV_PRED_OF_OBJ.n3()} ?obj .
-    OPTIONAL {{
-        ?simObj {URI_SIM_PRED_HAS_CONFIG.n3()} ?objConfigs .
-    }}
     ?obj a {URI_ENV_TYPE_OBJ.n3()} ;
         a ?objType .
 
