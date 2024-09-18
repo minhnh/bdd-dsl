@@ -10,6 +10,8 @@ from bdd_dsl.simulation.common import (
     URL_MM_SIM_SHACL,
     ObjModelLoader,
     get_path_of_node,
+    load_attr_has_config,
+    load_attr_path,
 )
 
 
@@ -46,18 +48,24 @@ class BDDSimTest(unittest.TestCase):
         self.assertTrue(conforms, f"SHACL violation:\n{report_text}")
 
         obj_res_loader = ObjModelLoader(graph)
+        obj_res_loader.model_loader.register(load_attr_path)
+        obj_res_loader.model_loader.register(load_attr_has_config)
         for _, obj_id in graph.subject_objects(predicate=URI_ENV_PRED_OF_OBJ):
             assert isinstance(obj_id, URIRef)
-            obj_inst = obj_res_loader.load_object_model(obj_id)
+            obj_inst = obj_res_loader.load_object_model(obj_id=obj_id, graph=graph)
 
             if URI_SIM_TYPE_SYS_RES in obj_inst.model_types:
-                _ = get_path_of_node(graph=graph, node_id=obj_inst.model_id)
+                assert len(obj_inst.model_type_to_id[URI_SIM_TYPE_SYS_RES]) == 1
+                sys_res_model_id = list(obj_inst.model_type_to_id[URI_SIM_TYPE_SYS_RES])[0]
+                _ = get_path_of_node(graph=graph, node_id=sys_res_model_id)
 
             elif URI_PY_TYPE_MODULE_ATTR in obj_inst.model_types:
+                assert len(obj_inst.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]) == 1
+                py_attr_model_id = list(obj_inst.model_type_to_id[URI_PY_TYPE_MODULE_ATTR])[0]
                 module_name = graph.value(
-                    subject=obj_inst.model_id, predicate=URI_PY_PRED_MODULE_NAME
+                    subject=py_attr_model_id, predicate=URI_PY_PRED_MODULE_NAME
                 )
-                attr_name = graph.value(subject=obj_inst.model_id, predicate=URI_PY_PRED_ATTR_NAME)
+                attr_name = graph.value(subject=py_attr_model_id, predicate=URI_PY_PRED_ATTR_NAME)
                 assert module_name is not None and attr_name is not None
 
 

@@ -61,8 +61,9 @@ def get_task_variation_table(
         var_names = []
         var_val_str_sets = []
 
-        var_uri_list = task_var.attributes[URI_BDD_PRED_VAR_LIST]
-        var_values_uri_sets = task_var.attributes[URI_BDD_PRED_OF_SETS]
+        var_uri_list = task_var.get_attr(key=URI_BDD_PRED_VAR_LIST)
+        var_values_uri_sets = task_var.get_attr(key=URI_BDD_PRED_OF_SETS)
+        assert var_uri_list is not None and var_values_uri_sets is not None
         assert len(var_uri_list) == len(var_values_uri_sets)
 
         for i in range(len(var_uri_list)):
@@ -79,11 +80,15 @@ def get_task_variation_table(
     if URI_BDD_TYPE_TABLE_VAR in task_var.types:
         var_names = []
         var_val_str_rows = []
-        for var_uri in task_var.attributes[URI_BDD_PRED_VAR_LIST]:
+        var_uri_list = task_var.get_attr(key=URI_BDD_PRED_VAR_LIST)
+        assert var_uri_list is not None
+        for var_uri in var_uri_list:
             assert isinstance(var_uri, URIRef)
             var_names.append(get_valid_var_name(var_uri.n3(namespace_manager=ns_manager)))
 
-        for var_val_uri_row in task_var.attributes[URI_BDD_PRED_ROWS]:
+        uri_rows = task_var.get_attr(key=URI_BDD_PRED_ROWS)
+        assert uri_rows is not None
+        for var_val_uri_row in uri_rows:
             var_val_strings = []
             for val_uri in var_val_uri_row:
                 assert isinstance(val_uri, URIRef)
