@@ -1,43 +1,13 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import json
-from typing import Any, Dict
+from typing import Any
 from rdflib import Graph, URIRef
 from rdf_utils.uri import URL_SECORO_MM
-from rdf_utils.models import ModelBase, ModelLoader
-from bdd_dsl.models.queries import Q_SIMULATED_OBJECT
+from rdf_utils.models import ModelBase
 from bdd_dsl.models.urirefs import URI_SIM_PRED_HAS_CONFIG, URI_SIM_PRED_PATH, URI_SIM_TYPE_RES_PATH
-from bdd_dsl.models.environment import ObjectModel
 
 
 URL_MM_SIM_SHACL = f"{URL_SECORO_MM}/acceptance-criteria/bdd/simulation.shacl.ttl"
-
-
-class ObjModelLoader(object):
-    model_loader: ModelLoader
-    _sim_obj_graph: Graph
-    _obj_models: Dict[URIRef, ObjectModel]
-
-    def __init__(self, graph: Graph):
-        q_result = graph.query(Q_SIMULATED_OBJECT)
-        assert (
-            q_result.type == "CONSTRUCT" and q_result.graph is not None
-        ), "querying simulated objects failed"
-
-        self._sim_obj_graph = q_result.graph
-        self._obj_models = {}  # Object URI -> ObjectModel instance
-
-        self.model_loader = ModelLoader()
-
-    def load_object_model(
-        self, graph: Graph, obj_id: URIRef, override: bool = False, **kwargs: Any
-    ) -> ObjectModel:
-        if obj_id in self._obj_models and not override:
-            return self._obj_models[obj_id]
-
-        obj_model = ObjectModel(graph=self._sim_obj_graph, obj_id=obj_id)
-        self.model_loader.load_attributes(graph=graph, model=obj_model, **kwargs)
-        self._obj_models[obj_id] = obj_model
-        return obj_model
 
 
 def get_path_of_node(graph: Graph, node_id: URIRef) -> str:

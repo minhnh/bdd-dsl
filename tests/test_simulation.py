@@ -6,9 +6,9 @@ from rdf_utils.uri import URL_SECORO_M, URL_MM_PYTHON_SHACL
 from rdf_utils.python import URI_PY_TYPE_MODULE_ATTR, URI_PY_PRED_ATTR_NAME, URI_PY_PRED_MODULE_NAME
 from rdf_utils.resolver import install_resolver
 from bdd_dsl.models.urirefs import URI_ENV_PRED_OF_OBJ, URI_SIM_TYPE_SYS_RES
+from bdd_dsl.models.environment import ObjModelLoader
 from bdd_dsl.simulation.common import (
     URL_MM_SIM_SHACL,
-    ObjModelLoader,
     get_path_of_node,
     load_attr_has_config,
     load_attr_path,

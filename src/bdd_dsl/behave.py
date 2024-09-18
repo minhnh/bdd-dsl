@@ -5,7 +5,7 @@ from behave import given
 from rdf_utils.models import ModelBase, ModelLoader
 from rdflib import Graph, URIRef
 from behave.runner import Context
-from bdd_dsl.simulation.common import ObjModelLoader, ObjectModel
+from bdd_dsl.models.environment import ObjModelLoader, ObjectModel
 
 
 def load_obj_models_from_table(
