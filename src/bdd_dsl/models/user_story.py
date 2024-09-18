@@ -1,14 +1,14 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from itertools import combinations
-from typing import Any, Dict, Generator, Iterable
+from typing import Dict, Generator, Iterable
 from rdflib import RDF, Graph, Literal, URIRef
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
 from rdf_utils.naming import get_valid_var_name
+from rdf_utils.models import ModelBase
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.exception import BDDConstraintViolation
-from bdd_dsl.models.common import ModelBase
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
@@ -67,15 +67,11 @@ SELECT DISTINCT ?us ?var WHERE {{
     ?us {URI_BDD_PRED_HAS_AC.n3()} ?var .
 }}
 """
-KEY_EVT_ID = "event_id"
 
 
 class TimeConstraintModel(ModelBase):
-    attributes: dict
-
     def __init__(self, full_graph: Graph, tc_id: URIRef) -> None:
         super().__init__(graph=full_graph, node_id=tc_id)
-        self.attributes = {}
 
 
 def process_time_constraint_model(constraint: TimeConstraintModel, full_graph: Graph):
@@ -87,8 +83,8 @@ def process_time_constraint_model(constraint: TimeConstraintModel, full_graph: G
                 f" does not refer to exactly 1 event: {event_ids}"
             )
         assert isinstance(event_ids[0], URIRef)
-        assert KEY_EVT_ID not in constraint.attributes
-        constraint.attributes[KEY_EVT_ID] = event_ids[0]
+        assert not constraint.has_attr(key=URI_TIME_PRED_REF_EVT)
+        constraint.set_attr(key=URI_TIME_PRED_REF_EVT, val=event_ids[0])
 
 
 class FluentClauseModel(ModelBase):
@@ -249,7 +245,6 @@ class SceneModel(ModelBase):
 class TaskVariationModel(ModelBase):
     task_id: URIRef
     variables: set[URIRef]
-    attributes: dict[URIRef, Any]
 
     def __init__(self, us_graph: Graph, full_graph: Graph, task_var_id: URIRef) -> None:
         super().__init__(graph=us_graph, node_id=task_var_id)
@@ -257,7 +252,6 @@ class TaskVariationModel(ModelBase):
         assert isinstance(task_id, URIRef)
         self.task_id = task_id
         self.variables = set()
-        self.attributes = {}
 
         self._process_builtin_task_var_types(full_graph)
 
@@ -295,8 +289,8 @@ class TaskVariationModel(ModelBase):
                 len(sets_list) == len(var_list)
             ), f"length mismatch 'variable-list' (len={len(var_list)}) != 'of-sets' (len={len(sets_list)})"
 
-            self.attributes[URI_BDD_PRED_VAR_LIST] = var_list
-            self.attributes[URI_BDD_PRED_OF_SETS] = sets_list
+            self.set_attr(key=URI_BDD_PRED_VAR_LIST, val=var_list)
+            self.set_attr(key=URI_BDD_PRED_OF_SETS, val=sets_list)
 
             return
 
@@ -331,8 +325,8 @@ class TaskVariationModel(ModelBase):
 
                 rows.append(row_uris)
 
-            self.attributes[URI_BDD_PRED_VAR_LIST] = var_list
-            self.attributes[URI_BDD_PRED_ROWS] = rows
+            self.set_attr(key=URI_BDD_PRED_VAR_LIST, val=var_list)
+            self.set_attr(key=URI_BDD_PRED_ROWS, val=rows)
 
             return
 

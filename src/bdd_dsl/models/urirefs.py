@@ -115,6 +115,7 @@ URI_TASK_PRED_OF_TASK = NS_MM_TASK["of-task"]
 
 # Simulation
 URI_SIM_TYPE_SYS_RES = NS_MM_SIM["SystemResource"]
+URI_SIM_TYPE_RES_PATH = NS_MM_SIM["ResourceWithPath"]
 URI_SIM_PRED_HAS_CONFIG = NS_MM_SIM["has-config"]
 URI_SIM_PRED_PATH = NS_MM_SIM["path"]
 

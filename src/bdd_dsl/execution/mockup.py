@@ -4,8 +4,9 @@ from typing import Any
 from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
+from bdd_dsl.behave import load_objects_models
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
-from bdd_dsl.simulation.common import ObjModelLoader, ObjectModel
+from bdd_dsl.simulation.common import ObjModelLoader, load_attr_has_config, load_attr_path
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
 
@@ -16,7 +17,10 @@ def before_all_mockup(context: Context):
     exec_model = ExecutionModel(graph=g)
     context.execution_model = exec_model
     context.us_loader = UserStoryLoader(graph=g)
-    context.obj_model_loader = ObjModelLoader(graph=g)
+    obj_loader = ObjModelLoader(graph=g)
+    obj_loader.model_loader.register(load_attr_path)
+    obj_loader.model_loader.register(load_attr_has_config)
+    context.obj_model_loader = obj_loader
 
 
 def before_scenario(context: Context, scenario: Scenario):
@@ -55,20 +59,14 @@ def before_scenario(context: Context, scenario: Scenario):
 
 @given("a set of objects")
 def given_objects_mockup(context: Context):
-    object_set = set()
     assert context.table is not None, "no table added to context, expected a list of objects"
-    for row in context.table:
-        obj_id_str = row["name"]
-        object_set.add(obj_id_str)
-        try:
-            obj_uri = context.model_graph.namespace_manager.expand_curie(obj_id_str)
-        except ValueError as e:
-            raise RuntimeError(f"can't parse object URI '{obj_id_str}': {e}")
-
-        obj_model = context.obj_model_loader.load_object_model(obj_uri)
-        assert isinstance(obj_model, ObjectModel)
-
-    context.objects = object_set
+    assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
+    assert (
+        context.obj_model_loader is not None
+    ), "no 'obj_model_loader' in context, expected an ObjModelLoader"
+    context.objects = load_objects_models(
+        context=context, graph=context.model_graph, obj_model_loader=context.obj_model_loader
+    )
 
 
 @given("a set of workspaces")
@@ -101,7 +99,12 @@ def given_scene_mockup(context: Context):
 @given('"{pick_obj}" is located at "{pick_ws}"')
 @then('"{pick_obj}" is located at "{pick_ws}"')
 def is_located_at_mockup_given(context: Context, pick_obj: str, pick_ws: str):
-    assert pick_obj in context.objects, f"object '{pick_obj}' unrecognized"
+    try:
+        pick_obj_uri = context.model_graph.namespace_manager.expand_curie(pick_obj)
+    except ValueError as e:
+        raise RuntimeError(f"can't parse pick target obj URI '{pick_obj}': {e}")
+
+    assert pick_obj_uri in context.objects, f"object '{pick_obj_uri}' unrecognized"
     assert pick_ws in context.workspaces, f"object '{pick_ws}' unrecognized"
 
 
