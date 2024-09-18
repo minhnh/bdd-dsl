@@ -7,8 +7,9 @@ from behave import given, then, when
 from rdf_utils.models import ModelLoader
 from bdd_dsl.behave import given_agn_models, given_object_models, given_ws_models
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
-from bdd_dsl.simulation.common import ObjModelLoader, load_attr_has_config, load_attr_path
+from bdd_dsl.simulation.common import load_attr_has_config, load_attr_path
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
+from bdd_dsl.models.environment import ObjModelLoader
 
 
 def before_all_mockup(context: Context):
