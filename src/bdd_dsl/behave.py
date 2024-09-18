@@ -5,11 +5,12 @@ from behave import given
 from rdf_utils.models import ModelBase, ModelLoader
 from rdflib import Graph, URIRef
 from behave.runner import Context
-from bdd_dsl.models.environment import ObjModelLoader, ObjectModel
+from bdd_dsl.models.environment import ObjectModel
+from bdd_dsl.models.user_story import SceneModel
 
 
 def load_obj_models_from_table(
-    table: Table, graph: Graph, obj_model_loader: ObjModelLoader
+    table: Table, graph: Graph, scene: SceneModel
 ) -> Dict[URIRef, ObjectModel]:
     """
     Load ObjectModel instances from a table of URIs in the behave Context,
@@ -23,7 +24,7 @@ def load_obj_models_from_table(
         except ValueError as e:
             raise RuntimeError(f"can't parse object URI '{obj_id_str}': {e}")
 
-        obj_model = obj_model_loader.load_object_model(obj_id=obj_uri, graph=graph)
+        obj_model = scene.load_obj_model(obj_id=obj_uri, graph=graph)
         assert obj_model.id not in object_models, f"duplicate object ID found: {obj_model.id}"
         object_models[obj_model.id] = obj_model
 
@@ -71,10 +72,10 @@ def given_object_models(context: Context):
     assert context.table is not None, "no table added to context, expected a list of objects"
     assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
     assert (
-        context.obj_model_loader is not None
-    ), "no 'obj_model_loader' in context, expected an ObjModelLoader"
+        context.current_scenario is not None
+    ), "no 'current_scenario' in context, expected an ObjModelLoader"
     context.objects = load_obj_models_from_table(
-        table=context.table, graph=context.model_graph, obj_model_loader=context.obj_model_loader
+        table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
     )
 
 

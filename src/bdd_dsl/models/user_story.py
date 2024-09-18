@@ -1,6 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from itertools import combinations
-from typing import Dict, Generator, Iterable
+from typing import Any, Dict, Generator, Iterable
 from rdflib import RDF, Graph, Literal, URIRef
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
@@ -9,6 +9,7 @@ from rdf_utils.models import ModelBase
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.exception import BDDConstraintViolation
+from bdd_dsl.models.environment import ObjModelLoader, ObjectModel
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
@@ -209,15 +210,17 @@ def get_clause_str(clause: FluentClauseModel, ns_manager: NamespaceManager = NS_
 class SceneModel(ModelBase):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
-    objects: Dict[URIRef, set]  # object URI -> obj types
+    objects: set[URIRef]  # object URIs
     workspaces: Dict[URIRef, set]  # workspace URI -> ws types
     agents: Dict[URIRef, set]  # agent URI -> agn types
+    obj_model_loader: ObjModelLoader
 
     def __init__(self, us_graph: Graph, full_graph: Graph, scene_id: URIRef) -> None:
         super().__init__(graph=full_graph, node_id=scene_id)
-        self.objects = {}
+        self.objects = set()
         self.workspaces = {}
         self.agents = {}
+        self.obj_model_loader = ObjModelLoader(full_graph)
 
         for comp_id in us_graph.objects(subject=scene_id, predicate=URI_BDD_PRED_HAS_SCENE):
             comp_types = set(us_graph.objects(subject=comp_id, predicate=RDF.type))
@@ -225,9 +228,8 @@ class SceneModel(ModelBase):
 
             if URI_BDD_TYPE_SCENE_OBJ in comp_types:
                 for obj_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_OBJ):
-                    obj_types = set(full_graph.objects(subject=obj_id, predicate=RDF.type))
                     assert isinstance(obj_id, URIRef)
-                    self.objects[obj_id] = obj_types
+                    self.objects.add(obj_id)
 
             if URI_BDD_TYPE_SCENE_WS in comp_types:
                 for ws_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_WS):
@@ -240,6 +242,14 @@ class SceneModel(ModelBase):
                     assert isinstance(agn_id, URIRef)
                     agn_types = set(full_graph.objects(subject=agn_id, predicate=RDF.type))
                     self.agents[agn_id] = agn_types
+
+    def load_obj_model(
+        self, graph: Graph, obj_id: URIRef, override: bool = False, **kwargs: Any
+    ) -> ObjectModel:
+        assert obj_id in self.objects, f"Object '{obj_id}' not in scene"
+        return self.obj_model_loader.load_object_model(
+            graph=graph, obj_id=obj_id, override=override, **kwargs
+        )
 
 
 class TaskVariationModel(ModelBase):

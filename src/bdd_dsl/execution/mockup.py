@@ -9,7 +9,6 @@ from bdd_dsl.behave import given_agn_models, given_object_models, given_ws_model
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
 from bdd_dsl.simulation.common import load_attr_has_config, load_attr_path
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
-from bdd_dsl.models.environment import ObjModelLoader
 
 
 def before_all_mockup(context: Context):
@@ -19,11 +18,6 @@ def before_all_mockup(context: Context):
     exec_model = ExecutionModel(graph=g)
     context.execution_model = exec_model
     context.us_loader = UserStoryLoader(graph=g)
-
-    obj_loader = ObjModelLoader(graph=g)
-    obj_loader.model_loader.register(load_attr_path)
-    obj_loader.model_loader.register(load_attr_has_config)
-    context.obj_model_loader = obj_loader
 
     generic_loader = ModelLoader()
     context.ws_model_loader = generic_loader
@@ -62,6 +56,11 @@ def before_scenario(context: Context, scenario: Scenario):
     assert (
         len(scenario_var_model.scene.agents) > 0
     ), f"scene '{scenario_var_model.scene.id}' has no agent"
+
+    scenario_var_model.scene.obj_model_loader.register_attr_loaders(
+        load_attr_path, load_attr_has_config
+    )
+    context.current_scenario = scenario_var_model
 
 
 given("a set of objects")(given_object_models)

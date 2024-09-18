@@ -48,8 +48,7 @@ class BDDSimTest(unittest.TestCase):
         self.assertTrue(conforms, f"SHACL violation:\n{report_text}")
 
         obj_res_loader = ObjModelLoader(graph)
-        obj_res_loader.model_loader.register(load_attr_path)
-        obj_res_loader.model_loader.register(load_attr_has_config)
+        obj_res_loader.register_attr_loaders(load_attr_path, load_attr_has_config)
         for _, obj_id in graph.subject_objects(predicate=URI_ENV_PRED_OF_OBJ):
             assert isinstance(obj_id, URIRef)
             obj_inst = obj_res_loader.load_object_model(obj_id=obj_id, graph=graph)
