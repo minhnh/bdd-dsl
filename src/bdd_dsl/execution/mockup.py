@@ -5,8 +5,15 @@ from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
 from rdf_utils.models import ModelLoader
-from bdd_dsl.behave import given_agn_models, given_object_models, given_ws_models
+from rdf_utils.python import (
+    URI_PY_TYPE_MODULE_ATTR,
+    URI_PY_PRED_ATTR_NAME,
+    URI_PY_PRED_MODULE_NAME,
+    load_py_module_attr,
+)
+from bdd_dsl.behave import given_agn_models, given_ws_models, load_obj_models_from_table
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
+from bdd_dsl.models.urirefs import URI_SIM_PRED_PATH, URI_SIM_TYPE_RES_PATH
 from bdd_dsl.simulation.common import load_attr_has_config, load_attr_path
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
@@ -58,12 +65,37 @@ def before_scenario(context: Context, scenario: Scenario):
     ), f"scene '{scenario_var_model.scene.id}' has no agent"
 
     scenario_var_model.scene.obj_model_loader.register_attr_loaders(
-        load_attr_path, load_attr_has_config
+        load_attr_path, load_attr_has_config, load_py_module_attr
     )
     context.current_scenario = scenario_var_model
 
 
-given("a set of objects")(given_object_models)
+@given("a set of objects")
+def given_object_mockup(context: Context):
+    assert context.table is not None, "no table added to context, expected a list of objects"
+    assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
+    assert (
+        context.current_scenario is not None
+    ), "no 'current_scenario' in context, expected an ObjModelLoader"
+    for obj_model in load_obj_models_from_table(
+        table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
+    ):
+        if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
+            for py_model_uri in obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
+                py_model = obj_model.models[py_model_uri]
+                assert py_model.has_attr(
+                    key=URI_PY_PRED_MODULE_NAME
+                ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
+                assert py_model.has_attr(
+                    key=URI_PY_PRED_ATTR_NAME
+                ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
+
+        if URI_SIM_TYPE_RES_PATH in obj_model.model_types:
+            for py_model_uri in obj_model.model_type_to_id[URI_SIM_TYPE_RES_PATH]:
+                path_model = obj_model.load_first_model_by_type(model_type=URI_SIM_TYPE_RES_PATH)
+                assert path_model.has_attr(
+                    URI_SIM_PRED_PATH
+                ), f"ResourceWithPath model '{path_model.id}' for object '{obj_model.id}' missing attr path"
 
 
 given("a set of workspaces")(given_ws_models)
@@ -74,7 +106,6 @@ given("a set of agents")(given_agn_models)
 
 @given("specified objects, workspaces and agents are available")
 def given_scene_mockup(context: Context):
-    assert getattr(context, "objects", None) is not None
     assert getattr(context, "workspaces", None) is not None
     assert getattr(context, "agents", None) is not None
 
@@ -87,12 +118,28 @@ def is_located_at_mockup_given(context: Context, pick_obj: str, pick_ws: str):
     except ValueError as e:
         raise RuntimeError(f"can't parse pick target obj URI '{pick_obj}': {e}")
 
+    assert context.model_graph is not None, "no 'model_graph' in context"
+    assert (
+        context.current_scenario is not None
+    ), "no 'current_scenario' in context, expected an ObjModelLoader"
+    obj_model = context.current_scenario.scene.load_obj_model(
+        graph=context.model_graph, obj_id=pick_obj_uri
+    )
+    assert obj_model is not None
+    if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
+        py_model = obj_model.load_first_model_by_type(URI_PY_TYPE_MODULE_ATTR)
+        assert py_model.has_attr(
+            key=URI_PY_PRED_MODULE_NAME
+        ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
+        assert py_model.has_attr(
+            key=URI_PY_PRED_ATTR_NAME
+        ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
+
     try:
         pick_ws_uri = context.model_graph.namespace_manager.expand_curie(pick_ws)
     except ValueError as e:
         raise RuntimeError(f"can't parse pick workspace URI '{pick_ws}': {e}")
 
-    assert pick_obj_uri in context.objects, f"object '{pick_obj_uri}' unrecognized"
     assert pick_ws_uri in context.workspaces, f"workspace '{pick_ws}' unrecognized"
 
 

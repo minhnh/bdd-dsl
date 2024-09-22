@@ -34,6 +34,16 @@ class ObjectModel(ModelBase):
 
                 self.model_type_to_id[model_type].add(obj_model.id)
 
+    def load_model_attrs(self, graph: Graph, model_loader: ModelLoader) -> None:
+        for model in self.models.values():
+            model_loader.load_attributes(graph=graph, model=model)
+
+    def load_first_model_by_type(self, model_type: URIRef) -> ModelBase:
+        for model_uri in self.model_type_to_id[model_type]:
+            return self.models[model_uri]
+
+        raise RuntimeError(f"object '{self.id}' doesn't have a model of type '{model_type}'")
+
 
 class ObjModelLoader(object):
     _model_loader: ModelLoader
@@ -58,7 +68,7 @@ class ObjModelLoader(object):
             return self._obj_models[obj_id]
 
         obj_model = ObjectModel(graph=self._modelled_obj_g, obj_id=obj_id)
-        self._model_loader.load_attributes(graph=graph, model=obj_model, **kwargs)
+        obj_model.load_model_attrs(graph=graph, model_loader=self._model_loader)
         self._obj_models[obj_id] = obj_model
         return obj_model
 

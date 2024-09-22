@@ -1,5 +1,7 @@
+import sys
 from os.path import join, dirname
 from timeit import default_timer as timer
+from urllib.request import HTTPError
 import rdflib
 
 from pprint import pprint
@@ -37,7 +39,12 @@ def main():
         g.parse(url, format=fmt)
 
     start = timer()
-    us_loader = UserStoryLoader(g)
+    try:
+        us_loader = UserStoryLoader(g)
+    except HTTPError as e:
+        print(f"error loading models URL '{e.url}':\n{e.info()}\n{e}")
+        sys.exit(1)
+
     end = timer()
     print(f"UserStoryLoader init time: {end - start:.5f} seconds")
 
