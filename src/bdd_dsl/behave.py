@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Dict
+from typing import Dict, Generator
 from behave.model import Table
 from behave import given
 from rdf_utils.models import ModelBase, ModelLoader
@@ -11,12 +11,11 @@ from bdd_dsl.models.user_story import SceneModel
 
 def load_obj_models_from_table(
     table: Table, graph: Graph, scene: SceneModel
-) -> Dict[URIRef, ObjectModel]:
+) -> Generator[ObjectModel, None, None]:
     """
     Load ObjectModel instances from a table of URIs in the behave Context,
     designed for the 'Given a set of objects' clause
     """
-    object_models = {}
     for row in table:
         obj_id_str = row["name"]
         try:
@@ -24,11 +23,7 @@ def load_obj_models_from_table(
         except ValueError as e:
             raise RuntimeError(f"can't parse object URI '{obj_id_str}': {e}")
 
-        obj_model = scene.load_obj_model(obj_id=obj_uri, graph=graph)
-        assert obj_model.id not in object_models, f"duplicate object ID found: {obj_model.id}"
-        object_models[obj_model.id] = obj_model
-
-    return object_models
+        yield scene.load_obj_model(obj_id=obj_uri, graph=graph)
 
 
 def load_ws_models_from_table(
@@ -65,18 +60,6 @@ def load_agn_models_from_table(
         agent_models[agn_model.id] = agn_model
 
     return agent_models
-
-
-@given("a set of objects")
-def given_object_models(context: Context):
-    assert context.table is not None, "no table added to context, expected a list of objects"
-    assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
-    assert (
-        context.current_scenario is not None
-    ), "no 'current_scenario' in context, expected an ObjModelLoader"
-    context.objects = load_obj_models_from_table(
-        table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
-    )
 
 
 @given("a set of workspaces")
