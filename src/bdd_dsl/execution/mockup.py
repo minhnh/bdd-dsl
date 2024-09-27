@@ -110,9 +110,11 @@ def given_scene_mockup(context: Context):
     assert getattr(context, "agents", None) is not None
 
 
-@given('"{pick_obj}" is located at "{pick_ws}"')
-@then('"{pick_obj}" is located at "{pick_ws}"')
-def is_located_at_mockup_given(context: Context, pick_obj: str, pick_ws: str):
+@given('"{pick_obj}" is located at "{pick_ws}" before event "{evt_uri_str}"')
+@given('"{pick_obj}" is located at "{pick_ws}" after event "{evt_uri_str}"')
+@then('"{pick_obj}" is located at "{pick_ws}" before event "{evt_uri_str}"')
+@then('"{pick_obj}" is located at "{pick_ws}" after event "{evt_uri_str}"')
+def is_located_at_mockup_given(context: Context, pick_obj: str, pick_ws: str, evt_uri_str: str):
     try:
         pick_obj_uri = context.model_graph.namespace_manager.expand_curie(pick_obj)
     except ValueError as e:
@@ -141,6 +143,13 @@ def is_located_at_mockup_given(context: Context, pick_obj: str, pick_ws: str):
         raise RuntimeError(f"can't parse pick workspace URI '{pick_ws}': {e}")
 
     assert pick_ws_uri in context.workspaces, f"workspace '{pick_ws}' unrecognized"
+
+    try:
+        evt_uri = context.model_graph.namespace_manager.expand_curie(evt_uri_str)
+    except ValueError as e:
+        raise RuntimeError(f"can't parse event URI '{evt_uri_str}': {e}")
+
+    assert evt_uri is not None, f"Event '{evt_uri}' is None"
 
 
 class PickplaceBehaviourMockup(Behaviour):
