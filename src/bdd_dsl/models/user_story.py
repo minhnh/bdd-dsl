@@ -1,6 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from itertools import combinations
-from typing import Any, Dict, Generator, Iterable
+from typing import Any, Callable, Dict, Generator, Iterable
 from rdflib import RDF, Graph, Literal, URIRef
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
@@ -174,7 +174,33 @@ class FluentClauseModel(ModelBase):
         )
 
 
-def get_clause_str(clause: FluentClauseModel, ns_manager: NamespaceManager = NS_MANAGER) -> str:
+def get_time_constraint_str(
+    tc_model: TimeConstraintModel, ns_manager: NamespaceManager = NS_MANAGER
+) -> str:
+    if URI_TIME_TYPE_BEFORE_EVT in tc_model.types or URI_TIME_TYPE_AFTER_EVT in tc_model.types:
+        evt_uri = tc_model.get_attr(key=URI_TIME_PRED_REF_EVT)
+        assert (
+            evt_uri is not None
+        ), f"TimeConstraint '{tc_model.id}' of types '{tc_model.types}' does ref an event or event attr not loaded"
+        assert isinstance(
+            evt_uri, URIRef
+        ), f"unexpected type for event URI '{evt_uri}': {type(evt_uri)}"
+        evt_uri_str = evt_uri.n3(ns_manager)
+
+        if URI_TIME_TYPE_BEFORE_EVT in tc_model.types:
+            return f'before event "{evt_uri_str}"'
+
+        if URI_TIME_TYPE_AFTER_EVT in tc_model.types:
+            return f'after event "{evt_uri_str}"'
+
+    raise RuntimeError(f"TimeConstraint '{tc_model.id}' has unhandled types: {tc_model.types}")
+
+
+def get_clause_str(
+    clause: FluentClauseModel,
+    ns_manager: NamespaceManager = NS_MANAGER,
+    tc_str_func: Callable[[TimeConstraintModel, NamespaceManager], str] = get_time_constraint_str,
+) -> str:
     if URI_BDD_TYPE_LOCATED_AT in clause.fluent.types:
         assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role
         obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
@@ -186,7 +212,7 @@ def get_clause_str(clause: FluentClauseModel, ns_manager: NamespaceManager = NS_
         assert isinstance(ws_id, URIRef)
         ws_id_str = get_valid_var_name(ws_id.n3(ns_manager))
 
-        return f'"<{obj_id_str}>" is located at "<{ws_id_str}>"'
+        return f'"<{obj_id_str}>" is located at "<{ws_id_str}>" {tc_str_func(clause.time_constraint, ns_manager)}'
 
     if URI_BDD_TYPE_IS_HELD in clause.fluent.types:
         assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role
@@ -199,7 +225,7 @@ def get_clause_str(clause: FluentClauseModel, ns_manager: NamespaceManager = NS_
         assert isinstance(agn_id, URIRef)
         agn_id_str = get_valid_var_name(agn_id.n3(ns_manager))
 
-        return f'"<{obj_id_str}>" is held by "<{agn_id_str}>"'
+        return f'"<{obj_id_str}>" is held by "<{agn_id_str}>" {tc_str_func(clause.time_constraint, ns_manager)}'
 
     raise RuntimeError(
         f"get_clause_str: unhandled types for fluent '{clause.fluent.id}' of clasue '{clause.id}':"
