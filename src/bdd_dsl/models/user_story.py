@@ -9,6 +9,7 @@ from rdf_utils.models import ModelBase
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.exception import BDDConstraintViolation
+from bdd_dsl.models.agent import AgentModel, AgnModelLoader
 from bdd_dsl.models.environment import ObjModelLoader, ObjectModel
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
@@ -238,15 +239,17 @@ class SceneModel(ModelBase):
 
     objects: set[URIRef]  # object URIs
     workspaces: Dict[URIRef, set]  # workspace URI -> ws types
-    agents: Dict[URIRef, set]  # agent URI -> agn types
+    agents: set[URIRef]  # agent URIs
     obj_model_loader: ObjModelLoader
+    agn_model_loader: AgnModelLoader
 
     def __init__(self, us_graph: Graph, full_graph: Graph, scene_id: URIRef) -> None:
         super().__init__(graph=full_graph, node_id=scene_id)
         self.objects = set()
         self.workspaces = {}
-        self.agents = {}
-        self.obj_model_loader = ObjModelLoader(full_graph)
+        self.agents = set()
+        self.obj_model_loader = ObjModelLoader()
+        self.agn_model_loader = AgnModelLoader()
 
         for comp_id in us_graph.objects(subject=scene_id, predicate=URI_BDD_PRED_HAS_SCENE):
             comp_types = set(us_graph.objects(subject=comp_id, predicate=RDF.type))
@@ -266,8 +269,7 @@ class SceneModel(ModelBase):
             if URI_BDD_TYPE_SCENE_AGN in comp_types:
                 for agn_id in full_graph.objects(subject=comp_id, predicate=URI_AGN_PRED_HAS_AGN):
                     assert isinstance(agn_id, URIRef)
-                    agn_types = set(full_graph.objects(subject=agn_id, predicate=RDF.type))
-                    self.agents[agn_id] = agn_types
+                    self.agents.add(agn_id)
 
     def load_obj_model(
         self, graph: Graph, obj_id: URIRef, override: bool = False, **kwargs: Any
@@ -275,6 +277,14 @@ class SceneModel(ModelBase):
         assert obj_id in self.objects, f"Object '{obj_id}' not in scene"
         return self.obj_model_loader.load_object_model(
             graph=graph, obj_id=obj_id, override=override, **kwargs
+        )
+
+    def load_agn_model(
+        self, graph: Graph, agent_id: URIRef, override: bool = False, **kwargs: Any
+    ) -> AgentModel:
+        assert agent_id in self.agents, f"Agent '{agent_id}' not in scene"
+        return self.agn_model_loader.load_agent_model(
+            graph=graph, agent_id=agent_id, override=override, **kwargs
         )
 
 

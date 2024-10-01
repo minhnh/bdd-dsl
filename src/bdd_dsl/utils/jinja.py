@@ -182,7 +182,7 @@ def prepare_jinja2_template_data(
                     scene_data[FR_WS] = ws_list
 
                 agn_list = []
-                for agn_id in scr_var.scene.agents.keys():
+                for agn_id in scr_var.scene.agents:
                     agn_list.append(agn_id.n3(namespace_manager=ns_manager))
                 if len(agn_list) > 0:
                     scene_data[FR_AGENTS] = agn_list

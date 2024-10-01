@@ -5,6 +5,7 @@ from behave import given
 from rdf_utils.models import ModelBase, ModelLoader
 from rdflib import Graph, URIRef
 from behave.runner import Context
+from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel
 from bdd_dsl.models.user_story import SceneModel
 
@@ -26,6 +27,23 @@ def load_obj_models_from_table(
         yield scene.load_obj_model(obj_id=obj_uri, graph=graph)
 
 
+def load_agn_models_from_table(
+    table: Table, graph: Graph, scene: SceneModel
+) -> Generator[AgentModel, None, None]:
+    """
+    Load AgentModel instances from a table of URIs in the behave Context,
+    designed for the 'Given a set of agents' clause
+    """
+    for row in table:
+        agn_id_str = row["name"]
+        try:
+            agn_uri = graph.namespace_manager.expand_curie(agn_id_str)
+        except ValueError as e:
+            raise RuntimeError(f"can't parse agent URI '{agn_id_str}': {e}")
+
+        yield scene.load_agn_model(agent_id=agn_uri, graph=graph)
+
+
 def load_ws_models_from_table(
     table: Table, graph: Graph, ws_model_loader: ModelLoader
 ) -> Dict[URIRef, ModelBase]:
@@ -44,24 +62,6 @@ def load_ws_models_from_table(
     return workspace_models
 
 
-def load_agn_models_from_table(
-    table: Table, graph: Graph, agn_model_loader: ModelLoader
-) -> Dict[URIRef, ModelBase]:
-    agent_models = {}
-    for row in table:
-        agn_id_str = row["name"]
-        try:
-            agn_uri = graph.namespace_manager.expand_curie(agn_id_str)
-        except ValueError as e:
-            raise RuntimeError(f"can't parse agent URI '{agn_id_str}': {e}")
-
-        agn_model = ModelBase(graph=graph, node_id=agn_uri)
-        agn_model_loader.load_attributes(model=agn_model, graph=graph)
-        agent_models[agn_model.id] = agn_model
-
-    return agent_models
-
-
 @given("a set of workspaces")
 def given_ws_models(context: Context):
     assert context.table is not None, "no table added to context, expected a list of workspaces"
@@ -71,16 +71,4 @@ def given_ws_models(context: Context):
     ), "no 'ws_model_loader' in context, expected a ModelLoader"
     context.workspaces = load_ws_models_from_table(
         table=context.table, graph=context.model_graph, ws_model_loader=context.ws_model_loader
-    )
-
-
-@given("a set of agents")
-def given_agn_models(context: Context):
-    assert context.table is not None, "no table added to context, expected a list of agents"
-    assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
-    assert (
-        context.agn_model_loader is not None
-    ), "no 'agn_model_loader' in context, expected a ModelLoader"
-    context.agents = load_agn_models_from_table(
-        table=context.table, graph=context.model_graph, agn_model_loader=context.agn_model_loader
     )

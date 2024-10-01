@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from rdflib import Graph, URIRef
 from rdf_utils.models import AttrLoaderProtocol, ModelBase, ModelLoader
 from bdd_dsl.models.queries import Q_MODELLED_OBJECT
@@ -8,7 +8,6 @@ from bdd_dsl.models.urirefs import URI_ENV_PRED_HAS_OBJ_MODEL
 
 class ObjectModel(ModelBase):
     models: Dict[URIRef, ModelBase]
-
     model_types: set[URIRef]
     model_type_to_id: Dict[URIRef, set[URIRef]]  # map a model type to a set of model URIs
 
@@ -34,9 +33,9 @@ class ObjectModel(ModelBase):
 
                 self.model_type_to_id[model_type].add(obj_model.id)
 
-    def load_model_attrs(self, graph: Graph, model_loader: ModelLoader) -> None:
+    def load_model_attrs(self, graph: Graph, model_loader: ModelLoader, **kwargs: Any) -> None:
         for model in self.models.values():
-            model_loader.load_attributes(graph=graph, model=model)
+            model_loader.load_attributes(graph=graph, model=model, **kwargs)
 
     def load_first_model_by_type(self, model_type: URIRef) -> ModelBase:
         for model_uri in self.model_type_to_id[model_type]:
@@ -47,19 +46,22 @@ class ObjectModel(ModelBase):
 
 class ObjModelLoader(object):
     _model_loader: ModelLoader
-    _modelled_obj_g: Graph
+    _modelled_obj_g: Optional[Graph]
     _obj_models: Dict[URIRef, ObjectModel]
 
-    def __init__(self, graph: Graph):
+    def __init__(self):
+        self._modelled_obj_g = None
+        self._model_loader = ModelLoader()
+        self._obj_models = {}  # Object URI -> ObjectModel instance
+
+    def _query_obj_models(self, graph: Graph) -> Graph:
         q_result = graph.query(Q_MODELLED_OBJECT)
         assert (
             q_result.type == "CONSTRUCT" and q_result.graph is not None
-        ), "querying simulated objects failed"
+        ), "querying ModelledObject's failed"
+        assert len(q_result.graph) > 0, "querying for ModelledObject's returned an empty graph"
 
-        self._modelled_obj_g = q_result.graph
-        self._obj_models = {}  # Object URI -> ObjectModel instance
-
-        self._model_loader = ModelLoader()
+        return q_result.graph
 
     def load_object_model(
         self, graph: Graph, obj_id: URIRef, override: bool = False, **kwargs: Any
@@ -67,8 +69,11 @@ class ObjModelLoader(object):
         if obj_id in self._obj_models and not override:
             return self._obj_models[obj_id]
 
+        if self._modelled_obj_g is None:
+            self._modelled_obj_g = self._query_obj_models(graph=graph)
+
         obj_model = ObjectModel(graph=self._modelled_obj_g, obj_id=obj_id)
-        obj_model.load_model_attrs(graph=graph, model_loader=self._model_loader)
+        obj_model.load_model_attrs(graph=graph, model_loader=self._model_loader, **kwargs)
         self._obj_models[obj_id] = obj_model
         return obj_model
 

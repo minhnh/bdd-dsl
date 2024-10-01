@@ -17,14 +17,14 @@ MODEL_URLS = {
 }
 
 
-class BDDTest(unittest.TestCase):
+class BDDSpecTest(unittest.TestCase):
     def setUp(self):
         install_resolver()
         self.graph = rdflib.ConjunctiveGraph()
         for url, fmt in MODEL_URLS.items():
             self.graph.parse(url, format=fmt)
 
-    def test_bdd(self):
+    def test_bdd_jinja(self):
         us_loader = UserStoryLoader(self.graph)
         processed_bdd_data = prepare_jinja2_template_data(us_loader, self.graph)
         for us_data in processed_bdd_data:
