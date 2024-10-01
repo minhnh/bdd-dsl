@@ -97,8 +97,11 @@ URI_ENV_PRED_OF_WS = NS_MM_ENV["of-workspace"]
 
 # Agent
 URI_AGN_TYPE_AGN = NS_MM_AGN["Agent"]
+URI_AGN_TYPE_MOD_AGN = NS_MM_AGN["ModelledAgent"]
+URI_AGN_TYPE_AGN_MODEL = NS_MM_AGN["AgentModel"]
 URI_AGN_PRED_OF_AGN = NS_MM_AGN["of-agent"]
 URI_AGN_PRED_HAS_AGN = NS_MM_AGN["has-agent"]
+URI_AGN_PRED_HAS_AGN_MODEL = NS_MM_AGN["has-agent-model"]
 
 # Behaviour
 URI_BHV_TYPE_BHV = NS_MM_BHV["Behaviour"]

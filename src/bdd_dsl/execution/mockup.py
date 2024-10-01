@@ -11,7 +11,7 @@ from rdf_utils.python import (
     URI_PY_PRED_MODULE_NAME,
     load_py_module_attr,
 )
-from bdd_dsl.behave import given_agn_models, given_ws_models, load_obj_models_from_table
+from bdd_dsl.behave import given_ws_models, load_obj_models_from_table, load_agn_models_from_table
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
 from bdd_dsl.models.urirefs import URI_SIM_PRED_PATH, URI_SIM_TYPE_RES_PATH
 from bdd_dsl.simulation.common import load_attr_has_config, load_attr_path
@@ -67,16 +67,17 @@ def before_scenario(context: Context, scenario: Scenario):
     scenario_var_model.scene.obj_model_loader.register_attr_loaders(
         load_attr_path, load_attr_has_config, load_py_module_attr
     )
+    scenario_var_model.scene.agn_model_loader.register_attr_loaders(load_py_module_attr)
     context.current_scenario = scenario_var_model
 
 
 @given("a set of objects")
-def given_object_mockup(context: Context):
-    assert context.table is not None, "no table added to context, expected a list of objects"
+def given_objects_mockup(context: Context):
+    assert context.table is not None, "no table added to context, expected a list of object URIs"
     assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
     assert (
         context.current_scenario is not None
-    ), "no 'current_scenario' in context, expected an ObjModelLoader"
+    ), "no 'current_scenario' in context, expected a ScenarioVariantModel"
     for obj_model in load_obj_models_from_table(
         table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
     ):
@@ -101,13 +102,30 @@ def given_object_mockup(context: Context):
 given("a set of workspaces")(given_ws_models)
 
 
-given("a set of agents")(given_agn_models)
+@given("a set of agents")
+def given_agents_mockup(context: Context):
+    assert context.table is not None, "no table added to context, expected a list of agent URIs"
+    assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
+    assert (
+        context.current_scenario is not None
+    ), "no 'current_scenario' in context, expected an ScenarioVariantModel"
+    for agn_model in load_agn_models_from_table(
+        table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
+    ):
+        if URI_PY_TYPE_MODULE_ATTR in agn_model.model_types:
+            for py_model_uri in agn_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
+                py_model = agn_model.models[py_model_uri]
+                assert py_model.has_attr(
+                    key=URI_PY_PRED_MODULE_NAME
+                ), f"Python attribute model '{py_model.id}' for agent '{agn_model.id}' missing module name"
+                assert py_model.has_attr(
+                    key=URI_PY_PRED_ATTR_NAME
+                ), f"Python attribute model '{py_model.id}' for agent '{agn_model.id}' missing attribute name"
 
 
 @given("specified objects, workspaces and agents are available")
 def given_scene_mockup(context: Context):
     assert getattr(context, "workspaces", None) is not None
-    assert getattr(context, "agents", None) is not None
 
 
 @given('"{pick_obj}" is located at "{pick_ws}" before event "{evt_uri_str}"')

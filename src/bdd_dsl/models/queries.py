@@ -8,6 +8,11 @@ from bdd_dsl.models.uri import (
     URI_MM_PY,
 )
 from bdd_dsl.models.urirefs import (
+    URI_AGN_PRED_HAS_AGN_MODEL,
+    URI_AGN_PRED_OF_AGN,
+    URI_AGN_TYPE_AGN,
+    URI_AGN_TYPE_AGN_MODEL,
+    URI_AGN_TYPE_MOD_AGN,
     URI_BDD_PRED_GIVEN,
     URI_BDD_PRED_HAS_AC,
     URI_BDD_PRED_HAS_SCENE,
@@ -360,7 +365,7 @@ CONSTRUCT {{
     ?objModel a ?objModelType .
 }}
 WHERE {{
-    ?simObj a {URI_ENV_TYPE_MOD_OBJ.n3()} ;
+    ?modelledObj a {URI_ENV_TYPE_MOD_OBJ.n3()} ;
         {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
         {URI_ENV_PRED_OF_OBJ.n3()} ?obj .
     ?obj a {URI_ENV_TYPE_OBJ.n3()} ;
@@ -368,5 +373,23 @@ WHERE {{
 
     ?objModel a {URI_ENV_TYPE_OBJ_MODEL.n3()} ;
         a ?objModelType .
+}}
+"""
+
+Q_MODELLED_AGENT = f"""
+CONSTRUCT {{
+    ?agn a ?agnType ;
+        {URI_AGN_PRED_HAS_AGN_MODEL.n3()} ?agnModel .
+    ?agnModel a ?agnModelType .
+}}
+WHERE {{
+    ?modelledAgn a {URI_AGN_TYPE_MOD_AGN.n3()} ;
+        {URI_AGN_PRED_HAS_AGN_MODEL.n3()} ?agnModel ;
+        {URI_AGN_PRED_OF_AGN.n3()} ?agn .
+    ?agn a {URI_AGN_TYPE_AGN.n3()} ;
+        a ?agnType .
+
+    ?agnModel a {URI_AGN_TYPE_AGN_MODEL.n3()} ;
+        a ?agnModelType .
 }}
 """
