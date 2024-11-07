@@ -47,7 +47,7 @@ def before_scenario(context: Context, scenario: Scenario):
         scenario_var_uri = model_graph.namespace_manager.expand_curie(scr_name)
     except ValueError as e:
         raise RuntimeError(
-            f"can't parse behaviour URI '{scr_name}' from scenario '{scenario.name}': {e}"
+            f"can't parse ScenarioVariant URI '{scr_name}' from scenario '{scenario.name}': {e}"
         )
 
     scenario_var_model = us_loader.load_scenario_variant(

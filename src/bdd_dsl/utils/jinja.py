@@ -100,7 +100,7 @@ def get_task_variation_table(
     raise RuntimeError(f"TaskVariation '{task_var.id}' has unhandled types: {task_var.types}")
 
 
-def prepare_scenario_variant_date(
+def prepare_scenario_variant_data(
     scr_var_model: ScenarioVariantModel,
     ns_manager: NamespaceManager,
 ) -> dict:
@@ -193,7 +193,7 @@ def prepare_jinja2_template_data(
                     )
 
             # ScenarioVariant data
-            scr_var_data = prepare_scenario_variant_date(
+            scr_var_data = prepare_scenario_variant_data(
                 scr_var_model=scr_var, ns_manager=ns_manager
             )
 
