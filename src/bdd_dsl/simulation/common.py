@@ -3,7 +3,7 @@ import json
 from typing import Any
 from rdflib import Graph, URIRef
 from rdf_utils.uri import URL_SECORO_MM
-from rdf_utils.models import ModelBase
+from rdf_utils.models.common import ModelBase
 from bdd_dsl.models.urirefs import URI_SIM_PRED_HAS_CONFIG, URI_SIM_PRED_PATH, URI_SIM_TYPE_RES_PATH
 
 

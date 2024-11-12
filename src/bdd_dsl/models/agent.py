@@ -1,7 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Any, Dict, Optional
 from rdflib import Graph, URIRef
-from rdf_utils.models import AttrLoaderProtocol, ModelBase, ModelLoader
+from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
 from bdd_dsl.models.queries import Q_MODELLED_AGENT
 from bdd_dsl.models.urirefs import URI_AGN_PRED_HAS_AGN_MODEL
 

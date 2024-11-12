@@ -2,11 +2,15 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 from behave.runner import Context
-from rdf_utils.models import ModelBase, ModelLoader
+from rdf_utils.models.common import ModelBase, ModelLoader
 from rdflib import Graph, URIRef
 from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.caching import read_url_and_cache
-from rdf_utils.python import URI_PY_TYPE_MODULE_ATTR, import_attr_from_model, load_py_module_attr
+from rdf_utils.models.python import (
+    URI_PY_TYPE_MODULE_ATTR,
+    import_attr_from_model,
+    load_py_module_attr,
+)
 from bdd_dsl.models.urirefs import URI_BDD_TYPE_BHV_IMPL, URI_BHV_PRED_OF_BHV
 
 

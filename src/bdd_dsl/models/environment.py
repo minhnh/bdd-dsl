@@ -1,7 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Dict, Any, Optional
 from rdflib import Graph, URIRef
-from rdf_utils.models import AttrLoaderProtocol, ModelBase, ModelLoader
+from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
 from bdd_dsl.models.queries import Q_MODELLED_OBJECT
 from bdd_dsl.models.urirefs import URI_ENV_PRED_HAS_OBJ_MODEL
 
@@ -18,7 +18,9 @@ class ObjectModel(ModelBase):
         self.model_type_to_id = {}
 
         for model_id in graph.objects(subject=obj_id, predicate=URI_ENV_PRED_HAS_OBJ_MODEL):
-            assert isinstance(model_id, URIRef)
+            assert isinstance(
+                model_id, URIRef
+            ), f"unexpected type for model ID (not URIRef): {type(model_id)}"
 
             obj_model = ModelBase(graph=graph, node_id=model_id)
             assert (
