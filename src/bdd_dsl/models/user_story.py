@@ -5,7 +5,7 @@ from rdflib import RDF, Graph, Literal, URIRef
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
 from rdf_utils.naming import get_valid_var_name
-from rdf_utils.models import ModelBase
+from rdf_utils.models.common import ModelBase
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.exception import BDDConstraintViolation
@@ -295,7 +295,7 @@ class TaskVariationModel(ModelBase):
     def __init__(self, us_graph: Graph, full_graph: Graph, task_var_id: URIRef) -> None:
         super().__init__(graph=us_graph, node_id=task_var_id)
         task_id = us_graph.value(subject=task_var_id, predicate=URI_TASK_PRED_OF_TASK)
-        assert isinstance(task_id, URIRef)
+        assert isinstance(task_id, URIRef), f"task_id is not URIRef: type={type(task_id)}"
         self.task_id = task_id
         self.variables = set()
 
@@ -349,7 +349,9 @@ class TaskVariationModel(ModelBase):
 
             rows = []
             for row_node in full_graph.items(list=rows_head):
-                assert isinstance(row_node, Literal)
+                assert isinstance(
+                    row_node, Literal
+                ), f"row_node is not Literal: type={type(row_node)}"
                 row_data = row_node.toPython()
                 assert isinstance(
                     row_data, list
@@ -623,11 +625,14 @@ class UserStoryLoader(object):
         returns { <UserStory URI> : [ <list of ScenarioVariant URIs> ] }
         """
         q_result = self._us_graph.query(Q_US_VAR)
-        assert q_result.type == "SELECT" and isinstance(q_result, Iterable)
+        assert q_result is not None, "querying scenario variant returns None query"
+        assert q_result.type == "SELECT" and isinstance(
+            q_result, Iterable
+        ), f"unexpected query result: type={q_result.type}"
 
         us_var_dict = {}
         for row in q_result:
-            assert isinstance(row, ResultRow)
+            assert isinstance(row, ResultRow), f"unexpected type for result row: {type(row)}"
             assert hasattr(row, "us"), "query result row has no attribute 'us'"
             assert hasattr(row, "var"), "query result row has no attribute 'var'"
 

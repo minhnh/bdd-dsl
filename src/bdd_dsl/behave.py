@@ -2,7 +2,7 @@
 from typing import Dict, Generator
 from behave.model import Table
 from behave import given
-from rdf_utils.models import ModelBase, ModelLoader
+from rdf_utils.models.common import ModelBase, ModelLoader
 from rdflib import Graph, URIRef
 from behave.runner import Context
 from bdd_dsl.models.agent import AgentModel

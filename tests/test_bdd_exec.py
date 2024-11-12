@@ -2,7 +2,7 @@
 import unittest
 from rdflib import ConjunctiveGraph
 from rdf_utils.uri import URL_SECORO_M, URL_MM_PYTHON_SHACL
-from rdf_utils.python import (
+from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,
