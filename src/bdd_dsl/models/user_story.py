@@ -312,7 +312,7 @@ class TaskVariationModel(ModelBase):
             ), f"CartesianProductVariation '{self.id}' does not have a valid 'of-sets' property: {of_sets_list_node}"
 
             sets_list = load_list_re(
-                graph=full_graph, col_head=of_sets_list_node, parse_uri=True, quiet=True
+                graph=full_graph, first_node=of_sets_list_node, parse_uri=True, quiet=True
             )
 
             assert (
@@ -331,7 +331,7 @@ class TaskVariationModel(ModelBase):
                 rows_head, BNode
             ), f"TableVariation '{self.id}' does not have valid 'rows' property: {rows_head}"
 
-            rows = load_list_re(graph=full_graph, col_head=rows_head, parse_uri=True, quiet=True)
+            rows = load_list_re(graph=full_graph, first_node=rows_head, parse_uri=True, quiet=True)
             for row in rows:
                 assert len(row) == len(
                     var_list
