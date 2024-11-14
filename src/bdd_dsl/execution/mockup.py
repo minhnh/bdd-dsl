@@ -4,8 +4,8 @@ from typing import Any
 from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
-from rdf_utils.models import ModelLoader
-from rdf_utils.python import (
+from rdf_utils.models.common import ModelLoader
+from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,

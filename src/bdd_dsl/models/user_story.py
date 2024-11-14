@@ -1,11 +1,12 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from itertools import combinations
 from typing import Any, Callable, Dict, Generator, Iterable
-from rdflib import RDF, Graph, Literal, URIRef
+from rdflib import RDF, Graph, Literal, URIRef, BNode
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
 from rdf_utils.naming import get_valid_var_name
 from rdf_utils.models.common import ModelBase
+from rdf_utils.collection import load_list_re
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.exception import BDDConstraintViolation
@@ -306,30 +307,13 @@ class TaskVariationModel(ModelBase):
             var_list = self._get_variable_list(graph=full_graph)
 
             of_sets_list_node = full_graph.value(subject=self.id, predicate=URI_BDD_PRED_OF_SETS)
-            assert (
-                of_sets_list_node is not None
-            ), f"CartesianProductVariation '{self.id}' does not have 'of-sets' property"
+            assert isinstance(
+                of_sets_list_node, BNode
+            ), f"CartesianProductVariation '{self.id}' does not have a valid 'of-sets' property: {of_sets_list_node}"
 
-            sets_list = []
-            for set_node in full_graph.items(list=of_sets_list_node):
-                # rdflib doesn't handle container of URIs nicely, so elements are always Literal
-                assert isinstance(set_node, Literal)
-                set_data = set_node.toPython()
-                if isinstance(set_data, list):
-                    uri_list = get_uris_from_strings(
-                        uri_strings=set_data, ns_manager=full_graph.namespace_manager
-                    )
-                    sets_list.append(uri_list)
-                elif isinstance(set_data, str):
-                    try:
-                        set_uri = full_graph.namespace_manager.expand_curie(set_data)
-                    except ValueError as e:
-                        raise ValueError(
-                            f"process_task_var: product: failed to parse '{set_data}' as URI: {e}"
-                        )
-                    sets_list.append(generate_set_values(graph=full_graph, set_uri=set_uri))
-                else:
-                    raise RuntimeError(f"unhandled type for '{set_node}', type='{type(set_data)}'")
+            sets_list = load_list_re(
+                graph=full_graph, col_head=of_sets_list_node, parse_uri=True, quiet=True
+            )
 
             assert (
                 len(sets_list) == len(var_list)
@@ -343,36 +327,15 @@ class TaskVariationModel(ModelBase):
         if URI_BDD_TYPE_TABLE_VAR in self.types:
             var_list = self._get_variable_list(graph=full_graph)
             rows_head = full_graph.value(subject=self.id, predicate=URI_BDD_PRED_ROWS)
-            assert (
-                rows_head is not None
-            ), f"TableVariation '{self.id}' does not have 'rows' property"
+            assert isinstance(
+                rows_head, BNode
+            ), f"TableVariation '{self.id}' does not have valid 'rows' property: {rows_head}"
 
-            rows = []
-            for row_node in full_graph.items(list=rows_head):
-                assert isinstance(
-                    row_node, Literal
-                ), f"row_node is not Literal: type={type(row_node)}"
-                row_data = row_node.toPython()
-                assert isinstance(
-                    row_data, list
-                ), f"TableVariation '{self.id}': row data not a list: {row_data}"
-                assert (
-                    len(row_data) == len(var_list)
-                ), f"TableVariation '{self.id}': row length does not match variable list: {row_data}"
-
-                row_uris = []
-                for uri_str in row_data:
-                    try:
-                        uri = full_graph.namespace_manager.expand_curie(uri_str)
-                    except ValueError as e:
-                        raise ValueError(
-                            f"process_task_var: table: failed to parse '{uri_str}' as URI: {e}"
-                        )
-
-                    row_uris.append(uri)
-
-                rows.append(row_uris)
-
+            rows = load_list_re(graph=full_graph, col_head=rows_head, parse_uri=True, quiet=True)
+            for row in rows:
+                assert len(row) == len(
+                    var_list
+                ), f"TableVariation '{self.id}': row length does not match variable list: {row}"
             self.set_attr(key=URI_BDD_PRED_VAR_LIST, val=var_list)
             self.set_attr(key=URI_BDD_PRED_ROWS, val=rows)
 
@@ -438,19 +401,6 @@ def generate_set_values(graph: Graph, set_uri: URIRef) -> list[URIRef]:
         return set_values
 
     raise RuntimeError(f"unhandled types for set '{set_uri}': {set_types}")
-
-
-def get_uris_from_strings(uri_strings: list, ns_manager: NamespaceManager) -> list[URIRef]:
-    uri_list = []
-    for uri_str in uri_strings:
-        try:
-            uri = ns_manager.expand_curie(uri_str)
-        except ValueError as e:
-            raise ValueError(f"uri_from_strings: failed to parse '{uri_str}' as URI: {e}")
-
-        uri_list.append(uri)
-
-    return uri_list
 
 
 class ScenarioVariantModel(ModelBase):

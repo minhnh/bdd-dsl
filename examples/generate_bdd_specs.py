@@ -34,7 +34,7 @@ def main():
     # This resolver is used by rdflib to load remote resources, e.g. included as URLs in the context.
     install_resolver()
 
-    g = rdflib.ConjunctiveGraph()
+    g = rdflib.Dataset()
     for url, fmt in MODEL_URLS.items():
         g.parse(url, format=fmt)
 
