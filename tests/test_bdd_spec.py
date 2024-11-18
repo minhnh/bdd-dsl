@@ -20,7 +20,7 @@ MODEL_URLS = {
 class BDDSpecTest(unittest.TestCase):
     def setUp(self):
         install_resolver()
-        self.graph = rdflib.ConjunctiveGraph()
+        self.graph = rdflib.Dataset()
         for url, fmt in MODEL_URLS.items():
             self.graph.parse(url, format=fmt)
 
