@@ -1,6 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import unittest
-from rdflib import ConjunctiveGraph
+from rdflib import Dataset
 from rdf_utils.uri import URL_SECORO_M, URL_MM_PYTHON_SHACL
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
@@ -43,7 +43,7 @@ SHACL_URLS = {
 class BDDExecTest(unittest.TestCase):
     def setUp(self):
         install_resolver()
-        self.graph = ConjunctiveGraph()
+        self.graph = Dataset()
         for url, fmt in SPEC_MODEL_URLS.items():
             self.graph.parse(url, format=fmt)
         check_shacl_constraints(graph=self.graph, shacl_dict=SHACL_URLS)

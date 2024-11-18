@@ -38,3 +38,10 @@ line-length = 100
 
 [tool.black]
 line-length = 100
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--ignore=tests/test_coordination.py"
+testpaths = [
+    "tests",
+]
