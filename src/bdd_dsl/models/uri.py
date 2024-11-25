@@ -3,8 +3,6 @@ from rdf_utils.uri import URL_SECORO, URL_SECORO_MM, URL_SECORO_M
 
 URI_MM_GEOM_EXT = f"{URL_SECORO_MM}/geometry#"
 
-URI_MM_DISTRIB = f"{URL_SECORO_MM}/distribution#"
-
 URL_SESAME = "https://hbrs-sesame.github.io"
 
 URI_TRANS = f"{URL_SECORO}/transformations/"

@@ -15,7 +15,6 @@ from bdd_dsl.models.namespace import (
     NS_TRANS,
     NS_MM_GEOM_EXT,
     NS_MM_PROB,
-    NS_MM_DISTRIB,
 )
 
 # Transformation
@@ -61,16 +60,6 @@ URI_GEOM_ROTATION_MATRIX = NS_MM_GEOM_EXT["RotationMatrix"]
 URI_GEOM_EULER_ANGLES = NS_MM_GEOM_EXT["EulerAngles"]
 URI_GEOM_FROM_POSITION = NS_MM_GEOM_EXT["from-position"]
 URI_GEOM_FROM_ORIENTATION = NS_MM_GEOM_EXT["from-orientation"]
-
-# Distribution
-URI_DISTRIB_SAMPLED_QUANTITY = NS_MM_DISTRIB["SampledQuantity"]
-URI_DISTRIB_UNIFORM = NS_MM_DISTRIB["Uniform"]
-URI_DISTRIB_CONTINUOUS = NS_MM_DISTRIB["Continuous"]
-URI_DISTRIB_UNIFORM_ROTATION = NS_MM_DISTRIB["UniformRotation"]
-URI_DISTRIB_FROM_DISTRIBUTION = NS_MM_DISTRIB["from-distribution"]
-URI_DISTRIB_DIM = NS_MM_DISTRIB["dimension"]
-URI_DISTRIB_UPPER = NS_MM_DISTRIB["upper-bound"]
-URI_DISTRIB_LOWER = NS_MM_DISTRIB["lower-bound"]
 
 # Probability
 URI_PROB_SAMPLED_QUANTITY = NS_MM_PROB["SampledQuantity"]
@@ -130,7 +119,6 @@ URI_BDD_TYPE_SCENARIO_VARIANT = NS_MM_BDD["ScenarioVariant"]
 URI_BDD_TYPE_TASK_VAR = NS_MM_BDD["TaskVariation"]
 URI_BDD_TYPE_TABLE_VAR = NS_MM_BDD["TableVariation"]
 URI_BDD_TYPE_CART_PRODUCT = NS_MM_BDD["CartesianProductVariation"]
-URI_BDD_TYPE_COMBINATION = NS_MM_BDD["Combination"]
 URI_BDD_TYPE_SCENE = NS_MM_BDD["Scene"]
 URI_BDD_TYPE_SCENE_OBJ = NS_MM_BDD["SceneHasObjects"]
 URI_BDD_TYPE_SCENE_WS = NS_MM_BDD["SceneHasWorkspaces"]
@@ -159,8 +147,5 @@ URI_BDD_PRED_HAS_VARIATION = NS_MM_BDD["has-variation"]
 URI_BDD_PRED_VAR_LIST = NS_MM_BDD["variable-list"]
 URI_BDD_PRED_ROWS = NS_MM_BDD["rows"]
 URI_BDD_PRED_OF_SETS = NS_MM_BDD["of-sets"]
-URI_BDD_PRED_REP_ALLOWED = NS_MM_BDD["repetition-allowed"]
-URI_BDD_PRED_SELECT = NS_MM_BDD["select"]
-URI_BDD_PRED_FROM = NS_MM_BDD["from"]
 URI_BDD_PRED_HAS_AC = NS_MM_BDD["has-criteria"]
 URI_BDD_PRED_HAS_BHV_IMPL = NS_MM_BDD["has-behaviour-impl"]

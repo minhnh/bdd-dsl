@@ -7,7 +7,6 @@ from bdd_dsl.models.uri import (
     URI_MM_TASK,
     URI_MM_GEOM_EXT,
     URI_MM_PROB,
-    URI_MM_DISTRIB,
     URI_M_SIM,
     URI_TRANS,
 )
@@ -15,7 +14,6 @@ from bdd_dsl.models.uri import (
 # Namespaces
 NS_MM_GEOM_EXT = Namespace(URI_MM_GEOM_EXT)
 NS_MM_PROB = Namespace(URI_MM_PROB)
-NS_MM_DISTRIB = Namespace(URI_MM_DISTRIB)
 NS_MM_BDD = Namespace(URI_MM_BDD)
 NS_MM_BHV = Namespace(URI_MM_BHV)
 NS_MM_TASK = Namespace(URI_MM_TASK)

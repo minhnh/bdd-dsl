@@ -62,17 +62,51 @@ def get_task_variation_table(
         var_val_str_sets = []
 
         var_uri_list = task_var.get_attr(key=URI_BDD_PRED_VAR_LIST)
-        var_values_uri_sets = task_var.get_attr(key=URI_BDD_PRED_OF_SETS)
-        assert var_uri_list is not None and var_values_uri_sets is not None
-        assert len(var_uri_list) == len(var_values_uri_sets)
+        var_value_sets = task_var.get_attr(key=URI_BDD_PRED_OF_SETS)
+        assert var_uri_list is not None and var_value_sets is not None
+        assert len(var_uri_list) == len(var_value_sets)
 
         for i in range(len(var_uri_list)):
             var_names.append(get_valid_var_name(var_uri_list[i].n3(namespace_manager=ns_manager)))
 
             var_val_strings = []
-            for val_uri in var_values_uri_sets[i]:
-                assert isinstance(val_uri, URIRef)
-                var_val_strings.append(val_uri.n3(namespace_manager=ns_manager))
+            set_data = var_value_sets[i]
+            uri_iterable = None
+            if isinstance(set_data, URIRef) and set_data in task_var.set_enums:
+                # set enumeration
+                uri_iterable = task_var.set_enums[set_data].enumerate()
+            elif isinstance(set_data, list):
+                # list
+                uri_iterable = set_data
+            else:
+                raise RuntimeError(
+                    f"get_task_variation_table: {task_var.id}: sets for cartesian product"
+                    f" not list or URIRef: {var_value_sets[i]}"
+                )
+
+            for val_data in uri_iterable:
+                if isinstance(val_data, URIRef):
+                    var_val_strings.append(val_data.n3(namespace_manager=ns_manager))
+                    continue
+
+                val_data_strings = []
+                assert isinstance(
+                    val_data, Iterable
+                ), f"variable value for '{task_var.id}' is not URIRef or Iterable: {val_data}"
+                for uri in val_data:
+                    assert isinstance(
+                        uri, URIRef
+                    ), f"get_task_variation_table: {task_var.id}: not a URIRef {uri}"
+                    val_data_strings.append(uri.n3(namespace_manager=ns_manager))
+
+                assert (
+                    len(val_data_strings) > 0
+                ), f"get_task_variation_table: {task_var.id}: empty iterable: {val_data}"
+                if len(val_data_strings) == 1:
+                    var_val_strings.append(val_data_strings[0])
+                else:
+                    var_val_strings.append(str(val_data_strings))
+
             var_val_str_sets.append(var_val_strings)
 
         return var_names, list(product(*var_val_str_sets))
