@@ -1,7 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from itertools import combinations
 from typing import Any, Callable, Dict, Generator, Iterable
-from rdflib import RDF, Graph, Literal, URIRef, BNode
+from rdflib import RDF, Graph, URIRef, BNode
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
 from rdf_utils.naming import get_valid_var_name
@@ -11,12 +10,12 @@ from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.agent import AgentModel, AgnModelLoader
+from bdd_dsl.models.combinatorics import SetEnumerationModel
 from bdd_dsl.models.environment import ObjModelLoader, ObjectModel
 from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_CLAUSE_OF,
-    URI_BDD_PRED_FROM,
     URI_BDD_PRED_GIVEN,
     URI_BDD_PRED_HAS_CLAUSE,
     URI_BDD_PRED_HAS_VARIATION,
@@ -26,14 +25,11 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
-    URI_BDD_PRED_REP_ALLOWED,
     URI_BDD_PRED_ROWS,
-    URI_BDD_PRED_SELECT,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_VAR_LIST,
     URI_BDD_PRED_WHEN,
     URI_BDD_TYPE_CART_PRODUCT,
-    URI_BDD_TYPE_COMBINATION,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_SCENE_AGN,
@@ -292,6 +288,7 @@ class SceneModel(ModelBase):
 class TaskVariationModel(ModelBase):
     task_id: URIRef
     variables: set[URIRef]
+    set_enums: dict[URIRef, SetEnumerationModel]
 
     def __init__(self, us_graph: Graph, full_graph: Graph, task_var_id: URIRef) -> None:
         super().__init__(graph=us_graph, node_id=task_var_id)
@@ -299,6 +296,7 @@ class TaskVariationModel(ModelBase):
         assert isinstance(task_id, URIRef), f"task_id is not URIRef: type={type(task_id)}"
         self.task_id = task_id
         self.variables = set()
+        self.set_enums = {}
 
         self._process_builtin_task_var_types(full_graph)
 
@@ -318,6 +316,21 @@ class TaskVariationModel(ModelBase):
             assert (
                 len(sets_list) == len(var_list)
             ), f"length mismatch 'variable-list' (len={len(var_list)}) != 'of-sets' (len={len(sets_list)})"
+
+            for sets_data in sets_list:
+                if isinstance(sets_data, list):
+                    continue
+
+                if not isinstance(sets_data, URIRef):
+                    raise RuntimeError(
+                        f"TaskVariation '{self.id}': unexpected sets type for: {sets_data}"
+                    )
+
+                if sets_data in self.set_enums:
+                    continue
+
+                # parse as SetEnumerationModel
+                self.set_enums[sets_data] = SetEnumerationModel(node_id=sets_data, graph=full_graph)
 
             self.set_attr(key=URI_BDD_PRED_VAR_LIST, val=var_list)
             self.set_attr(key=URI_BDD_PRED_OF_SETS, val=sets_list)
@@ -356,51 +369,6 @@ class TaskVariationModel(ModelBase):
             var_list.append(var_id)
 
         return var_list
-
-
-def generate_set_values(graph: Graph, set_uri: URIRef) -> list[URIRef]:
-    set_types = set(graph.objects(subject=set_uri, predicate=RDF.type))
-    if URI_BDD_TYPE_COMBINATION in set_types:
-        rep_allowed = graph.value(subject=set_uri, predicate=URI_BDD_PRED_REP_ALLOWED)
-        assert (
-            rep_allowed is not None
-            and isinstance(rep_allowed, Literal)
-            and isinstance(rep_allowed.value, bool)
-        ), f"Combination '{set_uri}' does not have bool literal 'repetition-allowed' property: {rep_allowed}"
-        rep_allowed = rep_allowed.value
-
-        select_num = graph.value(subject=set_uri, predicate=URI_BDD_PRED_SELECT)
-        assert (
-            select_num is not None
-            and isinstance(select_num, Literal)
-            and isinstance(select_num.value, int)
-        ), f"Combination '{set_uri}' does not have int literal 'select' property: {select_num}"
-        select_num = select_num.value
-        assert (
-            select_num > 0
-        ), f"Combination '{set_uri}': 'select' property is non-positive: {select_num}"
-
-        from_list_head = graph.value(subject=set_uri, predicate=URI_BDD_PRED_FROM)
-        assert from_list_head is not None, f"Combination '{set_uri}' does not have 'from' property"
-        from_list = []
-        for uri in graph.items(list=from_list_head):
-            assert isinstance(uri, URIRef)
-            from_list.append(uri)
-
-        assert (
-            select_num <= len(from_list)
-        ), f"Combination '{set_uri}': 'select'(={select_num}) is larger than length of 'from' (len={len(from_list)})"
-        set_values = []
-        for comb in combinations(from_list, select_num):
-            # TODO(minhnh): itertool does not consider repetitions, rep_allowed is unused
-            if select_num == 1:
-                set_values.append(comb[0])
-            else:
-                set_values.append(comb)
-
-        return set_values
-
-    raise RuntimeError(f"unhandled types for set '{set_uri}': {set_types}")
 
 
 class ScenarioVariantModel(ModelBase):

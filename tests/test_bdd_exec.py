@@ -1,5 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import unittest
+from urllib.request import HTTPError
 from rdflib import Dataset
 from rdf_utils.uri import URL_SECORO_M, URL_MM_PYTHON_SHACL
 from rdf_utils.models.python import (
@@ -45,14 +46,21 @@ class BDDExecTest(unittest.TestCase):
         install_resolver()
         self.graph = Dataset()
         for url, fmt in SPEC_MODEL_URLS.items():
-            self.graph.parse(url, format=fmt)
+            try:
+                self.graph.parse(url, format=fmt)
+            except HTTPError as e:
+                raise RuntimeError(f"HTTPError for URL '{url}': {e}")
         check_shacl_constraints(graph=self.graph, shacl_dict=SHACL_URLS)
 
         # UserStoryLoader should not need execution info
         self.us_loader = UserStoryLoader(self.graph)
 
         for url, fmt in EXEC_MODEL_URLS.items():
-            self.graph.parse(url, format=fmt)
+            try:
+                self.graph.parse(url, format=fmt)
+            except HTTPError as e:
+                raise RuntimeError(f"HTTPError for URL '{url}': {e}")
+
         check_shacl_constraints(graph=self.graph, shacl_dict=SHACL_URLS)
 
     def _test_obj_model(self, obj_model: ObjectModel):
