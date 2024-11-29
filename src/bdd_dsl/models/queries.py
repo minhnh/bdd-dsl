@@ -310,12 +310,13 @@ CONSTRUCT {{
     ?us a ?usType ;
         {URI_BDD_PRED_HAS_AC.n3()} ?scenarioVar .
     ?scenarioVar a ?scenarioVarType ;
-        {URI_TASK_PRED_OF_TASK.n3()} ?task ;
         {URI_BDD_PRED_HAS_VARIATION.n3()} ?taskVariation ;
-        {URI_BHV_PRED_OF_BHV.n3()} ?behaviour ;
         {URI_BDD_PRED_HAS_SCENE.n3()} ?scene ;
         {URI_BDD_PRED_OF_TMPL.n3()} ?scenarioTmpl ;
-        {URI_BDD_PRED_OF_SCENARIO.n3()} ?scenario ;
+        {URI_BDD_PRED_OF_SCENARIO.n3()} ?scenario .
+    ?scenario a {URI_BDD_TYPE_SCENARIO.n3()} ;
+        {URI_BHV_PRED_OF_BHV.n3()} ?behaviour ;
+        {URI_TASK_PRED_OF_TASK.n3()} ?task ;
         {URI_BDD_PRED_GIVEN.n3()} ?given ;
         {URI_BDD_PRED_WHEN.n3()} ?when ;
         {URI_BDD_PRED_THEN.n3()} ?then .
