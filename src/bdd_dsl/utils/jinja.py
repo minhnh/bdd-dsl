@@ -141,7 +141,7 @@ def prepare_scenario_variant_data(
     scr_var_data = {}
 
     scr_var_data[FR_NAME] = scr_var_model.id.n3(namespace_manager=ns_manager)
-    scr_var_data["behaviour"] = scr_var_model.bhv_id.n3(namespace_manager=ns_manager)
+    scr_var_data["behaviour"] = scr_var_model.scenario.bhv_id.n3(namespace_manager=ns_manager)
 
     first_clause = True
     given_clause_strings = []
