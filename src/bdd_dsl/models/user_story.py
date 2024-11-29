@@ -1,10 +1,10 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Callable, Dict, Generator, Iterable
+from typing import Any, Callable, Generator, Iterable, Optional
 from rdflib import RDF, Graph, URIRef, BNode
 from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
 from rdf_utils.naming import get_valid_var_name
-from rdf_utils.models.common import ModelBase
+from rdf_utils.models.common import ModelBase, get_node_types
 from rdf_utils.collection import load_list_re
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
@@ -30,6 +30,9 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_VAR_LIST,
     URI_BDD_PRED_WHEN,
     URI_BDD_TYPE_CART_PRODUCT,
+    URI_BDD_TYPE_EXISTS,
+    URI_BDD_TYPE_FLUENT_CLAUSE,
+    URI_BDD_TYPE_FORALL,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_SCENE_AGN,
@@ -81,27 +84,147 @@ def process_time_constraint_model(constraint: TimeConstraintModel, full_graph: G
                 f"TimeConstraint '{constraint.id}' of  type '{constraint.types}'"
                 f" does not refer to exactly 1 event: {event_ids}"
             )
-        assert isinstance(event_ids[0], URIRef)
-        assert not constraint.has_attr(key=URI_TIME_PRED_REF_EVT)
+        assert isinstance(event_ids[0], URIRef), f"event ref not a URIRef: {event_ids[0]}"
+        assert not constraint.has_attr(
+            key=URI_TIME_PRED_REF_EVT
+        ), f"contraint '{constraint.id}' doesn't have :ref-event attribute"
         constraint.set_attr(key=URI_TIME_PRED_REF_EVT, val=event_ids[0])
+
+
+class IHasClause(ModelBase):
+    _clauses: dict[URIRef, ModelBase]
+    _clauses_by_role: dict[URIRef, set[URIRef]]  # given/when/then URI -> clause URI
+    variables: set[URIRef]
+
+    def __init__(
+        self,
+        node_id: URIRef,
+        scr_clause_roles: set[URIRef],
+        graph: Optional[Graph] = None,
+        types: Optional[set[URIRef]] = None,
+    ) -> None:
+        super().__init__(node_id=node_id, graph=graph, types=types)
+        self.variables = set()
+        self._clauses = {}
+        self._clauses_by_role = {}
+        for role in scr_clause_roles:
+            self._clauses_by_role[role] = set()
+
+    def _load_fluent_clause(self, graph: Graph, clause_id: URIRef, clause_types: set[URIRef]):
+        clause = FluentClauseModel(full_graph=graph, clause_id=clause_id, types=clause_types)
+        assert (
+            clause.clause_of in self._clauses_by_role
+        ), f"{self.id}: FluentClause '{clause_id}' not connected to Given, When, Then of current scenario"
+        assert clause_id not in self._clauses_by_role[clause.clause_of]
+
+        self._clauses[clause_id] = clause
+        self._clauses_by_role[clause.clause_of].add(clause_id)
+        for var_id in clause.role_by_variable.keys():
+            self.variables.add(var_id)
+
+    def _load_clauses_re(self, node_id: URIRef, graph: Graph, has_clause_set: set[URIRef]) -> None:
+        if node_id in has_clause_set:
+            raise RuntimeError(f"load_clause_re: loop detected at node '{node_id}'")
+        has_clause_set.add(node_id)
+
+        has_clause_obj = graph.value(subject=node_id, predicate=URI_BDD_PRED_HAS_CLAUSE)
+        if has_clause_obj is None:
+            # no has-clause
+            return
+        assert isinstance(
+            has_clause_obj, BNode
+        ), f"'{node_id}': 'has-clause' does not refer to BNode: {has_clause_obj}"
+
+        for clause_id in graph.items(list=has_clause_obj):
+            assert isinstance(
+                clause_id, URIRef
+            ), f"'{node_id}': item in 'has-clause' collection not a URIRef: {clause_id}"
+            assert clause_id not in self._clauses, f"'{node_id}': duplicate clause '{clause_id}'"
+
+            clause_types = get_node_types(graph=graph, node_id=clause_id)
+            if URI_BDD_TYPE_FLUENT_CLAUSE in clause_types:
+                self._load_fluent_clause(
+                    graph=graph, clause_id=clause_id, clause_types=clause_types
+                )
+                continue
+
+            if URI_BDD_TYPE_FORALL in clause_types:
+                forall_model = ForAllModel(
+                    node_id=clause_id,
+                    scr_clause_roles=set(self._clauses_by_role.keys()),
+                    graph=graph,
+                    types=clause_types,
+                )
+                # TODO track role
+                forall_model._load_clauses_re(
+                    node_id=forall_model.id, graph=graph, has_clause_set=has_clause_set
+                )
+                self._clauses[clause_id] = forall_model
+                continue
+
+            if URI_BDD_TYPE_EXISTS in clause_types:
+                exists_model = ThereExistsModel(
+                    node_id=clause_id,
+                    scr_clause_roles=set(self._clauses_by_role.keys()),
+                    graph=graph,
+                    types=clause_types,
+                )
+                # TODO track role
+                exists_model._load_clauses_re(
+                    node_id=exists_model.id, graph=graph, has_clause_set=has_clause_set
+                )
+                self._clauses[clause_id] = exists_model
+                continue
+
+            raise RuntimeError(f"Clause '{clause_id}' has unexpected types: {clause_types}")
+
+
+class ForAllModel(IHasClause):
+    def __init__(
+        self,
+        node_id: URIRef,
+        scr_clause_roles: set[URIRef],
+        graph: Optional[Graph] = None,
+        types: Optional[set[URIRef]] = None,
+    ) -> None:
+        super().__init__(
+            node_id=node_id, scr_clause_roles=scr_clause_roles, graph=graph, types=types
+        )
+
+
+class ThereExistsModel(IHasClause):
+    def __init__(
+        self,
+        node_id: URIRef,
+        scr_clause_roles: set[URIRef],
+        graph: Optional[Graph] = None,
+        types: Optional[set[URIRef]] = None,
+    ) -> None:
+        super().__init__(
+            node_id=node_id, scr_clause_roles=scr_clause_roles, graph=graph, types=types
+        )
 
 
 class FluentClauseModel(ModelBase):
     clause_of: URIRef
     fluent: ModelBase
     time_constraint: TimeConstraintModel
-    variable_by_role: Dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
-    role_by_variable: Dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
+    variable_by_role: dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
+    role_by_variable: dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
 
-    def __init__(self, full_graph: Graph, clause_id: URIRef) -> None:
-        super().__init__(graph=full_graph, node_id=clause_id)
+    def __init__(self, full_graph: Graph, clause_id: URIRef, types: Optional[set[URIRef]]) -> None:
+        super().__init__(graph=full_graph, node_id=clause_id, types=types)
 
         clause_of_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_CLAUSE_OF)
-        assert isinstance(clause_of_id, URIRef)
+        assert isinstance(
+            clause_of_id, URIRef
+        ), f"FluentClause '{self.id}': clause-of doesn't link to URIRef: {clause_of_id}"
         self.clause_of = clause_of_id
 
         fluent_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS)
-        assert isinstance(fluent_id, URIRef)
+        assert isinstance(
+            fluent_id, URIRef
+        ), f"FluentClause '{self.id}': holds doesn't link to URIRef: {fluent_id}"
         self.fluent = ModelBase(graph=full_graph, node_id=fluent_id)
 
         self.variable_by_role = {}
@@ -109,7 +232,9 @@ class FluentClauseModel(ModelBase):
         self.process_builtin_fluent_types(full_graph=full_graph)
 
         tc_id = full_graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS_AT)
-        assert isinstance(tc_id, URIRef)
+        assert isinstance(
+            tc_id, URIRef
+        ), f"FluentClause '{self.id}': holds-at doesn't link to URIRef"
         tc = TimeConstraintModel(full_graph=full_graph, tc_id=tc_id)
         process_time_constraint_model(constraint=tc, full_graph=full_graph)
         self.time_constraint = tc
@@ -119,7 +244,9 @@ class FluentClauseModel(ModelBase):
             self.variable_by_role[role_pred] = []
 
         for var_id in full_graph.objects(subject=self.id, predicate=role_pred):
-            assert isinstance(var_id, URIRef)
+            assert isinstance(
+                var_id, URIRef
+            ), f"FluentClause '{self.id}': variable not a URIRef: {var_id}"
 
             self.variable_by_role[role_pred].append(var_id)
 
@@ -235,7 +362,7 @@ class SceneModel(ModelBase):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
     objects: set[URIRef]  # object URIs
-    workspaces: Dict[URIRef, set]  # workspace URI -> ws types
+    workspaces: dict[URIRef, set]  # workspace URI -> ws types
     agents: set[URIRef]  # agent URIs
     obj_model_loader: ObjModelLoader
     agn_model_loader: AgnModelLoader
@@ -371,7 +498,7 @@ class TaskVariationModel(ModelBase):
         return var_list
 
 
-class ScenarioVariantModel(ModelBase):
+class ScenarioVariantModel(IHasClause):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
     us_id: URIRef
@@ -384,27 +511,8 @@ class ScenarioVariantModel(ModelBase):
     task_id: URIRef
     scene: SceneModel
     task_variation: TaskVariationModel
-    variables: set[URIRef]  # set of ScenarioVariables referred to by clauses
-    _clauses: Dict[URIRef, FluentClauseModel]
-    _clauses_by_role: Dict[URIRef, set[URIRef]]  # given/when/then URI -> clause URI
-    _tmpl_clauses: set[URIRef]
-    _variant_clauses: set[URIRef]
 
     def __init__(self, us_graph: Graph, full_graph: Graph, var_id: URIRef) -> None:
-        super().__init__(graph=us_graph, node_id=var_id)
-
-        node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"ScenarioVariant '{var_id}' does not refer to a Scenario"
-        self.scenario_id = node_val
-
-        node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_TMPL)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"ScenarioVariant '{var_id}' does not refer to a ScenarioTemplate"
-        self.tmpl_id = node_val
-
         node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_GIVEN)
         assert node_val is not None and isinstance(
             node_val, URIRef
@@ -422,6 +530,21 @@ class ScenarioVariantModel(ModelBase):
             node_val, URIRef
         ), f"ScenarioVariant '{var_id}' does not refer to a Then"
         self.then_id = node_val
+
+        scr_clause_roles = {self.given_id, self.when_id, self.then_id}
+        super().__init__(node_id=var_id, scr_clause_roles=scr_clause_roles, graph=us_graph)
+
+        node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
+        assert node_val is not None and isinstance(
+            node_val, URIRef
+        ), f"ScenarioVariant '{var_id}' does not refer to a Scenario"
+        self.scenario_id = node_val
+
+        node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_TMPL)
+        assert node_val is not None and isinstance(
+            node_val, URIRef
+        ), f"ScenarioVariant '{var_id}' does not refer to a ScenarioTemplate"
+        self.tmpl_id = node_val
 
         node_val = us_graph.value(subject=var_id, predicate=URI_BHV_PRED_OF_BHV)
         assert node_val is not None and isinstance(
@@ -447,13 +570,12 @@ class ScenarioVariantModel(ModelBase):
         ), f"ScenarioVariant 'var_id' is not referred from exactly 1 UserStory, found: {us_ids}"
         self.us_id = us_ids[0]
 
-        self._clauses = {}
-        self._clauses_by_role = {self.given_id: set(), self.when_id: set(), self.then_id: set()}
         self._tmpl_clauses = set()
         self._variant_clauses = set()
-        self.variables = set()
 
-        self._load_clauses(full_graph)
+        clause_set = set()
+        self._load_clauses_re(node_id=self.tmpl_id, graph=full_graph, has_clause_set=clause_set)
+        self._load_clauses_re(node_id=self.id, graph=full_graph, has_clause_set=clause_set)
 
         task_var_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_HAS_VARIATION)
         assert task_var_id is not None and isinstance(
@@ -462,51 +584,12 @@ class ScenarioVariantModel(ModelBase):
         self.task_variation = TaskVariationModel(
             us_graph=us_graph, full_graph=full_graph, task_var_id=task_var_id
         )
-        assert self.task_variation.variables == self.variables, (
-            f"variables referred to by clauses in ScenarioVariant '{self.id}'"
-            f" does not match that of TaskVariation '{self.task_variation.id}':\n"
-            f"clause vars: {self.variables}\ntask variation vars: {self.task_variation.variables}"
-        )
 
-    def _load_clauses(self, full_graph: Graph) -> None:
-        """
-        Load all fluent clauses attached to both the ScenarioVariant and ScenarioTemplate in the graph.
-        This will also update the set of variables referred to by these clauses
-        """
-        # template clauses
-        for clause_id in full_graph.objects(
-            subject=self.tmpl_id, predicate=URI_BDD_PRED_HAS_CLAUSE
-        ):
-            assert isinstance(clause_id, URIRef)
-            assert clause_id not in self._tmpl_clauses, f"Duplicate template clause '{clause_id}'"
-            self._tmpl_clauses.add(clause_id)
-            self._load_single_clause(full_graph, clause_id)
-
-        # variant clauses
-        for clause_id in full_graph.objects(subject=self.id, predicate=URI_BDD_PRED_HAS_CLAUSE):
-            assert isinstance(clause_id, URIRef)
-            assert clause_id not in self._variant_clauses, f"Duplicate variant clause '{clause_id}'"
-            self._variant_clauses.add(clause_id)
-            self._load_single_clause(full_graph, clause_id)
-
-    def _load_single_clause(self, full_graph: Graph, clause_id: URIRef):
-        assert clause_id not in self._clauses, f"Duplicate clause '{clause_id}'"
-        clause = FluentClauseModel(full_graph=full_graph, clause_id=clause_id)
-        assert (
-            clause.clause_of in self._clauses_by_role
-        ), f"Clause '{clause_id}' not connected to Given, When, Then of Scenario '{self.scenario_id}'"
-        assert clause_id not in self._clauses_by_role[clause.clause_of]
-
-        self._clauses[clause_id] = clause
-        self._clauses_by_role[clause.clause_of].add(clause_id)
-        for var_id in clause.role_by_variable.keys():
-            self.variables.add(var_id)
-
-    def get_given_clause_models(self) -> Generator[FluentClauseModel, None, None]:
+    def get_given_clause_models(self) -> Generator[ModelBase, None, None]:
         for given_clause_id in self._clauses_by_role[self.given_id]:
             yield self._clauses[given_clause_id]
 
-    def get_then_clause_models(self) -> Generator[FluentClauseModel, None, None]:
+    def get_then_clause_models(self) -> Generator[ModelBase, None, None]:
         for then_clause_id in self._clauses_by_role[self.then_id]:
             yield self._clauses[then_clause_id]
 
@@ -538,7 +621,7 @@ class UserStoryLoader(object):
         self._scenario_variants[variant_id] = var_model
         return var_model
 
-    def get_us_scenario_variants(self) -> Dict[URIRef, set[URIRef]]:
+    def get_us_scenario_variants(self) -> dict[URIRef, set[URIRef]]:
         """
         returns { <UserStory URI> : [ <list of ScenarioVariant URIs> ] }
         """
