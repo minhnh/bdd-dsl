@@ -187,23 +187,19 @@ class PickplaceBehaviourMockup(Behaviour):
         sleep(0.1)
 
 
-@when('behaviour "{bhv_name}" occurs')
-def behaviour_mockup(context: Context, bhv_name: str):
+@when('"{agn_id}" picks "{obj_id}" from "{pick_ws}" and places it at "{place_ws}"')
+def behaviour_mockup(context: Context, agn_id: str, obj_id: str, pick_ws: str, place_ws: str):
     behaviour_model = getattr(context, "behaviour_model", None)
     if behaviour_model is None:
         exec_model = getattr(context, "execution_model", None)
-        assert exec_model is not None, "no 'execution_model' added to the context"
-        assert isinstance(exec_model, ExecutionModel)
+        assert isinstance(
+            exec_model, ExecutionModel
+        ), f"no valid 'execution_model' added to the context: {exec_model}"
 
         model_graph = getattr(context, "model_graph", None)
         assert model_graph is not None
 
-        try:
-            bhv_uri = model_graph.namespace_manager.expand_curie(bhv_name)
-        except ValueError as e:
-            raise RuntimeError(f"can't parse behaviour URI '{bhv_name}': {e}")
-
-        behaviour_model = exec_model.load_behaviour_impl(context=context, bhv_id=bhv_uri)
+        behaviour_model = exec_model.load_behaviour_impl(context=context)
         context.behaviour_model = behaviour_model
 
     bhv = behaviour_model.behaviour
