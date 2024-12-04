@@ -1,4 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from numbers import Number
 from typing import Any, Iterable, Optional, Protocol
 from itertools import product
 from jinja2 import Environment, FileSystemLoader, Template
@@ -92,13 +93,13 @@ def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], lis
         for set_data in var_value_sets:
             if isinstance(set_data, URIRef) and set_data in task_var.set_enums:
                 # set enumeration
-                uri_iterables.append(task_var.set_enums[set_data].enumerate())
+                uri_iterables.append(list(task_var.set_enums[set_data].enumerate()))
             elif isinstance(set_data, list):
                 # list
                 uri_iterables.append(set_data)
             else:
                 raise RuntimeError(
-                    f"TaskVariation {task_var.id}: sets for cartesian product not list or URIRef: {set_data}"
+                    f"TaskVariation {task_var.id}: sets for cartesian product not list or SetEnumeration URIRef: {set_data}"
                 )
 
         return var_uri_list, list(product(*uri_iterables))
@@ -152,11 +153,14 @@ class FluentClauseToStringProtocol(Protocol):
 
 
 def _var_val_to_str(var_val, ns_manager: NamespaceManager) -> str:
+    if isinstance(var_val, URIRef):
+        return var_val.n3(namespace_manager=ns_manager)
+
     if isinstance(var_val, str):
         return var_val
 
-    if isinstance(var_val, URIRef):
-        return var_val.n3(namespace_manager=ns_manager)
+    if isinstance(var_val, Number):
+        return str(var_val)
 
     if isinstance(var_val, Iterable):
         uri_str_list = []
@@ -166,7 +170,7 @@ def _var_val_to_str(var_val, ns_manager: NamespaceManager) -> str:
 
         return str(uri_str_list)
 
-    raise RuntimeError(f"_var_val_to_str: unhandled types: {var_val}")
+    raise RuntimeError(f"_var_val_to_str: unhandled types: (type={type(var_val)}) {var_val}")
 
 
 def get_fc_str_located_at(
