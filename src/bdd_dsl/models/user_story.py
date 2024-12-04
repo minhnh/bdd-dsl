@@ -1,9 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Callable, Iterable, Optional, Generator
+from typing import Any, Iterable, Optional
 from rdflib import RDF, Graph, URIRef, BNode
-from rdflib.namespace import NamespaceManager
 from rdflib.query import ResultRow
-from rdf_utils.naming import get_valid_var_name
 from rdf_utils.models.common import ModelBase, get_node_types
 from rdf_utils.collection import load_list_re
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
@@ -16,29 +14,22 @@ from bdd_dsl.models.clauses import (
     FluentClauseLoader,
     FluentClauseLoaderProtocol,
     FluentClauseModel,
-    TimeConstraintModel,
     IClause,
     WhenBehaviourModel,
     WhenBhvLoader,
     WhenBhvLoaderProtocol,
 )
 from bdd_dsl.models.combinatorics import SetEnumerationModel
-from bdd_dsl.models.namespace import NS_MANAGER
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_GIVEN,
     URI_BDD_PRED_HAS_VARIATION,
     URI_BDD_PRED_OF_SETS,
-    URI_BDD_PRED_REF_AGN,
-    URI_BDD_PRED_REF_OBJ,
-    URI_BDD_PRED_REF_WS,
     URI_BDD_PRED_ROWS,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_VAR_LIST,
     URI_BDD_PRED_WHEN,
     URI_BDD_TYPE_CART_PRODUCT,
-    URI_BDD_TYPE_IS_HELD,
-    URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENE_AGN,
     URI_BDD_TYPE_SCENE_OBJ,
@@ -55,9 +46,6 @@ from bdd_dsl.models.urirefs import (
     URI_ENV_PRED_HAS_OBJ,
     URI_ENV_PRED_HAS_WS,
     URI_AGN_PRED_HAS_AGN,
-    URI_TIME_PRED_REF_EVT,
-    URI_TIME_TYPE_AFTER_EVT,
-    URI_TIME_TYPE_BEFORE_EVT,
     URI_BDD_PRED_HAS_CLAUSE,
     URI_BDD_PRED_IN_SET,
     URI_BDD_PRED_REF_VAR,
@@ -122,65 +110,6 @@ class ScenarioModel(ModelBase):
             node_val, URIRef
         ), f"Scenario '{self.id}' does not refer to a Task"
         self.task_id = node_val
-
-
-def get_time_constraint_str(
-    tc_model: TimeConstraintModel, ns_manager: NamespaceManager = NS_MANAGER
-) -> str:
-    if URI_TIME_TYPE_BEFORE_EVT in tc_model.types or URI_TIME_TYPE_AFTER_EVT in tc_model.types:
-        evt_uri = tc_model.get_attr(key=URI_TIME_PRED_REF_EVT)
-        assert (
-            evt_uri is not None
-        ), f"TimeConstraint '{tc_model.id}' of types '{tc_model.types}' does ref an event or event attr not loaded"
-        assert isinstance(
-            evt_uri, URIRef
-        ), f"unexpected type for event URI '{evt_uri}': {type(evt_uri)}"
-        evt_uri_str = evt_uri.n3(ns_manager)
-
-        if URI_TIME_TYPE_BEFORE_EVT in tc_model.types:
-            return f'before event "{evt_uri_str}"'
-
-        if URI_TIME_TYPE_AFTER_EVT in tc_model.types:
-            return f'after event "{evt_uri_str}"'
-
-    raise RuntimeError(f"TimeConstraint '{tc_model.id}' has unhandled types: {tc_model.types}")
-
-
-def get_clause_str(
-    clause: FluentClauseModel,
-    ns_manager: NamespaceManager = NS_MANAGER,
-    tc_str_func: Callable[[TimeConstraintModel, NamespaceManager], str] = get_time_constraint_str,
-) -> str:
-    if URI_BDD_TYPE_LOCATED_AT in clause.fluent.types:
-        assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role
-        obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
-        assert isinstance(obj_id, URIRef)
-        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
-
-        assert URI_BDD_PRED_REF_WS in clause.variable_by_role
-        ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
-        assert isinstance(ws_id, URIRef)
-        ws_id_str = get_valid_var_name(ws_id.n3(ns_manager))
-
-        return f'"<{obj_id_str}>" is located at "<{ws_id_str}>" {tc_str_func(clause.time_constraint, ns_manager)}'
-
-    if URI_BDD_TYPE_IS_HELD in clause.fluent.types:
-        assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role
-        obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
-        assert isinstance(obj_id, URIRef)
-        obj_id_str = get_valid_var_name(obj_id.n3(ns_manager))
-
-        assert URI_BDD_PRED_REF_AGN in clause.variable_by_role
-        agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
-        assert isinstance(agn_id, URIRef)
-        agn_id_str = get_valid_var_name(agn_id.n3(ns_manager))
-
-        return f'"<{obj_id_str}>" is held by "<{agn_id_str}>" {tc_str_func(clause.time_constraint, ns_manager)}'
-
-    raise RuntimeError(
-        f"get_clause_str: unhandled types for fluent '{clause.fluent.id}' of clasue '{clause.id}':"
-        f" {clause.fluent.types}"
-    )
 
 
 class SceneModel(ModelBase):
@@ -326,12 +255,13 @@ class TaskVariationModel(ModelBase):
 
 
 class IHasClause(ModelBase):
-    _clauses: dict[URIRef, IClause]
-    _clauses_by_role: dict[URIRef, list[URIRef]]  # given/when/then URI -> clause URI
     _forall_id: Optional[URIRef]
     _when_bhv_id: Optional[URIRef]
     _fluent_loader: FluentClauseLoader
     _bhv_loader: Optional[WhenBhvLoader]
+    exists_clauses: set[URIRef]
+    clauses: dict[URIRef, IClause]
+    clauses_by_role: dict[URIRef, list[URIRef]]  # given/when/then URI -> clause URI
     variables: set[URIRef]
     scenario: ScenarioModel
 
@@ -347,8 +277,9 @@ class IHasClause(ModelBase):
         super().__init__(node_id=node_id, graph=graph, types=types)
         self.variables = set()
         self.scenario = scenario
-        self._clauses = {}
-        self._clauses_by_role = {scenario.given: [], scenario.when: [], scenario.then: []}
+        self.clauses = {}
+        self.clauses_by_role = {scenario.given: [], scenario.when: [], scenario.then: []}
+        self.exists_clauses = set()
         self._forall_id = None
         self._when_bhv_id = None
         self._fluent_loader = fluent_loader
@@ -359,12 +290,12 @@ class IHasClause(ModelBase):
             clause, ModelBase
         ), f"{self.id}: got IClause which is not also a ModelBase: {clause}"
         assert (
-            clause.clause_of in self._clauses_by_role
+            clause.clause_of in self.clauses_by_role
         ), f"{self.id}: IClause '{clause.id}' does not ref Given, When, Then of parent scenario '{self.scenario.id}'"
 
-        assert clause.id not in self._clauses, f"{self.id}: duplicate clause: {clause.id}"
-        self._clauses[clause.id] = clause
-        self._clauses_by_role[clause.clause_of].append(clause.id)
+        assert clause.id not in self.clauses, f"{self.id}: duplicate clause: {clause.id}"
+        self.clauses[clause.id] = clause
+        self.clauses_by_role[clause.clause_of].append(clause.id)
 
     def _load_clauses_re(self, node_id: URIRef, graph: Graph, has_clause_set: set[URIRef]) -> None:
         if node_id in has_clause_set:
@@ -383,7 +314,7 @@ class IHasClause(ModelBase):
             assert isinstance(
                 clause_id, URIRef
             ), f"'{node_id}': item in 'has-clause' collection not a URIRef: {clause_id}"
-            assert clause_id not in self._clauses, f"'{node_id}': duplicate clause '{clause_id}'"
+            assert clause_id not in self.clauses, f"'{node_id}': duplicate clause '{clause_id}'"
 
             clause_types = get_node_types(graph=graph, node_id=clause_id)
             if URI_BDD_TYPE_FLUENT_CLAUSE in clause_types:
@@ -425,6 +356,7 @@ class IHasClause(ModelBase):
                     types=clause_types,
                 )
                 self._process_iclause(clause=exists_model)
+                self.exists_clauses.add(clause_id)
                 exists_model._load_clauses_re(
                     node_id=exists_model.id, graph=graph, has_clause_set=has_clause_set
                 )
@@ -445,33 +377,10 @@ class IHasClause(ModelBase):
 
             raise RuntimeError(f"Clause '{clause_id}' has unexpected types: {clause_types}")
 
-    def get_given_clause_models(self) -> Generator[IClause, None, None]:
-        for given_clause_id in self._clauses_by_role[self.scenario.given]:
-            yield self._clauses[given_clause_id]
-
-    def get_then_clause_models(self) -> Generator[IClause, None, None]:
-        for then_clause_id in self._clauses_by_role[self.scenario.then]:
-            yield self._clauses[then_clause_id]
-
-    def get_gherkin_clauses(
-        self, var_values: dict[URIRef, Any], ns_manager: NamespaceManager, clause_list: list[str]
-    ) -> None:
-        for g_clause_id in self._clauses_by_role[self.scenario.given]:
-            clause_str = self._clauses[g_clause_id].get_gherkin_repr(
-                var_values=var_values, ns_manager=ns_manager
-            )
-            assert isinstance(
-                clause_str, str
-            ), f"get_gherkin_repr: Given clause '{g_clause_id}' doesn't return string: {clause_str}"
-            clause_list.append(clause_str)
-
-        for w_clause_id in self._clauses_by_role[self.scenario.when]:
-            pass
-
 
 class ForAllModel(IHasClause, IClause):
     quantified_var: URIRef
-    in_set: URIRef | list
+    in_set: URIRef
 
     def __init__(
         self,
@@ -500,21 +409,15 @@ class ForAllModel(IHasClause, IClause):
         self.quantified_var = var_node
 
         in_set_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_IN_SET)
-        if isinstance(in_set_node, URIRef):
-            self.in_set = in_set_node
-        elif isinstance(in_set_node, BNode):
-            self.in_set = load_list_re(
-                graph=graph, first_node=in_set_node, parse_uri=True, quiet=False
-            )
-        else:
-            raise RuntimeError(
-                f"ForAll {self.id}: 'in-set' is not a BNode (list) or a URI: {in_set_node}"
-            )
+        assert isinstance(
+            in_set_node, URIRef
+        ), f"ForAll {self.id}: 'in-set' is not a URI: {in_set_node}"
+        self.in_set = in_set_node
 
 
 class ThereExistsModel(IHasClause, IClause):
     quantified_var: URIRef
-    in_set: URIRef | list
+    in_set: URIRef
 
     def __init__(
         self,
@@ -541,16 +444,10 @@ class ThereExistsModel(IHasClause, IClause):
         self.quantified_var = var_node
 
         in_set_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_IN_SET)
-        if isinstance(in_set_node, URIRef):
-            self.in_set = in_set_node
-        elif isinstance(in_set_node, BNode):
-            self.in_set = load_list_re(
-                graph=graph, first_node=in_set_node, parse_uri=True, quiet=False
-            )
-        else:
-            raise RuntimeError(
-                f"ForAll {self.id}: 'in-set' is not a BNode (list) or a URI: {in_set_node}"
-            )
+        assert isinstance(
+            in_set_node, URIRef
+        ), f"ForAll {self.id}: 'in-set' is not a URI: {in_set_node}"
+        self.in_set = in_set_node
 
 
 class ScenarioVariantModel(IHasClause):

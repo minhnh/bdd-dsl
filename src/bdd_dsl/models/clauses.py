@@ -1,8 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from abc import abstractmethod
-from typing import Optional, Any, Protocol
+from typing import Optional, Protocol
 from rdflib import URIRef, Graph
-from rdflib.namespace import NamespaceManager
 from rdf_utils.models.common import ModelBase
 from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.urirefs import (
@@ -17,6 +15,7 @@ from bdd_dsl.models.urirefs import (
     URI_BHV_PRED_OF_BHV,
     URI_BHV_PRED_PICK_WS,
     URI_BHV_PRED_PLACE_WS,
+    URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
     URI_BHV_PRED_TARGET_WS,
     URI_BHV_TYPE_PICK,
@@ -57,12 +56,6 @@ class IClause(object):
             clause_of_id, URIRef
         ), f"Node '{node_id}': 'clause-of' does not link to URIRef: {clause_of_id}"
         self.clause_of = clause_of_id
-
-    @abstractmethod
-    def get_gherkin_repr(
-        self, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
-    ) -> str | list[str]:
-        raise NotImplementedError(f"{type(self)}: IClause must implement 'get_gherkin_string'")
 
 
 class FluentClauseModel(ModelBase, IClause):
@@ -201,7 +194,7 @@ class WhenBhvLoaderProtocol(Protocol):
     def __call__(self, graph: Graph, when_bhv: WhenBehaviourModel) -> None: ...
 
 
-def load_target_obj_ws(graph: Graph, when_bhv: WhenBehaviourModel) -> None:
+def load_target_obj_ws_agn(graph: Graph, when_bhv: WhenBehaviourModel) -> None:
     target_obj_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_OBJ)
     assert isinstance(
         target_obj_id, URIRef
@@ -214,6 +207,12 @@ def load_target_obj_ws(graph: Graph, when_bhv: WhenBehaviourModel) -> None:
     ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target workspace's URI: {target_ws_id}"
     when_bhv.set_attr(key=URI_BHV_PRED_TARGET_WS, val=target_ws_id)
 
+    target_agn_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_AGN)
+    assert isinstance(
+        target_agn_id, URIRef
+    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target agent's URI: {target_agn_id}"
+    when_bhv.set_attr(key=URI_BHV_PRED_TARGET_AGN, val=target_agn_id)
+
 
 def load_pickplace_info(graph: Graph, when_bhv: WhenBehaviourModel):
     target_obj_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_OBJ)
@@ -221,6 +220,12 @@ def load_pickplace_info(graph: Graph, when_bhv: WhenBehaviourModel):
         target_obj_id, URIRef
     ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target object's URI: {target_obj_id}"
     when_bhv.set_attr(key=URI_BHV_PRED_TARGET_OBJ, val=target_obj_id)
+
+    target_agn_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_AGN)
+    assert isinstance(
+        target_agn_id, URIRef
+    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target agent's URI: {target_agn_id}"
+    when_bhv.set_attr(key=URI_BHV_PRED_TARGET_AGN, val=target_agn_id)
 
     pick_ws_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_PICK_WS)
     assert isinstance(
@@ -236,8 +241,8 @@ def load_pickplace_info(graph: Graph, when_bhv: WhenBehaviourModel):
 
 
 DEFAULT_BHV_LOADERS = {
-    URI_BHV_TYPE_PICK: load_target_obj_ws,
-    URI_BHV_TYPE_PLACE: load_target_obj_ws,
+    URI_BHV_TYPE_PICK: load_target_obj_ws_agn,
+    URI_BHV_TYPE_PLACE: load_target_obj_ws_agn,
     URI_BHV_TYPE_PICKPLACE: load_pickplace_info,
 }
 
