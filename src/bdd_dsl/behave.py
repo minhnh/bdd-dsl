@@ -1,10 +1,13 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Dict, Generator
+from typing import Generator, Union
+from ast import literal_eval
 from behave.model import Table
 from behave import given
-from rdf_utils.models.common import ModelBase, ModelLoader
-from rdflib import Graph, URIRef
 from behave.runner import Context
+from rdf_utils.uri import try_expand_curie
+from rdflib import Graph, URIRef
+from rdflib.namespace import NamespaceManager
+from rdf_utils.models.common import ModelBase, ModelLoader
 from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel
 from bdd_dsl.models.user_story import SceneModel
@@ -46,7 +49,7 @@ def load_agn_models_from_table(
 
 def load_ws_models_from_table(
     table: Table, graph: Graph, ws_model_loader: ModelLoader
-) -> Dict[URIRef, ModelBase]:
+) -> dict[URIRef, ModelBase]:
     workspace_models = {}
     for row in table:
         ws_id_str = row["name"]
@@ -72,3 +75,30 @@ def given_ws_models(context: Context):
     context.workspaces = load_ws_models_from_table(
         table=context.table, graph=context.model_graph, ws_model_loader=context.ws_model_loader
     )
+
+
+def parse_uri_or_set(arg_str: str, ns_manager: NamespaceManager) -> Union[URIRef, list[URIRef]]:
+    # ThereExists string representation: 'any of [set items]'
+    if arg_str.startswith("any of "):
+        list_str = arg_str.split("any of ")[1]
+        try:
+            uri_str_list = literal_eval(list_str)
+        except SyntaxError as e:
+            raise RuntimeError(f"unable to parse '{list_str}': {e}")
+
+        assert isinstance(
+            uri_str_list, list
+        ), f"can't parse as a list (type={type(uri_str_list)}): {list_str}"
+
+        uri_list = []
+        for uri_str in uri_str_list:
+            uri = try_expand_curie(curie_str=uri_str, ns_manager=ns_manager, quiet=False)
+            assert uri is not None, f"can't parse as URI: {uri_str} (type={type(uri)})"
+            uri_list.append(uri)
+
+        return uri_list
+
+    # shortened URI form
+    uri = try_expand_curie(curie_str=arg_str, ns_manager=ns_manager, quiet=False)
+    assert uri is not None, f"can't parse as URI: {arg_str} (type={type(uri)})"
+    return uri
