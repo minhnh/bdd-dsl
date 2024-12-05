@@ -35,6 +35,9 @@ dependencies = [
 
 [tool.ruff]
 line-length = 100
+exclude = [
+    "examples/generated"
+]
 
 [tool.black]
 line-length = 100
