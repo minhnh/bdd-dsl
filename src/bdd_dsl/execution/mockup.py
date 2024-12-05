@@ -4,14 +4,20 @@ from typing import Any
 from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
-from rdf_utils.models.common import ModelLoader
+from rdf_utils.models.common import ModelLoader, URIRef
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,
     load_py_module_attr,
 )
-from bdd_dsl.behave import given_ws_models, load_obj_models_from_table, load_agn_models_from_table
+from rdf_utils.uri import try_expand_curie
+from bdd_dsl.behave import (
+    given_ws_models,
+    load_obj_models_from_table,
+    load_agn_models_from_table,
+    parse_uri_or_set,
+)
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
 from bdd_dsl.models.urirefs import URI_SIM_PRED_PATH, URI_SIM_TYPE_RES_PATH
 from bdd_dsl.simulation.common import load_attr_has_config, load_attr_path
@@ -43,12 +49,10 @@ def before_scenario(context: Context, scenario: Scenario):
     scr_name_splits = scenario.name.split(" -- ")
     assert len(scr_name_splits) > 0, f"unexpected scenario name: {scenario.name}"
     scr_name = scr_name_splits[0]
-    try:
-        scenario_var_uri = model_graph.namespace_manager.expand_curie(scr_name)
-    except ValueError as e:
-        raise RuntimeError(
-            f"can't parse ScenarioVariant URI '{scr_name}' from scenario '{scenario.name}': {e}"
-        )
+    scenario_var_uri = try_expand_curie(
+        curie_str=scr_name, ns_manager=model_graph.namespace_manager, quiet=False
+    )
+    assert scenario_var_uri is not None, f"can't parse '{scr_name}' as URI"
 
     scenario_var_model = us_loader.load_scenario_variant(
         full_graph=model_graph, variant_id=scenario_var_uri
@@ -128,46 +132,50 @@ def given_scene_mockup(context: Context):
     assert getattr(context, "workspaces", None) is not None
 
 
-@given('"{pick_obj}" is located at "{pick_ws}" before event "{evt_uri_str}"')
-@given('"{pick_obj}" is located at "{pick_ws}" after event "{evt_uri_str}"')
-@then('"{pick_obj}" is located at "{pick_ws}" before event "{evt_uri_str}"')
-@then('"{pick_obj}" is located at "{pick_ws}" after event "{evt_uri_str}"')
-def is_located_at_mockup_given(context: Context, pick_obj: str, pick_ws: str, evt_uri_str: str):
-    try:
-        pick_obj_uri = context.model_graph.namespace_manager.expand_curie(pick_obj)
-    except ValueError as e:
-        raise RuntimeError(f"can't parse pick target obj URI '{pick_obj}': {e}")
-
+@given('"{pick_obj_str}" is located at "{pick_ws_str}" before event "{evt_uri_str}"')
+@given('"{pick_obj_str}" is located at "{pick_ws_str}" after event "{evt_uri_str}"')
+@then('"{pick_obj_str}" is located at "{pick_ws_str}" before event "{evt_uri_str}"')
+@then('"{pick_obj_str}" is located at "{pick_ws_str}" after event "{evt_uri_str}"')
+def is_located_at_mockup_given(
+    context: Context, pick_obj_str: str, pick_ws_str: str, evt_uri_str: str
+):
     assert context.model_graph is not None, "no 'model_graph' in context"
     assert (
         context.current_scenario is not None
     ), "no 'current_scenario' in context, expected an ObjModelLoader"
-    obj_model = context.current_scenario.scene.load_obj_model(
-        graph=context.model_graph, obj_id=pick_obj_uri
+
+    pick_obj_uris = parse_uri_or_set(
+        arg_str=pick_obj_str, ns_manager=context.model_graph.namespace_manager
     )
-    assert obj_model is not None
-    if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
-        py_model = obj_model.load_first_model_by_type(URI_PY_TYPE_MODULE_ATTR)
-        assert py_model.has_attr(
-            key=URI_PY_PRED_MODULE_NAME
-        ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
-        assert py_model.has_attr(
-            key=URI_PY_PRED_ATTR_NAME
-        ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
+    if isinstance(pick_obj_uris, URIRef):
+        pick_obj_uris = [pick_obj_uris]
 
-    try:
-        pick_ws_uri = context.model_graph.namespace_manager.expand_curie(pick_ws)
-    except ValueError as e:
-        raise RuntimeError(f"can't parse pick workspace URI '{pick_ws}': {e}")
+    for obj_uri in pick_obj_uris:
+        obj_model = context.current_scenario.scene.load_obj_model(
+            graph=context.model_graph, obj_id=obj_uri
+        )
+        assert obj_model is not None, f"can't load model for object {obj_uri}"
+        if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
+            py_model = obj_model.load_first_model_by_type(URI_PY_TYPE_MODULE_ATTR)
+            assert py_model.has_attr(
+                key=URI_PY_PRED_MODULE_NAME
+            ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
+            assert py_model.has_attr(
+                key=URI_PY_PRED_ATTR_NAME
+            ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
 
-    assert pick_ws_uri in context.workspaces, f"workspace '{pick_ws}' unrecognized"
+    pick_ws_uris = parse_uri_or_set(
+        arg_str=pick_ws_str, ns_manager=context.model_graph.namespace_manager
+    )
+    if isinstance(pick_ws_uris, URIRef):
+        pick_ws_uris = [pick_ws_uris]
+    for ws_uri in pick_ws_uris:
+        assert ws_uri in context.workspaces, f"workspace '{ws_uri}' unrecognized"
 
-    try:
-        evt_uri = context.model_graph.namespace_manager.expand_curie(evt_uri_str)
-    except ValueError as e:
-        raise RuntimeError(f"can't parse event URI '{evt_uri_str}': {e}")
-
-    assert evt_uri is not None, f"Event '{evt_uri}' is None"
+    evt_uri = try_expand_curie(
+        curie_str=evt_uri_str, ns_manager=context.model_graph.namespace_manager, quiet=False
+    )
+    assert evt_uri is not None, f"can't parse '{evt_uri_str}' as URI"
 
 
 class PickplaceBehaviourMockup(Behaviour):
@@ -187,8 +195,8 @@ class PickplaceBehaviourMockup(Behaviour):
         sleep(0.1)
 
 
-@when('"{agn_id}" picks "{obj_id}" from "{pick_ws}" and places it at "{place_ws}"')
-def behaviour_mockup(context: Context, agn_id: str, obj_id: str, pick_ws: str, place_ws: str):
+@when('"{agn_id}" picks "{obj_id}" from "{pick_ws_str}" and places it at "{place_ws}"')
+def behaviour_mockup(context: Context, agn_id: str, obj_id: str, pick_ws_str: str, place_ws: str):
     behaviour_model = getattr(context, "behaviour_model", None)
     if behaviour_model is None:
         exec_model = getattr(context, "execution_model", None)
