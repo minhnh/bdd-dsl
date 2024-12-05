@@ -3,7 +3,6 @@ from time import sleep
 from typing import Any
 from behave.runner import Context
 from behave.model import Scenario
-from behave import given, then, when
 from rdflib import Graph
 from rdf_utils.models.common import ModelLoader, URIRef
 from rdf_utils.models.python import (
@@ -14,9 +13,15 @@ from rdf_utils.models.python import (
 )
 from rdf_utils.uri import NamespaceManager, try_expand_curie
 from bdd_dsl.behave import (
-    given_ws_models,
+    PARAM_AGN,
+    PARAM_EVT,
+    PARAM_OBJ,
+    PARAM_PICK_WS,
+    PARAM_PLACE_WS,
+    PARAM_WS,
     load_obj_models_from_table,
     load_agn_models_from_table,
+    load_str_params,
     parse_str_param,
 )
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
@@ -35,7 +40,6 @@ def before_all_mockup(context: Context):
 
     generic_loader = ModelLoader()
     context.ws_model_loader = generic_loader
-    context.agn_model_loader = generic_loader
 
 
 def before_scenario(context: Context, scenario: Scenario):
@@ -76,7 +80,6 @@ def before_scenario(context: Context, scenario: Scenario):
     context.current_scenario = scenario_var_model
 
 
-@given("a set of objects")
 def given_objects_mockup(context: Context):
     assert context.table is not None, "no table added to context, expected a list of object URIs"
     assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
@@ -104,10 +107,6 @@ def given_objects_mockup(context: Context):
                 ), f"ResourceWithPath model '{path_model.id}' for object '{obj_model.id}' missing attr path"
 
 
-given("a set of workspaces")(given_ws_models)
-
-
-@given("a set of agents")
 def given_agents_mockup(context: Context):
     assert context.table is not None, "no table added to context, expected a list of agent URIs"
     assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
@@ -128,25 +127,16 @@ def given_agents_mockup(context: Context):
                 ), f"Python attribute model '{py_model.id}' for agent '{agn_model.id}' missing attribute name"
 
 
-@given("specified objects, workspaces and agents are available")
-def given_scene_mockup(context: Context):
-    assert getattr(context, "workspaces", None) is not None
+def is_located_at_mockup(context: Context, **kwargs: Any):
+    params = load_str_params(param_names=[PARAM_OBJ, PARAM_WS, PARAM_EVT], **kwargs)
 
-
-@given('"{pick_obj_str}" is located at "{pick_ws_str}" before event "{evt_uri_str}"')
-@given('"{pick_obj_str}" is located at "{pick_ws_str}" after event "{evt_uri_str}"')
-@then('"{pick_obj_str}" is located at "{pick_ws_str}" before event "{evt_uri_str}"')
-@then('"{pick_obj_str}" is located at "{pick_ws_str}" after event "{evt_uri_str}"')
-def is_located_at_mockup_given(
-    context: Context, pick_obj_str: str, pick_ws_str: str, evt_uri_str: str
-):
     assert context.model_graph is not None, "no 'model_graph' in context"
     assert (
         context.current_scenario is not None
     ), "no 'current_scenario' in context, expected an ObjModelLoader"
 
     _, pick_obj_uris = parse_str_param(
-        param_str=pick_obj_str, ns_manager=context.model_graph.namespace_manager
+        param_str=params[PARAM_OBJ], ns_manager=context.model_graph.namespace_manager
     )
     for obj_uri in pick_obj_uris:
         obj_model = context.current_scenario.scene.load_obj_model(
@@ -163,15 +153,15 @@ def is_located_at_mockup_given(
             ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
 
     _, pick_ws_uris = parse_str_param(
-        param_str=pick_ws_str, ns_manager=context.model_graph.namespace_manager
+        param_str=params[PARAM_WS], ns_manager=context.model_graph.namespace_manager
     )
     for ws_uri in pick_ws_uris:
         assert ws_uri in context.workspaces, f"workspace '{ws_uri}' unrecognized"
 
     evt_uri = try_expand_curie(
-        curie_str=evt_uri_str, ns_manager=context.model_graph.namespace_manager, quiet=False
+        curie_str=params[PARAM_EVT], ns_manager=context.model_graph.namespace_manager, quiet=False
     )
-    assert evt_uri is not None, f"can't parse '{evt_uri_str}' as URI"
+    assert evt_uri is not None, f"can't parse '{params[PARAM_EVT]}' as URI"
 
 
 class PickplaceBehaviourMockup(Behaviour):
@@ -241,11 +231,13 @@ class PickplaceBehaviourMockup(Behaviour):
         self.counter -= 1
 
 
-@when('"{agn_id_str}" picks "{obj_id_str}" from "{pick_ws_str}" and places it at "{place_ws_str}"')
-def behaviour_mockup(
-    context: Context, agn_id_str: str, obj_id_str: str, pick_ws_str: str, place_ws_str: str
-):
+def behaviour_mockup(context: Context, **kwargs: Any):
+    params = load_str_params(
+        param_names=[PARAM_AGN, PARAM_OBJ, PARAM_PICK_WS, PARAM_PLACE_WS], **kwargs
+    )
+
     behaviour_model = getattr(context, "behaviour_model", None)
+
     if behaviour_model is None:
         exec_model = getattr(context, "execution_model", None)
         assert isinstance(
@@ -259,10 +251,10 @@ def behaviour_mockup(
 
         behaviour_model = exec_model.load_behaviour_impl(
             context=context,
-            agn_id_str=agn_id_str,
-            obj_id_str=obj_id_str,
-            pick_ws_str=pick_ws_str,
-            place_ws_str=place_ws_str,
+            agn_id_str=params[PARAM_AGN],
+            obj_id_str=params[PARAM_OBJ],
+            pick_ws_str=params[PARAM_PICK_WS],
+            place_ws_str=params[PARAM_PLACE_WS],
             ns_manager=model_graph.namespace_manager,
         )
         context.behaviour_model = behaviour_model
