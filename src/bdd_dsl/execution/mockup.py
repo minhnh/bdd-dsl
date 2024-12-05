@@ -4,14 +4,15 @@ from typing import Any
 from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
-from rdf_utils.models.common import ModelLoader
+from rdflib import Graph
+from rdf_utils.models.common import ModelLoader, URIRef
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,
     load_py_module_attr,
 )
-from rdf_utils.uri import try_expand_curie
+from rdf_utils.uri import NamespaceManager, try_expand_curie
 from bdd_dsl.behave import (
     given_ws_models,
     load_obj_models_from_table,
@@ -174,9 +175,49 @@ def is_located_at_mockup_given(
 
 
 class PickplaceBehaviourMockup(Behaviour):
-    def __init__(self, context: Any, **kwargs) -> None:
+    agn_ids: list[URIRef]
+    obj_ids: list[URIRef]
+    pick_ws_ids: list[URIRef]
+    place_ws_ids: list[URIRef]
+
+    def __init__(
+        self,
+        context: Any,
+        agn_id_str: str,
+        obj_id_str: str,
+        pick_ws_str: str,
+        place_ws_str: str,
+        ns_manager: NamespaceManager,
+        **kwargs,
+    ) -> None:
         self.max_count = kwargs.get("max_count", 5)
         self.counter = self.max_count
+
+        _, agn_uris = parse_str_param(param_str=agn_id_str, ns_manager=ns_manager)
+        self.agn_ids = []
+        for uri in agn_uris:
+            assert isinstance(uri, URIRef), f"unexpected agent URI: {uri}"
+            self.agn_ids.append(uri)
+
+        _, obj_uris = parse_str_param(param_str=obj_id_str, ns_manager=ns_manager)
+        self.obj_ids = []
+        for uri in obj_uris:
+            assert isinstance(uri, URIRef), f"unexpected obj URI: {uri}"
+            self.obj_ids.append(uri)
+
+        _, pick_ws_uris = parse_str_param(param_str=pick_ws_str, ns_manager=ns_manager)
+        self.pick_ws_ids = []
+        for uri in pick_ws_uris:
+            assert isinstance(uri, URIRef), f"unexpected pick ws URI: {uri}"
+            self.pick_ws_ids.append(uri)
+
+        _, place_ws_uris = parse_str_param(param_str=place_ws_str, ns_manager=ns_manager)
+        self.place_ws_ids = []
+        for uri in place_ws_uris:
+            assert isinstance(uri, URIRef), f"unexpected place ws URI: {uri}"
+            self.place_ws_ids.append(uri)
+
+        self._ns_manager = ns_manager
 
     def is_finished(self, context: Context, **kwargs: Any) -> bool:
         return self.counter <= 0
@@ -185,13 +226,25 @@ class PickplaceBehaviourMockup(Behaviour):
         self.counter = self.max_count
 
     def step(self, context: Context, **kwargs: Any) -> Any:
-        print(self.counter)
+        agn_str = " or ".join(uri.n3(namespace_manager=self._ns_manager) for uri in self.agn_ids)
+        obj_str = " or ".join(uri.n3(namespace_manager=self._ns_manager) for uri in self.obj_ids)
+        pick_ws_str = " or ".join(
+            uri.n3(namespace_manager=self._ns_manager) for uri in self.pick_ws_ids
+        )
+        place_ws_str = " or ".join(
+            uri.n3(namespace_manager=self._ns_manager) for uri in self.place_ws_ids
+        )
+        print(f"'{agn_str}' picks '{obj_str}' from '{pick_ws_str}'")
+        sleep(0.05)
+        print(f"'{agn_str}' places '{obj_str}' at '{place_ws_str}'")
+        sleep(0.05)
         self.counter -= 1
-        sleep(0.1)
 
 
-@when('"{agn_id}" picks "{obj_id}" from "{pick_ws_str}" and places it at "{place_ws}"')
-def behaviour_mockup(context: Context, agn_id: str, obj_id: str, pick_ws_str: str, place_ws: str):
+@when('"{agn_id_str}" picks "{obj_id_str}" from "{pick_ws_str}" and places it at "{place_ws_str}"')
+def behaviour_mockup(
+    context: Context, agn_id_str: str, obj_id_str: str, pick_ws_str: str, place_ws_str: str
+):
     behaviour_model = getattr(context, "behaviour_model", None)
     if behaviour_model is None:
         exec_model = getattr(context, "execution_model", None)
@@ -200,9 +253,18 @@ def behaviour_mockup(context: Context, agn_id: str, obj_id: str, pick_ws_str: st
         ), f"no valid 'execution_model' added to the context: {exec_model}"
 
         model_graph = getattr(context, "model_graph", None)
-        assert model_graph is not None
+        assert isinstance(
+            model_graph, Graph
+        ), f"no 'model_graph' of type rdflib.Graph in context: {model_graph}"
 
-        behaviour_model = exec_model.load_behaviour_impl(context=context)
+        behaviour_model = exec_model.load_behaviour_impl(
+            context=context,
+            agn_id_str=agn_id_str,
+            obj_id_str=obj_id_str,
+            pick_ws_str=pick_ws_str,
+            place_ws_str=place_ws_str,
+            ns_manager=model_graph.namespace_manager,
+        )
         context.behaviour_model = behaviour_model
 
     bhv = behaviour_model.behaviour
