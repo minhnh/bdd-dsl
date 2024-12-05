@@ -1,9 +1,8 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from enum import Enum
-from typing import Generator, Union
+from typing import Any, Generator, Union
 from ast import literal_eval
 from behave.model import Table
-from behave import given
 from behave.runner import Context
 from rdflib import Graph, URIRef
 from rdflib.term import Node as RDFNode
@@ -13,6 +12,21 @@ from rdf_utils.models.common import ModelBase, ModelLoader
 from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel
 from bdd_dsl.models.user_story import SceneModel
+
+
+PARAM_OBJ = "obj_str"
+PARAM_WS = "ws_str"
+PARAM_PICK_WS = "pick_ws_str"
+PARAM_PLACE_WS = "place_ws_str"
+PARAM_AGN = "agn_str"
+PARAM_EVT = "evt_str"
+CLAUSE_BG_OBJECTS = "a set of objects"
+CLAUSE_BG_WORKSPACES = "a set of workspaces"
+CLAUSE_BG_AGENTS = "a set of agents"
+CLAUSE_FL_LOCATED_AT = f'"{{{PARAM_OBJ}}}" is located at "{{{PARAM_WS}}}"'
+CLAUSE_TC_BEFORE_EVT = f'before event "{{{PARAM_EVT}}}"'
+CLAUSE_TC_AFTER_EVT = f'after event "{{{PARAM_EVT}}}"'
+CLAUSE_BHV_PICKPLACE = f'"{{{PARAM_AGN}}}" picks "{{{PARAM_OBJ}}}" from "{{{PARAM_PICK_WS}}}" and places it at "{{{PARAM_PLACE_WS}}}"'
 
 
 def load_obj_models_from_table(
@@ -67,7 +81,6 @@ def load_ws_models_from_table(
     return workspace_models
 
 
-@given("a set of workspaces")
 def given_ws_models(context: Context):
     assert context.table is not None, "no table added to context, expected a list of workspaces"
     assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
@@ -127,3 +140,13 @@ def parse_str_param(
     n3_term = try_parse_n3_string(n3_str=param_str, ns_manager=ns_manager, quiet=False)
     assert n3_term is not None, f"can't parse N3 string: {param_str})"
     return ParamType.URI, [n3_term]
+
+
+def load_str_params(param_names: list[str], **kwargs: Any) -> dict[str, str]:
+    params = {}
+    for param_name in param_names:
+        param_str = kwargs.get(param_name, None)
+        assert param_str is not None, f"no param '{param_name}' specified"
+        params[param_name] = param_str
+
+    return params
