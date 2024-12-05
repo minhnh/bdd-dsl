@@ -4,7 +4,7 @@ from typing import Any
 from behave.runner import Context
 from behave.model import Scenario
 from behave import given, then, when
-from rdf_utils.models.common import ModelLoader, URIRef
+from rdf_utils.models.common import ModelLoader
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
@@ -16,7 +16,7 @@ from bdd_dsl.behave import (
     given_ws_models,
     load_obj_models_from_table,
     load_agn_models_from_table,
-    parse_uri_or_set,
+    parse_str_param,
 )
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
 from bdd_dsl.models.urirefs import URI_SIM_PRED_PATH, URI_SIM_TYPE_RES_PATH
@@ -144,12 +144,9 @@ def is_located_at_mockup_given(
         context.current_scenario is not None
     ), "no 'current_scenario' in context, expected an ObjModelLoader"
 
-    pick_obj_uris = parse_uri_or_set(
-        arg_str=pick_obj_str, ns_manager=context.model_graph.namespace_manager
+    _, pick_obj_uris = parse_str_param(
+        param_str=pick_obj_str, ns_manager=context.model_graph.namespace_manager
     )
-    if isinstance(pick_obj_uris, URIRef):
-        pick_obj_uris = [pick_obj_uris]
-
     for obj_uri in pick_obj_uris:
         obj_model = context.current_scenario.scene.load_obj_model(
             graph=context.model_graph, obj_id=obj_uri
@@ -164,11 +161,9 @@ def is_located_at_mockup_given(
                 key=URI_PY_PRED_ATTR_NAME
             ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
 
-    pick_ws_uris = parse_uri_or_set(
-        arg_str=pick_ws_str, ns_manager=context.model_graph.namespace_manager
+    _, pick_ws_uris = parse_str_param(
+        param_str=pick_ws_str, ns_manager=context.model_graph.namespace_manager
     )
-    if isinstance(pick_ws_uris, URIRef):
-        pick_ws_uris = [pick_ws_uris]
     for ws_uri in pick_ws_uris:
         assert ws_uri in context.workspaces, f"workspace '{ws_uri}' unrecognized"
 

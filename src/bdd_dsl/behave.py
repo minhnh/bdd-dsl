@@ -1,12 +1,14 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from enum import Enum
 from typing import Generator, Union
 from ast import literal_eval
 from behave.model import Table
 from behave import given
 from behave.runner import Context
-from rdf_utils.uri import try_expand_curie
 from rdflib import Graph, URIRef
+from rdflib.term import Node as RDFNode
 from rdflib.namespace import NamespaceManager
+from rdf_utils.uri import try_parse_n3_iterable, try_parse_n3_string
 from rdf_utils.models.common import ModelBase, ModelLoader
 from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel
@@ -77,28 +79,51 @@ def given_ws_models(context: Context):
     )
 
 
-def parse_uri_or_set(arg_str: str, ns_manager: NamespaceManager) -> Union[URIRef, list[URIRef]]:
+class ParamType(Enum):
+    URI = 0
+    EXISTS_SET = 1
+    SET = 2
+
+
+def parse_str_param(
+    param_str: str, ns_manager: NamespaceManager
+) -> tuple[ParamType, list[Union[RDFNode, str]]]:
     # ThereExists string representation: 'any of [set items]'
-    if arg_str.startswith("any of "):
-        list_str = arg_str.split("any of ")[1]
+    if param_str.startswith("any of "):
+        list_str = param_str.split("any of ")[1]
         try:
-            uri_str_list = literal_eval(list_str)
+            n3_str_list = literal_eval(list_str)
         except SyntaxError as e:
             raise RuntimeError(f"unable to parse '{list_str}': {e}")
 
         assert isinstance(
-            uri_str_list, list
-        ), f"can't parse as a list (type={type(uri_str_list)}): {list_str}"
+            n3_str_list, list
+        ), f"can't parse as a list (type={type(n3_str_list)}): {list_str}"
 
-        uri_list = []
-        for uri_str in uri_str_list:
-            uri = try_expand_curie(curie_str=uri_str, ns_manager=ns_manager, quiet=False)
-            assert uri is not None, f"can't parse as URI: {uri_str} (type={type(uri)})"
-            uri_list.append(uri)
+        n3_term_list = try_parse_n3_iterable(
+            n3_str_iterable=n3_str_list, ns_manager=ns_manager, quiet=False
+        )
+        assert n3_term_list is not None, f"unable to parse N3 string list {n3_str_list}"
+        return ParamType.EXISTS_SET, n3_term_list
 
-        return uri_list
+    # regular list
+    if param_str.startswith("["):
+        try:
+            n3_str_list = literal_eval(param_str)
+        except SyntaxError as e:
+            raise RuntimeError(f"unable to parse '{param_str}': {e}")
 
-    # shortened URI form
-    uri = try_expand_curie(curie_str=arg_str, ns_manager=ns_manager, quiet=False)
-    assert uri is not None, f"can't parse as URI: {arg_str} (type={type(uri)})"
-    return uri
+        assert isinstance(
+            n3_str_list, list
+        ), f"can't parse as a list (type={type(n3_str_list)}): {param_str}"
+
+        n3_term_list = try_parse_n3_iterable(
+            n3_str_iterable=n3_str_list, ns_manager=ns_manager, quiet=False
+        )
+        assert n3_term_list is not None, f"unable to parse N3 string list {n3_str_list}"
+        return ParamType.SET, n3_term_list
+
+    # N3 string
+    n3_term = try_parse_n3_string(n3_str=param_str, ns_manager=ns_manager, quiet=False)
+    assert n3_term is not None, f"can't parse N3 string: {param_str})"
+    return ParamType.URI, [n3_term]
