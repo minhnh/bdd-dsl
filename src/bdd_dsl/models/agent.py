@@ -2,6 +2,7 @@
 from typing import Any, Dict, Optional
 from rdflib import Graph, URIRef
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
+from bdd_dsl.simulation.common import load_attr_has_config
 from bdd_dsl.models.queries import Q_MODELLED_AGENT
 from bdd_dsl.models.urirefs import URI_AGN_PRED_HAS_AGN_MODEL
 
@@ -16,6 +17,8 @@ class AgentModel(ModelBase):
         self.models = {}
         self.model_types = set()
         self.model_type_to_id = {}
+
+        load_attr_has_config(graph=graph, model=self)
 
         for model_id in graph.objects(subject=agent_id, predicate=URI_AGN_PRED_HAS_AGN_MODEL):
             assert isinstance(model_id, URIRef)

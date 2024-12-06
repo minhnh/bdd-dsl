@@ -4,6 +4,7 @@ from rdflib import Graph, URIRef
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
 from bdd_dsl.models.queries import Q_MODELLED_OBJECT
 from bdd_dsl.models.urirefs import URI_ENV_PRED_HAS_OBJ_MODEL
+from bdd_dsl.simulation.common import load_attr_has_config
 
 
 class ObjectModel(ModelBase):
@@ -16,6 +17,8 @@ class ObjectModel(ModelBase):
         self.models = {}
         self.model_types = set()
         self.model_type_to_id = {}
+
+        load_attr_has_config(graph=graph, model=self)
 
         for model_id in graph.objects(subject=obj_id, predicate=URI_ENV_PRED_HAS_OBJ_MODEL):
             assert isinstance(
