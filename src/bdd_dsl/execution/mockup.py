@@ -1,6 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from time import sleep
-from typing import Any
+from typing import Any, Optional
 from behave.runner import Context
 from behave.model import Scenario
 from rdflib import Graph
@@ -163,41 +163,26 @@ def is_located_at_mockup(context: Context, **kwargs: Any):
 
 
 class PickplaceBehaviourMockup(Behaviour):
-    agn_ids: list[URIRef]
-    obj_ids: list[URIRef]
-    place_ws_ids: list[URIRef]
+    agn_ids: Optional[list[URIRef]]
+    obj_ids: Optional[list[URIRef]]
+    place_ws_ids: Optional[list[URIRef]]
 
     def __init__(
         self,
         context: Any,
-        agn_id_str: str,
-        obj_id_str: str,
-        ws_id_str: str,
         ns_manager: NamespaceManager,
         **kwargs,
     ) -> None:
+        super().__init__(context=context, **kwargs)
+
         self.max_count = kwargs.get("max_count", 5)
         self.counter = self.max_count
 
-        _, agn_uris = parse_str_param(param_str=agn_id_str, ns_manager=ns_manager)
-        self.agn_ids = []
-        for uri in agn_uris:
-            assert isinstance(uri, URIRef), f"unexpected agent URI: {uri}"
-            self.agn_ids.append(uri)
-
-        _, obj_uris = parse_str_param(param_str=obj_id_str, ns_manager=ns_manager)
-        self.obj_ids = []
-        for uri in obj_uris:
-            assert isinstance(uri, URIRef), f"unexpected obj URI: {uri}"
-            self.obj_ids.append(uri)
-
-        _, place_ws_uris = parse_str_param(param_str=ws_id_str, ns_manager=ns_manager)
-        self.place_ws_ids = []
-        for uri in place_ws_uris:
-            assert isinstance(uri, URIRef), f"unexpected place ws URI: {uri}"
-            self.place_ws_ids.append(uri)
-
         self._ns_manager = ns_manager
+
+        self.agn_ids = None
+        self.obj_ids = None
+        self.place_ws_ids = None
 
     def is_finished(self, context: Context, **kwargs: Any) -> bool:
         return self.counter <= 0
@@ -205,7 +190,36 @@ class PickplaceBehaviourMockup(Behaviour):
     def reset(self, context: Context, **kwargs: Any) -> None:
         self.counter = self.max_count
 
+        agn_id_str = kwargs.get("agn_id_str", None)
+        assert agn_id_str is not None, "arg 'agn_id_str' not specified'"
+        obj_id_str = kwargs.get("obj_id_str", None)
+        assert obj_id_str is not None, "arg 'obj_id_str' not specified'"
+        ws_id_str = kwargs.get("ws_id_str", None)
+        assert ws_id_str is not None, "arg 'ws_id_str not specified'"
+
+        _, agn_uris = parse_str_param(param_str=agn_id_str, ns_manager=self._ns_manager)
+        self.agn_ids = []
+        for uri in agn_uris:
+            assert isinstance(uri, URIRef), f"unexpected agent URI: {uri}"
+            self.agn_ids.append(uri)
+
+        _, obj_uris = parse_str_param(param_str=obj_id_str, ns_manager=self._ns_manager)
+        self.obj_ids = []
+        for uri in obj_uris:
+            assert isinstance(uri, URIRef), f"unexpected obj URI: {uri}"
+            self.obj_ids.append(uri)
+
+        _, place_ws_uris = parse_str_param(param_str=ws_id_str, ns_manager=self._ns_manager)
+        self.place_ws_ids = []
+        for uri in place_ws_uris:
+            assert isinstance(uri, URIRef), f"unexpected place ws URI: {uri}"
+            self.place_ws_ids.append(uri)
+
     def step(self, context: Context, **kwargs: Any) -> Any:
+        assert (
+            self.agn_ids is not None and self.obj_ids is not None and self.place_ws_ids is not None
+        ), "Behaviour.step: mockup behaviour expects reset() to be called first"
+
         agn_str = " or ".join(uri.n3(namespace_manager=self._ns_manager) for uri in self.agn_ids)
         obj_str = " or ".join(uri.n3(namespace_manager=self._ns_manager) for uri in self.obj_ids)
         place_ws_str = " or ".join(
@@ -236,15 +250,17 @@ def behaviour_mockup(context: Context, **kwargs: Any):
 
         behaviour_model = exec_model.load_behaviour_impl(
             context=context,
-            agn_id_str=params[PARAM_AGN],
-            obj_id_str=params[PARAM_OBJ],
-            ws_id_str=params[PARAM_WS],
             ns_manager=model_graph.namespace_manager,
         )
         context.behaviour_model = behaviour_model
 
     bhv = behaviour_model.behaviour
-    assert bhv is not None
-    bhv.reset(context=context)
+    assert bhv is not None, f"behaviour not processed for {behaviour_model.id}"
+    bhv.reset(
+        context=context,
+        agn_id_str=params[PARAM_AGN],
+        obj_id_str=params[PARAM_OBJ],
+        ws_id_str=params[PARAM_WS],
+    )
     while not bhv.is_finished(context=context):
         bhv.step(context=context)
