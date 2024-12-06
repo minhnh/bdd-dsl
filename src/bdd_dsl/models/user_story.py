@@ -9,7 +9,7 @@ from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.models.environment import ObjModelLoader, ObjectModel
 from bdd_dsl.models.agent import AgentModel, AgnModelLoader
 from bdd_dsl.models.clauses import (
-    DEFAULT_BHV_LOADERS,
+    load_bhv_pickplace,
     DEFAULT_FLUENT_LOADERS,
     FluentClauseLoader,
     FluentClauseLoaderProtocol,
@@ -464,7 +464,7 @@ class ScenarioVariantModel(IHasClause):
         full_graph: Graph,
         var_id: URIRef,
         fluent_loaders: dict[URIRef, FluentClauseLoaderProtocol] = DEFAULT_FLUENT_LOADERS,
-        bhv_loaders: dict[URIRef, WhenBhvLoaderProtocol] = DEFAULT_BHV_LOADERS,
+        bhv_loaders: list[WhenBhvLoaderProtocol] = [load_bhv_pickplace],
     ) -> None:
         node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
         assert node_val is not None and isinstance(

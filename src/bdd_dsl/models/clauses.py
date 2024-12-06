@@ -13,13 +13,10 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BHV_PRED_OF_BHV,
-    URI_BHV_PRED_PICK_WS,
-    URI_BHV_PRED_PLACE_WS,
     URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
     URI_BHV_PRED_TARGET_WS,
     URI_BHV_TYPE_PICK,
-    URI_BHV_TYPE_PICKPLACE,
     URI_BHV_TYPE_PLACE,
     URI_TIME_TYPE_AFTER_EVT,
     URI_TIME_TYPE_BEFORE_EVT,
@@ -194,27 +191,12 @@ class WhenBhvLoaderProtocol(Protocol):
     def __call__(self, graph: Graph, when_bhv: WhenBehaviourModel) -> None: ...
 
 
-def load_target_obj_ws_agn(graph: Graph, when_bhv: WhenBehaviourModel) -> None:
-    target_obj_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_OBJ)
-    assert isinstance(
-        target_obj_id, URIRef
-    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target object's URI: {target_obj_id}"
-    when_bhv.set_attr(key=URI_BHV_PRED_TARGET_OBJ, val=target_obj_id)
+def load_bhv_pickplace(graph: Graph, when_bhv: WhenBehaviourModel) -> None:
+    assert (
+        URI_BHV_TYPE_PICK in when_bhv.behaviour.types
+        or URI_BHV_TYPE_PLACE in when_bhv.behaviour.types
+    ), f"load_bhv_pickplace: '{when_bhv.behaviour.id}' not a pick or place bhv, types: {when_bhv.behaviour.types}"
 
-    target_ws_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_WS)
-    assert isinstance(
-        target_ws_id, URIRef
-    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target workspace's URI: {target_ws_id}"
-    when_bhv.set_attr(key=URI_BHV_PRED_TARGET_WS, val=target_ws_id)
-
-    target_agn_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_AGN)
-    assert isinstance(
-        target_agn_id, URIRef
-    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target agent's URI: {target_agn_id}"
-    when_bhv.set_attr(key=URI_BHV_PRED_TARGET_AGN, val=target_agn_id)
-
-
-def load_pickplace_info(graph: Graph, when_bhv: WhenBehaviourModel):
     target_obj_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_OBJ)
     assert isinstance(
         target_obj_id, URIRef
@@ -227,41 +209,20 @@ def load_pickplace_info(graph: Graph, when_bhv: WhenBehaviourModel):
     ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target agent's URI: {target_agn_id}"
     when_bhv.set_attr(key=URI_BHV_PRED_TARGET_AGN, val=target_agn_id)
 
-    pick_ws_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_PICK_WS)
-    assert isinstance(
-        pick_ws_id, URIRef
-    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref pick workspace's URI: {pick_ws_id}"
-    when_bhv.set_attr(key=URI_BHV_PRED_PICK_WS, val=pick_ws_id)
-
-    place_ws_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_PLACE_WS)
-    assert isinstance(
-        place_ws_id, URIRef
-    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref place workspace's URI: {place_ws_id}"
-    when_bhv.set_attr(key=URI_BHV_PRED_PLACE_WS, val=place_ws_id)
-
-
-DEFAULT_BHV_LOADERS = {
-    URI_BHV_TYPE_PICK: load_target_obj_ws_agn,
-    URI_BHV_TYPE_PLACE: load_target_obj_ws_agn,
-    URI_BHV_TYPE_PICKPLACE: load_pickplace_info,
-}
+    if URI_BHV_TYPE_PLACE in when_bhv.behaviour.types:
+        target_ws_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_WS)
+        assert isinstance(
+            target_ws_id, URIRef
+        ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target workspace's URI: {target_ws_id}"
+        when_bhv.set_attr(key=URI_BHV_PRED_TARGET_WS, val=target_ws_id)
 
 
 class WhenBhvLoader(object):
-    _loaders: dict[URIRef, WhenBhvLoaderProtocol]
+    _loaders: list[WhenBhvLoaderProtocol]
 
-    def __init__(self, loaders: dict[URIRef, WhenBhvLoaderProtocol]) -> None:
+    def __init__(self, loaders: list[WhenBhvLoaderProtocol]) -> None:
         self._loaders = loaders
 
     def load_bhv_info(self, when_bhv: WhenBehaviourModel, graph: Graph):
-        processed_type = None
-        for bhv_type in self._loaders:
-            if bhv_type not in when_bhv.behaviour.types:
-                continue
-
-            processed_type = bhv_type
-            self._loaders[bhv_type](graph=graph, when_bhv=when_bhv)
-
-        assert (
-            processed_type is not None
-        ), f"unhandled types for behaviour '{when_bhv.behaviour.id}' of clause '{when_bhv.id}': {when_bhv.behaviour.types}"
+        for bhv_loader in self._loaders:
+            bhv_loader(graph=graph, when_bhv=when_bhv)
