@@ -16,8 +16,6 @@ from bdd_dsl.behave import (
     PARAM_AGN,
     PARAM_EVT,
     PARAM_OBJ,
-    PARAM_PICK_WS,
-    PARAM_PLACE_WS,
     PARAM_WS,
     load_obj_models_from_table,
     load_agn_models_from_table,
@@ -167,7 +165,6 @@ def is_located_at_mockup(context: Context, **kwargs: Any):
 class PickplaceBehaviourMockup(Behaviour):
     agn_ids: list[URIRef]
     obj_ids: list[URIRef]
-    pick_ws_ids: list[URIRef]
     place_ws_ids: list[URIRef]
 
     def __init__(
@@ -175,8 +172,7 @@ class PickplaceBehaviourMockup(Behaviour):
         context: Any,
         agn_id_str: str,
         obj_id_str: str,
-        pick_ws_str: str,
-        place_ws_str: str,
+        ws_id_str: str,
         ns_manager: NamespaceManager,
         **kwargs,
     ) -> None:
@@ -195,13 +191,7 @@ class PickplaceBehaviourMockup(Behaviour):
             assert isinstance(uri, URIRef), f"unexpected obj URI: {uri}"
             self.obj_ids.append(uri)
 
-        _, pick_ws_uris = parse_str_param(param_str=pick_ws_str, ns_manager=ns_manager)
-        self.pick_ws_ids = []
-        for uri in pick_ws_uris:
-            assert isinstance(uri, URIRef), f"unexpected pick ws URI: {uri}"
-            self.pick_ws_ids.append(uri)
-
-        _, place_ws_uris = parse_str_param(param_str=place_ws_str, ns_manager=ns_manager)
+        _, place_ws_uris = parse_str_param(param_str=ws_id_str, ns_manager=ns_manager)
         self.place_ws_ids = []
         for uri in place_ws_uris:
             assert isinstance(uri, URIRef), f"unexpected place ws URI: {uri}"
@@ -218,13 +208,10 @@ class PickplaceBehaviourMockup(Behaviour):
     def step(self, context: Context, **kwargs: Any) -> Any:
         agn_str = " or ".join(uri.n3(namespace_manager=self._ns_manager) for uri in self.agn_ids)
         obj_str = " or ".join(uri.n3(namespace_manager=self._ns_manager) for uri in self.obj_ids)
-        pick_ws_str = " or ".join(
-            uri.n3(namespace_manager=self._ns_manager) for uri in self.pick_ws_ids
-        )
         place_ws_str = " or ".join(
             uri.n3(namespace_manager=self._ns_manager) for uri in self.place_ws_ids
         )
-        print(f"'{agn_str}' picks '{obj_str}' from '{pick_ws_str}'")
+        print(f"'{agn_str}' picks '{obj_str}'")
         sleep(0.05)
         print(f"'{agn_str}' places '{obj_str}' at '{place_ws_str}'")
         sleep(0.05)
@@ -232,9 +219,7 @@ class PickplaceBehaviourMockup(Behaviour):
 
 
 def behaviour_mockup(context: Context, **kwargs: Any):
-    params = load_str_params(
-        param_names=[PARAM_AGN, PARAM_OBJ, PARAM_PICK_WS, PARAM_PLACE_WS], **kwargs
-    )
+    params = load_str_params(param_names=[PARAM_AGN, PARAM_OBJ, PARAM_WS], **kwargs)
 
     behaviour_model = getattr(context, "behaviour_model", None)
 
@@ -253,8 +238,7 @@ def behaviour_mockup(context: Context, **kwargs: Any):
             context=context,
             agn_id_str=params[PARAM_AGN],
             obj_id_str=params[PARAM_OBJ],
-            pick_ws_str=params[PARAM_PICK_WS],
-            place_ws_str=params[PARAM_PLACE_WS],
+            ws_id_str=params[PARAM_WS],
             ns_manager=model_graph.namespace_manager,
         )
         context.behaviour_model = behaviour_model

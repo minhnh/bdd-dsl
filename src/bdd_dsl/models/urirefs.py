@@ -97,12 +97,9 @@ URI_BHV_TYPE_BHV = NS_MM_BHV["Behaviour"]
 URI_BHV_PRED_OF_BHV = NS_MM_BHV["of-behaviour"]
 URI_BHV_TYPE_PICK = NS_MM_BHV["Pick"]
 URI_BHV_TYPE_PLACE = NS_MM_BHV["Place"]
-URI_BHV_TYPE_PICKPLACE = NS_MM_BHV["PickPlace"]
 URI_BHV_PRED_TARGET_OBJ = NS_MM_BHV["target-object"]
 URI_BHV_PRED_TARGET_WS = NS_MM_BHV["target-workspace"]
 URI_BHV_PRED_TARGET_AGN = NS_MM_BHV["target-agent"]
-URI_BHV_PRED_PICK_WS = NS_MM_BHV["pick-workspace"]
-URI_BHV_PRED_PLACE_WS = NS_MM_BHV["place-workspace"]
 
 # Time
 URI_TIME_TYPE_BEFORE_EVT = NS_MM_TIME["BeforeEventConstraint"]

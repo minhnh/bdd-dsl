@@ -32,11 +32,11 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_REF_WS,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
-    URI_BHV_PRED_PICK_WS,
-    URI_BHV_PRED_PLACE_WS,
     URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
-    URI_BHV_TYPE_PICKPLACE,
+    URI_BHV_PRED_TARGET_WS,
+    URI_BHV_TYPE_PICK,
+    URI_BHV_TYPE_PLACE,
     URI_TIME_PRED_REF_EVT,
     URI_TIME_TYPE_AFTER_EVT,
     URI_TIME_TYPE_BEFORE_EVT,
@@ -275,52 +275,55 @@ def get_bhv_str_pickplace(
         model=when_bhv, key=URI_BHV_PRED_TARGET_AGN, var_values=var_values, ns_manager=ns_manager
     )
 
-    pick_ws_val_str = _get_attr_var_val_str(
-        model=when_bhv, key=URI_BHV_PRED_PICK_WS, var_values=var_values, ns_manager=ns_manager
-    )
+    if URI_BHV_TYPE_PLACE in when_bhv.behaviour.types:
+        target_ws_val_str = _get_attr_var_val_str(
+            model=when_bhv, key=URI_BHV_PRED_TARGET_WS, var_values=var_values, ns_manager=ns_manager
+        )
 
-    place_ws_val_str = _get_attr_var_val_str(
-        model=when_bhv, key=URI_BHV_PRED_PLACE_WS, var_values=var_values, ns_manager=ns_manager
-    )
+        if URI_BHV_TYPE_PICK in when_bhv.behaviour.types:
+            # pick and place
+            return f'"{agn_val_str}" picks "{obj_val_str}" and places it at "{target_ws_val_str}"'
+        else:
+            # only place
+            return f'"{agn_val_str}" places "{obj_val_str}" at "{target_ws_val_str}"'
 
-    return f'"{agn_val_str}" picks "{obj_val_str}" from "{pick_ws_val_str}" and places it at "{place_ws_val_str}"'
-
-
-DEFAULT_WHEN_BHV_STR_GENS = {
-    URI_BHV_TYPE_PICKPLACE: get_bhv_str_pickplace,
-}
+    assert (
+        URI_BHV_TYPE_PICK in when_bhv.behaviour.types
+    ), f"get_bhv_str_pickplace: WhenBehaviour '{when_bhv.id}': bhv '{when_bhv.behaviour.id}' not a pick and place bhv"
+    # only pick
+    return f'"{agn_val_str}" picks "{obj_val_str}"'
 
 
 class GherkinClauseStrGen(object):
-    _tc_transformers: dict[URIRef, TimeConstraintToStringProtocol]
-    _fc_transformers: dict[URIRef, FluentClauseToStringProtocol]
-    _wb_transformers: dict[URIRef, WhenBhvToStringProtocol]
+    _tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol]
+    _fc_str_gens: dict[URIRef, FluentClauseToStringProtocol]
+    _wb_str_gens: list[WhenBhvToStringProtocol]
 
     def __init__(
         self,
-        tc_transformers: dict[URIRef, TimeConstraintToStringProtocol],
-        fc_transformers: dict[URIRef, FluentClauseToStringProtocol],
-        wb_transformers: dict[URIRef, WhenBhvToStringProtocol],
+        tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol],
+        fc_str_gens: dict[URIRef, FluentClauseToStringProtocol],
+        wb_str_gens: list[WhenBhvToStringProtocol],
     ) -> None:
-        self._tc_transformers = tc_transformers
-        self._fc_transformers = fc_transformers
-        self._wb_transformers = wb_transformers
+        self._tc_str_gens = tc_str_gens
+        self._fc_str_gens = fc_str_gens
+        self._wb_str_gens = wb_str_gens
 
     def get_fluent_clause_str(
         self, clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
     ) -> str:
-        for fluent_type in self._fc_transformers:
+        for fluent_type in self._fc_str_gens:
             if fluent_type not in clause.fluent.types:
                 continue
 
-            for tc_type in self._tc_transformers:
+            for tc_type in self._tc_str_gens:
                 if tc_type not in clause.time_constraint.types:
                     continue
 
-                clause_str = self._fc_transformers[fluent_type](
+                clause_str = self._fc_str_gens[fluent_type](
                     clause=clause, var_values=var_values, ns_manager=ns_manager
                 )
-                tc_str = self._tc_transformers[tc_type](
+                tc_str = self._tc_str_gens[tc_type](
                     tc=clause.time_constraint, ns_manager=ns_manager
                 )
                 return f"{clause_str} {tc_str}"
@@ -335,13 +338,8 @@ class GherkinClauseStrGen(object):
         var_values: dict[URIRef, Any],
         ns_manager: NamespaceManager,
     ) -> str:
-        for bhv_type in self._wb_transformers:
-            if bhv_type not in when_bhv.behaviour.types:
-                continue
-
-            return self._wb_transformers[bhv_type](
-                when_bhv=when_bhv, var_values=var_values, ns_manager=ns_manager
-            )
+        for bhv_str_gen in self._wb_str_gens:
+            return bhv_str_gen(when_bhv=when_bhv, var_values=var_values, ns_manager=ns_manager)
 
         raise RuntimeError(
             f"get_bhv_str: WhenBehaviour '{when_bhv.id}' has unhandled behaviour types: {when_bhv.behaviour.types}"
@@ -465,9 +463,9 @@ def get_gherkin_clauses_re(
 def prepare_scenario_variant_data(
     scr_var_model: ScenarioVariantModel,
     ns_manager: NamespaceManager,
-    tc_transformers: dict[URIRef, TimeConstraintToStringProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
-    fc_transformers: dict[URIRef, FluentClauseToStringProtocol] = DEFAULT_FLUENT_CLAUSE_STR_GENS,
-    wb_transformers: dict[URIRef, WhenBhvToStringProtocol] = DEFAULT_WHEN_BHV_STR_GENS,
+    tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
+    fc_str_gens: dict[URIRef, FluentClauseToStringProtocol] = DEFAULT_FLUENT_CLAUSE_STR_GENS,
+    wb_str_gens: list[WhenBhvToStringProtocol] = [get_bhv_str_pickplace],
 ) -> dict:
     scr_var_name = scr_var_model.id.n3(namespace_manager=ns_manager)
     scr_var_data = {FR_NAME: scr_var_name, FR_VARIATIONS: []}
@@ -475,9 +473,9 @@ def prepare_scenario_variant_data(
     var_uri_list, var_vals_list = get_task_variations(scr_var_model.task_variation)
     var_count = 1
     string_gen = GherkinClauseStrGen(
-        tc_transformers=tc_transformers,
-        fc_transformers=fc_transformers,
-        wb_transformers=wb_transformers,
+        tc_str_gens=tc_str_gens,
+        fc_str_gens=fc_str_gens,
+        wb_str_gens=wb_str_gens,
     )
     for var_value_set in var_vals_list:
         var_values = dict(zip(var_uri_list, var_value_set))

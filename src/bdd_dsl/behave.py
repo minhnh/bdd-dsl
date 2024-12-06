@@ -16,8 +16,6 @@ from bdd_dsl.models.user_story import SceneModel
 
 PARAM_OBJ = "obj_str"
 PARAM_WS = "ws_str"
-PARAM_PICK_WS = "pick_ws_str"
-PARAM_PLACE_WS = "place_ws_str"
 PARAM_AGN = "agn_str"
 PARAM_EVT = "evt_str"
 CLAUSE_BG_OBJECTS = "a set of objects"
@@ -26,7 +24,11 @@ CLAUSE_BG_AGENTS = "a set of agents"
 CLAUSE_FL_LOCATED_AT = f'"{{{PARAM_OBJ}}}" is located at "{{{PARAM_WS}}}"'
 CLAUSE_TC_BEFORE_EVT = f'before event "{{{PARAM_EVT}}}"'
 CLAUSE_TC_AFTER_EVT = f'after event "{{{PARAM_EVT}}}"'
-CLAUSE_BHV_PICKPLACE = f'"{{{PARAM_AGN}}}" picks "{{{PARAM_OBJ}}}" from "{{{PARAM_PICK_WS}}}" and places it at "{{{PARAM_PLACE_WS}}}"'
+CLAUSE_BHV_PICKPLACE = (
+    f'"{{{PARAM_AGN}}}" picks "{{{PARAM_OBJ}}}" and places it at "{{{PARAM_WS}}}"'
+)
+CLAUSE_BHV_PICK = f'"{{{PARAM_AGN}}}" picks "{{{PARAM_OBJ}}}"'
+CLAUSE_BHV_PLACE = f'"{{{PARAM_AGN}}}" places "{{{PARAM_OBJ}}}" at "{{{PARAM_WS}}}"'
 
 
 def load_obj_models_from_table(
