@@ -22,10 +22,12 @@ from bdd_dsl.models.user_story import ScenarioVariantModel
 URL_Q_SCENARIO_EXEC = f"{URL_SECORO_M}/acceptance-criteria/bdd/queries/scenario-execution.rq"
 
 
-class Behaviour(ABC):
+class Behaviour(ModelBase, ABC):
     @abstractmethod
-    def __init__(self, context: Context, **kwargs: Any) -> None:
-        pass
+    def __init__(
+        self, bhv_id: URIRef, bhv_types: set[URIRef], context: Context, **kwargs: Any
+    ) -> None:
+        ModelBase.__init__(self, node_id=bhv_id, types=bhv_types)
 
     @abstractmethod
     def is_finished(self, context: Context, **kwargs: Any) -> bool:
@@ -123,7 +125,12 @@ class ExecutionModel(object):
             assert issubclass(
                 bhv_cls, Behaviour
             ), f"Implementation for '{bhv_impl.id}' is not an extension of '{Behaviour}'"
-            bhv_impl.behaviour = bhv_cls(context=context, **kwargs)
+            bhv_impl.behaviour = bhv_cls(
+                bhv_id=bhv_impl.behaviour_uri,
+                bhv_types=bhv_impl.behaviour_types,
+                context=context,
+                **kwargs,
+            )
 
         assert (
             bhv_impl.behaviour is not None

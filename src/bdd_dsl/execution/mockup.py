@@ -169,11 +169,13 @@ class PickplaceBehaviourMockup(Behaviour):
 
     def __init__(
         self,
+        bhv_id: URIRef,
+        bhv_types: set[URIRef],
         context: Any,
         ns_manager: NamespaceManager,
         **kwargs,
     ) -> None:
-        super().__init__(context=context, **kwargs)
+        super().__init__(bhv_id=bhv_id, bhv_types=bhv_types, context=context, **kwargs)
 
         self.max_count = kwargs.get("max_count", 5)
         self.counter = self.max_count
