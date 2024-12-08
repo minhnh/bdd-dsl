@@ -46,6 +46,8 @@ class ObjectModel(ModelBase):
 
                 self.model_type_to_id[model_type].add(obj_model.id)
 
+        assert len(self.model_types) > 0, f"obj '{obj_id}' has no model type"
+
     def load_model_attrs(self, graph: Graph, model_loader: ModelLoader, **kwargs: Any) -> None:
         for model in self.models.values():
             model_loader.load_attributes(graph=graph, model=model, **kwargs)
@@ -68,15 +70,21 @@ class WorkspaceModel(ModelBase):
 
 
 def _get_ws_objects_re(
-    ws_id: URIRef, ws_dict: dict[URIRef, WorkspaceModel]
+    ws_id: URIRef, ws_dict: dict[URIRef, WorkspaceModel], ws_path: Optional[set[URIRef]] = None
 ) -> Generator[URIRef, None, None]:
+    if ws_path is None:
+        ws_path = set()
+    if ws_id in ws_path:
+        raise RuntimeError(f"_get_ws_objects_re: loop detected at {ws_id}")
+    ws_path.add(ws_id)
+
     assert ws_id in ws_dict, f"_get_ws_objects_re: '{ws_id}' not on record"
     ws_model = ws_dict[ws_id]
     for sub_ws_id in ws_model.workspaces:
         assert (
             sub_ws_id in ws_dict
         ), f"sub-ws '{sub_ws_id}' of workspace '{ws_model.id}' not on record"
-        for obj_id in _get_ws_objects_re(ws_id=sub_ws_id, ws_dict=ws_dict):
+        for obj_id in _get_ws_objects_re(ws_id=sub_ws_id, ws_dict=ws_dict, ws_path=ws_path):
             yield obj_id
 
     for obj_id in ws_model.objects:
@@ -87,7 +95,6 @@ def _load_ws_re(
     ws_id: URIRef,
     graph: Graph,
     ws_dict: dict[URIRef, WorkspaceModel],
-    obj_dict: dict[URIRef, ObjectModel],
     ws_path: Optional[set[URIRef]] = None,
 ) -> None:
     if ws_path is None:
@@ -116,10 +123,7 @@ def _load_ws_re(
             assert isinstance(
                 obj_id, URIRef
             ), f"comp '{ws_comp_id}' of ws '{ws_id}' does not ref an obj URI: {obj_id}"
-
-            obj = ObjectModel(obj_id=obj_id, graph=graph)
             ws_model.objects.add(obj_id)
-            obj_dict[obj_id] = obj
 
     if URI_ENV_TYPE_WS_WS in ws_comp_types:
         for sub_ws_id in graph.objects(subject=ws_comp_id, predicate=URI_ENV_PRED_HAS_WS):
@@ -128,9 +132,7 @@ def _load_ws_re(
             ), f"'{ws_comp_id}' of ws '{ws_id}' does not ref a ws URI: {sub_ws_id}"
 
             ws_model.workspaces.add(sub_ws_id)
-            _load_ws_re(
-                ws_id=sub_ws_id, graph=graph, ws_dict=ws_dict, obj_dict=obj_dict, ws_path=ws_path
-            )
+            _load_ws_re(ws_id=sub_ws_id, graph=graph, ws_dict=ws_dict, ws_path=ws_path)
 
 
 class EnvModelLoader(object):
@@ -174,10 +176,7 @@ class EnvModelLoader(object):
         if ws_id in self._ws_models and not override:
             return self._ws_models[ws_id]
 
-        _load_ws_re(ws_id=ws_id, graph=graph, ws_dict=self._ws_models, obj_dict=self._obj_models)
-
-        if self._modelled_obj_g is None:
-            self._modelled_obj_g = self._query_obj_models(graph=graph)
+        _load_ws_re(ws_id=ws_id, graph=graph, ws_dict=self._ws_models)
 
         for obj_id in _get_ws_objects_re(ws_id=ws_id, ws_dict=self._ws_models):
             _ = self.load_object_model(graph=graph, obj_id=obj_id, override=override, **kwargs)
