@@ -529,7 +529,7 @@ def prepare_jinja2_template_data(
                     scene_data[FR_OBJECTS] = obj_list
 
                 ws_list = []
-                for ws_id in scr_var.scene.workspaces.keys():
+                for ws_id in scr_var.scene.workspaces:
                     ws_list.append(ws_id.n3(namespace_manager=ns_manager))
                 if len(ws_list) > 0:
                     scene_data[FR_WS] = ws_list

@@ -3,14 +3,12 @@ from enum import Enum
 from typing import Any, Generator, Union
 from ast import literal_eval
 from behave.model import Table
-from behave.runner import Context
-from rdflib import Graph, URIRef
+from rdflib import Graph
 from rdflib.term import Node as RDFNode
 from rdflib.namespace import NamespaceManager
 from rdf_utils.uri import try_parse_n3_iterable, try_parse_n3_string
-from rdf_utils.models.common import ModelBase, ModelLoader
 from bdd_dsl.models.agent import AgentModel
-from bdd_dsl.models.environment import ObjectModel
+from bdd_dsl.models.environment import ObjectModel, WorkspaceModel
 from bdd_dsl.models.user_story import SceneModel
 
 
@@ -66,9 +64,8 @@ def load_agn_models_from_table(
 
 
 def load_ws_models_from_table(
-    table: Table, graph: Graph, ws_model_loader: ModelLoader
-) -> dict[URIRef, ModelBase]:
-    workspace_models = {}
+    table: Table, graph: Graph, scene: SceneModel
+) -> Generator[WorkspaceModel, None, None]:
     for row in table:
         ws_id_str = row["name"]
         try:
@@ -76,22 +73,7 @@ def load_ws_models_from_table(
         except ValueError as e:
             raise RuntimeError(f"can't parse workspace URI '{ws_id_str}': {e}")
 
-        ws_model = ModelBase(graph=graph, node_id=ws_uri)
-        ws_model_loader.load_attributes(model=ws_model, graph=graph)
-        workspace_models[ws_model.id] = ws_model
-
-    return workspace_models
-
-
-def given_ws_models(context: Context):
-    assert context.table is not None, "no table added to context, expected a list of workspaces"
-    assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
-    assert (
-        context.ws_model_loader is not None
-    ), "no 'ws_model_loader' in context, expected a ModelLoader"
-    context.workspaces = load_ws_models_from_table(
-        table=context.table, graph=context.model_graph, ws_model_loader=context.ws_model_loader
-    )
+        yield scene.load_ws_model(ws_id=ws_uri, graph=graph)
 
 
 class ParamType(Enum):

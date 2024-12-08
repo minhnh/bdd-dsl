@@ -75,6 +75,8 @@ URI_PROB_FROM_DISTRIBUTION = NS_MM_PROB["from-distribution"]
 # Environment
 URI_ENV_TYPE_OBJ = NS_MM_ENV["Object"]
 URI_ENV_TYPE_WS = NS_MM_ENV["Workspace"]
+URI_ENV_TYPE_WS_WS = NS_MM_ENV["WorkspaceHasWorkspace"]
+URI_ENV_TYPE_WS_OBJ = NS_MM_ENV["WorkspaceHasObject"]
 URI_ENV_TYPE_RIGID_OBJ = NS_MM_ENV["RigidObject"]
 URI_ENV_TYPE_MOD_OBJ = NS_MM_ENV["ModelledObject"]
 URI_ENV_TYPE_OBJ_MODEL = NS_MM_ENV["ObjectModel"]

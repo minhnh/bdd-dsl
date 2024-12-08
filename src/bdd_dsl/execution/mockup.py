@@ -20,6 +20,7 @@ from bdd_dsl.behave import (
     load_obj_models_from_table,
     load_agn_models_from_table,
     load_str_params,
+    load_ws_models_from_table,
     parse_str_param,
 )
 from bdd_dsl.execution.common import Behaviour, ExecutionModel
@@ -71,7 +72,7 @@ def before_scenario(context: Context, scenario: Scenario):
         len(scenario_var_model.scene.agents) > 0
     ), f"scene '{scenario_var_model.scene.id}' has no agent"
 
-    scenario_var_model.scene.obj_model_loader.register_attr_loaders(
+    scenario_var_model.scene.env_model_loader.register_attr_loaders(
         load_attr_path, load_attr_has_config, load_py_module_attr
     )
     scenario_var_model.scene.agn_model_loader.register_attr_loaders(load_py_module_attr)
@@ -105,6 +106,39 @@ def given_objects_mockup(context: Context):
                 ), f"ResourceWithPath model '{path_model.id}' for object '{obj_model.id}' missing attr path"
 
 
+def given_workspaces_mockup(context: Context):
+    assert context.table is not None, "no table added to context, expected a list of object URIs"
+    assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
+    assert (
+        context.current_scenario is not None
+    ), "no 'current_scenario' in context, expected a ScenarioVariantModel"
+    for ws_model in load_ws_models_from_table(
+        table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
+    ):
+        print(f"loading objects for ws {ws_model.id}")
+        env_loader = context.current_scenario.scene.env_model_loader
+        for obj_model in env_loader.load_ws_objects(graph=context.model_graph, ws_id=ws_model.id):
+            print(f"loading obj {obj_model.id}")
+            if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
+                for py_model_uri in obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
+                    py_model = obj_model.models[py_model_uri]
+                    assert py_model.has_attr(
+                        key=URI_PY_PRED_MODULE_NAME
+                    ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
+                    assert py_model.has_attr(
+                        key=URI_PY_PRED_ATTR_NAME
+                    ), f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
+
+            if URI_SIM_TYPE_RES_PATH in obj_model.model_types:
+                for py_model_uri in obj_model.model_type_to_id[URI_SIM_TYPE_RES_PATH]:
+                    path_model = obj_model.load_first_model_by_type(
+                        model_type=URI_SIM_TYPE_RES_PATH
+                    )
+                    assert path_model.has_attr(
+                        URI_SIM_PRED_PATH
+                    ), f"ResourceWithPath model '{path_model.id}' for object '{obj_model.id}' missing attr path"
+
+
 def given_agents_mockup(context: Context):
     assert context.table is not None, "no table added to context, expected a list of agent URIs"
     assert context.model_graph is not None, "no 'model_graph' in context, expected an rdflib.Graph"
@@ -131,7 +165,7 @@ def is_located_at_mockup(context: Context, **kwargs: Any):
     assert context.model_graph is not None, "no 'model_graph' in context"
     assert (
         context.current_scenario is not None
-    ), "no 'current_scenario' in context, expected an ObjModelLoader"
+    ), "no 'current_scenario' in context, expected an ScenarioVariantModel"
 
     _, pick_obj_uris = parse_str_param(
         param_str=params[PARAM_OBJ], ns_manager=context.model_graph.namespace_manager
@@ -154,7 +188,7 @@ def is_located_at_mockup(context: Context, **kwargs: Any):
         param_str=params[PARAM_WS], ns_manager=context.model_graph.namespace_manager
     )
     for ws_uri in pick_ws_uris:
-        assert ws_uri in context.workspaces, f"workspace '{ws_uri}' unrecognized"
+        _ = context.current_scenario.scene.load_ws_model(graph=context.model_graph, ws_id=ws_uri)
 
     evt_uri = try_expand_curie(
         curie_str=params[PARAM_EVT], ns_manager=context.model_graph.namespace_manager, quiet=False

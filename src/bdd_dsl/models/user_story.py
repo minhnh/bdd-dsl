@@ -6,7 +6,7 @@ from rdf_utils.models.common import ModelBase, get_node_types
 from rdf_utils.collection import load_list_re
 from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
-from bdd_dsl.models.environment import ObjModelLoader, ObjectModel
+from bdd_dsl.models.environment import EnvModelLoader, ObjectModel, WorkspaceModel
 from bdd_dsl.models.agent import AgentModel, AgnModelLoader
 from bdd_dsl.models.clauses import (
     load_bhv_pickplace,
@@ -116,17 +116,17 @@ class SceneModel(ModelBase):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
     objects: set[URIRef]  # object URIs
-    workspaces: dict[URIRef, set]  # workspace URI -> ws types
+    workspaces: set[URIRef]  # workspace URI -> ws types
     agents: set[URIRef]  # agent URIs
-    obj_model_loader: ObjModelLoader
+    env_model_loader: EnvModelLoader
     agn_model_loader: AgnModelLoader
 
     def __init__(self, us_graph: Graph, full_graph: Graph, scene_id: URIRef) -> None:
         super().__init__(graph=full_graph, node_id=scene_id)
         self.objects = set()
-        self.workspaces = {}
+        self.workspaces = set()
         self.agents = set()
-        self.obj_model_loader = ObjModelLoader()
+        self.env_model_loader = EnvModelLoader()
         self.agn_model_loader = AgnModelLoader()
 
         for comp_id in us_graph.objects(subject=scene_id, predicate=URI_BDD_PRED_HAS_SCENE):
@@ -142,9 +142,8 @@ class SceneModel(ModelBase):
 
             if URI_BDD_TYPE_SCENE_WS in comp_types:
                 for ws_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_WS):
-                    assert isinstance(ws_id, URIRef)
-                    ws_types = set(full_graph.objects(subject=ws_id, predicate=RDF.type))
-                    self.workspaces[ws_id] = ws_types
+                    assert isinstance(ws_id, URIRef), f"SceneModel {self.id}: '{ws_id}' not URIRef"
+                    self.workspaces.add(ws_id)
 
             if URI_BDD_TYPE_SCENE_AGN in comp_types:
                 for agn_id in full_graph.objects(subject=comp_id, predicate=URI_AGN_PRED_HAS_AGN):
@@ -155,8 +154,16 @@ class SceneModel(ModelBase):
         self, graph: Graph, obj_id: URIRef, override: bool = False, **kwargs: Any
     ) -> ObjectModel:
         assert obj_id in self.objects, f"Object '{obj_id}' not in scene"
-        return self.obj_model_loader.load_object_model(
+        return self.env_model_loader.load_object_model(
             graph=graph, obj_id=obj_id, override=override, **kwargs
+        )
+
+    def load_ws_model(
+        self, graph: Graph, ws_id: URIRef, override: bool = False, **kwargs: Any
+    ) -> WorkspaceModel:
+        assert ws_id in self.workspaces, f"Workspace '{ws_id}' not in scene"
+        return self.env_model_loader.load_ws_model(
+            graph=graph, ws_id=ws_id, override=override, **kwargs
         )
 
     def load_agn_model(

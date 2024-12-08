@@ -17,7 +17,7 @@ MODELS_PATH = join(PKG_ROOT, "models")
 
 class NominalCoordination(unittest.TestCase):
     def setUp(self):
-        self.graph = rdflib.ConjunctiveGraph()
+        self.graph = rdflib.Dataset()
         self.event_loop_model_file = join(MODELS_PATH, "coordination", "pickup-events.json")
         self.graph.parse(self.event_loop_model_file, format="json-ld")
         self.graph.parse(
