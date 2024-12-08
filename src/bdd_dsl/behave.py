@@ -19,6 +19,7 @@ PARAM_EVT = "evt_str"
 CLAUSE_BG_OBJECTS = "a set of objects"
 CLAUSE_BG_WORKSPACES = "a set of workspaces"
 CLAUSE_BG_AGENTS = "a set of agents"
+CLAUSE_BG_SCENE = "the scene is set up"
 CLAUSE_FL_LOCATED_AT = f'"{{{PARAM_OBJ}}}" is located at "{{{PARAM_WS}}}"'
 CLAUSE_TC_BEFORE_EVT = f'before event "{{{PARAM_EVT}}}"'
 CLAUSE_TC_AFTER_EVT = f'after event "{{{PARAM_EVT}}}"'

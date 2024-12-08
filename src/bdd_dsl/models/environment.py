@@ -90,7 +90,8 @@ def load_ws_re(
     obj_dict: dict[URIRef, ObjectModel],
 ) -> None:
     if ws_id in ws_dict:
-        raise RuntimeError(f"load_ws_re: loop detected at '{ws_id}'")
+        # assuming this subtree of workspaces is already loaded
+        return
 
     ws_model = WorkspaceModel(ws_id=ws_id, graph=graph)
     ws_dict[ws_id] = ws_model
