@@ -114,14 +114,20 @@ class BDDExecTest(unittest.TestCase):
                 scr_var = self.us_loader.load_scenario_variant(
                     full_graph=self.graph, variant_id=scr_var_uri
                 )
-                scr_var.scene.obj_model_loader.register_attr_loaders(
+                scr_var.scene.env_model_loader.register_attr_loaders(
                     load_attr_path, load_attr_has_config, load_py_module_attr
                 )
                 for obj_id in scr_var.scene.objects:
-                    obj_model = scr_var.scene.obj_model_loader.load_object_model(
+                    obj_model = scr_var.scene.env_model_loader.load_object_model(
                         obj_id=obj_id, graph=self.graph
                     )
                     self._test_obj_model(obj_model=obj_model)
+
+                for ws_id in scr_var.scene.workspaces:
+                    for obj_model in scr_var.scene.env_model_loader.load_ws_objects(
+                        ws_id=ws_id, graph=self.graph
+                    ):
+                        self._test_obj_model(obj_model=obj_model)
 
                 scr_var.scene.agn_model_loader.register_attr_loaders(load_py_module_attr)
                 for agn_id in scr_var.scene.agents:

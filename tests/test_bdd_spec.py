@@ -4,7 +4,7 @@ import rdflib
 from rdf_utils.resolver import install_resolver
 from rdf_utils.uri import URL_SECORO_M
 from bdd_dsl.models.user_story import UserStoryLoader
-from bdd_dsl.models.frames import FR_CRITERIA, FR_VARIABLES, FR_VARIATIONS
+from bdd_dsl.models.frames import FR_CRITERIA, FR_VARIATIONS
 from bdd_dsl.utils.jinja import prepare_jinja2_template_data
 
 MODEL_URLS = {
@@ -29,13 +29,9 @@ class BDDSpecTest(unittest.TestCase):
         processed_bdd_data = prepare_jinja2_template_data(us_loader, self.graph)
         for us_data in processed_bdd_data:
             for scenario_data in us_data[FR_CRITERIA]:
-                self.assertTrue(len(scenario_data["given_clauses"]) > 0)
-                self.assertTrue(len(scenario_data["then_clauses"]) > 0)
-                self.assertTrue(len(scenario_data[FR_VARIABLES]) > 0)
                 self.assertTrue(len(scenario_data[FR_VARIATIONS]) > 0)
-                self.assertTrue(
-                    len(scenario_data[FR_VARIATIONS][0]) == len(scenario_data[FR_VARIABLES])
-                )
+                for var_data in scenario_data[FR_VARIATIONS]:
+                    self.assertTrue(len(var_data["clauses"]) > 0)
 
 
 if __name__ == "__main__":

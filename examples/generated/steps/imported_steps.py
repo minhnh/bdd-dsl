@@ -7,10 +7,10 @@ from bdd_dsl.behave import (
     CLAUSE_FL_LOCATED_AT,
     CLAUSE_TC_AFTER_EVT,
     CLAUSE_TC_BEFORE_EVT,
-    given_ws_models
 )
 from bdd_dsl.execution.mockup import (
     given_objects_mockup,
+    given_workspaces_mockup,
     given_agents_mockup,
     is_located_at_mockup,
     behaviour_mockup
@@ -18,7 +18,7 @@ from bdd_dsl.execution.mockup import (
 
 
 given(CLAUSE_BG_OBJECTS)(given_objects_mockup)
-given(CLAUSE_BG_WORKSPACES)(given_ws_models)
+given(CLAUSE_BG_WORKSPACES)(given_workspaces_mockup)
 given(CLAUSE_BG_AGENTS)(given_agents_mockup)
 
 given(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_BEFORE_EVT}")(is_located_at_mockup)
