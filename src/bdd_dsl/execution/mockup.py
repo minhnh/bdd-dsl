@@ -115,10 +115,8 @@ def given_workspaces_mockup(context: Context):
     for ws_model in load_ws_models_from_table(
         table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
     ):
-        print(f"loading objects for ws {ws_model.id}")
         env_loader = context.current_scenario.scene.env_model_loader
         for obj_model in env_loader.load_ws_objects(graph=context.model_graph, ws_id=ws_model.id):
-            print(f"loading obj {obj_model.id}")
             if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
                 for py_model_uri in obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
                     py_model = obj_model.models[py_model_uri]
@@ -157,6 +155,10 @@ def given_agents_mockup(context: Context):
                 assert py_model.has_attr(
                     key=URI_PY_PRED_ATTR_NAME
                 ), f"Python attribute model '{py_model.id}' for agent '{agn_model.id}' missing attribute name"
+
+
+def given_scene_mockup(context: Context):
+    pass
 
 
 def is_located_at_mockup(context: Context, **kwargs: Any):
