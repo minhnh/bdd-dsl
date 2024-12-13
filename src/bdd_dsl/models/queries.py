@@ -370,8 +370,10 @@ CONSTRUCT {{
 WHERE {{
     ?modelledObj a {URI_ENV_TYPE_MOD_OBJ.n3()} ;
         {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
-        {URI_ENV_PRED_OF_OBJ.n3()} ?obj ;
-        {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+        {URI_ENV_PRED_OF_OBJ.n3()} ?obj .
+    OPTIONAL {{
+        ?modelledObj {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+    }}
     ?obj a {URI_ENV_TYPE_OBJ.n3()} ;
         a ?objType .
 
@@ -390,8 +392,10 @@ CONSTRUCT {{
 WHERE {{
     ?modelledAgn a {URI_AGN_TYPE_MOD_AGN.n3()} ;
         {URI_AGN_PRED_HAS_AGN_MODEL.n3()} ?agnModel ;
-        {URI_AGN_PRED_OF_AGN.n3()} ?agn ;
-        {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+        {URI_AGN_PRED_OF_AGN.n3()} ?agn .
+    OPTIONAL {{
+        ?modelledAgn {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+    }}
     ?agn a {URI_AGN_TYPE_AGN.n3()} ;
         a ?agnType .
 
