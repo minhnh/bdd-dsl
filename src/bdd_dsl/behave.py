@@ -27,6 +27,7 @@ CLAUSE_TC_AFTER_EVT = f'after event "{{{PARAM_EVT}}}"'
 CLAUSE_TC_DURING = f'from "{{{PARAM_FROM_EVT}}}" until "{{{PARAM_UNTIL_EVT}}}"'
 CLAUSE_FL_LOCATED_AT = f'"{{{PARAM_OBJ}}}" is located at "{{{PARAM_WS}}}"'
 CLAUSE_FL_MOVE_SAFE = f'"{{{PARAM_AGN}}}" moves safely'
+CLAUSE_FL_SORTED = f'"{{{PARAM_OBJ}}}" are sorted into "{{{PARAM_WS}}}"'
 CLAUSE_BHV_PICKPLACE = (
     f'"{{{PARAM_AGN}}}" picks "{{{PARAM_OBJ}}}" and places it at "{{{PARAM_WS}}}"'
 )

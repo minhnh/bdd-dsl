@@ -7,6 +7,7 @@ from bdd_dsl.behave import (
     CLAUSE_BHV_PICKPLACE,
     CLAUSE_FL_LOCATED_AT,
     CLAUSE_FL_MOVE_SAFE,
+    CLAUSE_FL_SORTED,
     CLAUSE_TC_AFTER_EVT,
     CLAUSE_TC_BEFORE_EVT,
     CLAUSE_TC_DURING,
@@ -32,5 +33,6 @@ given(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_AFTER_EVT}")(is_located_at_mockup)
 then(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_BEFORE_EVT}")(is_located_at_mockup)
 then(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_AFTER_EVT}")(is_located_at_mockup)
 then(f"{CLAUSE_FL_MOVE_SAFE} {CLAUSE_TC_DURING}")(move_safe_mockup)
+then(f"{CLAUSE_FL_SORTED} {CLAUSE_TC_AFTER_EVT}")(is_located_at_mockup)
 
 when(CLAUSE_BHV_PICKPLACE)(behaviour_mockup)

@@ -5,7 +5,6 @@ from rdf_utils.models.common import ModelBase
 from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_CLAUSE_OF,
-    URI_BDD_PRED_HOLDS,
     URI_BDD_PRED_HOLDS_AT,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
@@ -13,6 +12,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_MOVE_SAFE,
+    URI_BDD_TYPE_SORTED,
     URI_BHV_PRED_OF_BHV,
     URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
@@ -86,7 +86,6 @@ class IClause(object):
 
 
 class FluentClauseModel(ModelBase, IClause):
-    fluent: ModelBase
     time_constraint: TimeConstraintModel
     variable_by_role: dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
     role_by_variable: dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
@@ -94,12 +93,6 @@ class FluentClauseModel(ModelBase, IClause):
     def __init__(self, graph: Graph, clause_id: URIRef, types: Optional[set[URIRef]]) -> None:
         ModelBase.__init__(self, graph=graph, node_id=clause_id, types=types)
         IClause.__init__(self, node_id=clause_id, graph=graph)
-
-        fluent_id = graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS)
-        assert isinstance(
-            fluent_id, URIRef
-        ), f"FluentClause '{self.id}': holds doesn't link to URIRef: {fluent_id}"
-        self.fluent = ModelBase(graph=graph, node_id=fluent_id)
 
         self.variable_by_role = {}
         self.role_by_variable = {}
@@ -140,16 +133,11 @@ class FluentClauseLoaderProtocol(Protocol):
 
 def load_located_at_info(graph: Graph, clause: FluentClauseModel) -> None:
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_OBJ)
-    if len(clause.variable_by_role[URI_BDD_PRED_REF_OBJ]) != 1:
-        raise BDDConstraintViolation(
-            f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'LocatedAt',"
-            f" does not refer to exactly 1 object: {clause.variable_by_role[URI_BDD_PRED_REF_OBJ]}"
-        )
 
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_WS)
     if len(clause.variable_by_role[URI_BDD_PRED_REF_WS]) != 1:
         raise BDDConstraintViolation(
-            f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'LocatedAt',"
+            f"FluentClasue '{clause.id}', type {clause.types},"
             f" does not refer to exactly 1 workspace: {clause.variable_by_role[URI_BDD_PRED_REF_WS]}"
         )
 
@@ -158,29 +146,18 @@ def load_located_at_info(graph: Graph, clause: FluentClauseModel) -> None:
 
 def load_held_by_info(graph: Graph, clause: FluentClauseModel) -> None:
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_OBJ)
-    if len(clause.variable_by_role[URI_BDD_PRED_REF_OBJ]) != 1:
-        raise BDDConstraintViolation(
-            f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'IsHeld',"
-            f" does not refer to exactly 1 object: {clause.variable_by_role[URI_BDD_PRED_REF_OBJ]}"
-        )
-
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_AGN)
-    if len(clause.variable_by_role[URI_BDD_PRED_REF_AGN]) != 1:
-        raise BDDConstraintViolation(
-            f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'IsHeld',"
-            f" does not refer to exactly 1 agent: {clause.variable_by_role[URI_BDD_PRED_REF_AGN]}"
-        )
-
     return
 
 
 def load_move_safe_info(graph: Graph, clause: FluentClauseModel) -> None:
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_AGN)
-    if len(clause.variable_by_role[URI_BDD_PRED_REF_AGN]) != 1:
-        raise BDDConstraintViolation(
-            f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'MoveSafely',"
-            f" does not refer to exactly 1 agent: {clause.variable_by_role[URI_BDD_PRED_REF_AGN]}"
-        )
+    return
+
+
+def load_sorted_info(graph: Graph, clause: FluentClauseModel) -> None:
+    clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_OBJ)
+    clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_WS)
     return
 
 
@@ -188,6 +165,7 @@ DEFAULT_FLUENT_LOADERS = {
     URI_BDD_TYPE_LOCATED_AT: load_located_at_info,
     URI_BDD_TYPE_IS_HELD: load_held_by_info,
     URI_BDD_TYPE_MOVE_SAFE: load_move_safe_info,
+    URI_BDD_TYPE_SORTED: load_sorted_info,
 }
 
 
@@ -200,7 +178,7 @@ class FluentClauseLoader(object):
     def load_clause_info(self, clause: FluentClauseModel, graph: Graph):
         processed_type = None
         for clause_type in self._loaders:
-            if clause_type not in clause.fluent.types:
+            if clause_type not in clause.types:
                 continue
 
             processed_type = clause_type
@@ -209,7 +187,7 @@ class FluentClauseLoader(object):
 
         assert (
             processed_type is not None
-        ), f"unhandled types for fluent '{clause.fluent.id}' of clause '{clause.id}': {clause.fluent.types}"
+        ), f"unhandled types for fluent of clause '{clause.id}': {clause.types}"
 
 
 class WhenBehaviourModel(ModelBase, IClause):
