@@ -27,6 +27,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_VAR_LIST,
     URI_BDD_TYPE_CART_PRODUCT,
     URI_BDD_TYPE_MOVE_SAFE,
+    URI_BDD_TYPE_SORTED,
     URI_BDD_TYPE_TABLE_VAR,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
@@ -270,10 +271,41 @@ def get_fc_str_move_safe(
     return f'"{agn_value_str}" moves safely'
 
 
+def get_fc_str_sorted(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    assert (
+        URI_BDD_PRED_REF_OBJ in clause.variable_by_role
+    ), f"SortedInto fluent '{clause.id}' does not have 'ref-obj' property"
+    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
+    assert isinstance(
+        obj_id, URIRef
+    ), f"SortedInto fluent '{clause.id}' does not have URI 'ref-obj' property"
+    assert (
+        obj_id in var_values
+    ), f"SortedInto fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
+    obj_value_str = _var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
+
+    assert (
+        URI_BDD_PRED_REF_WS in clause.variable_by_role
+    ), f"SortedInto fluent '{clause.id}' does not have 'ref-ws' property"
+    ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
+    assert isinstance(
+        ws_id, URIRef
+    ), f"SortedInto fluent '{clause.id}' does not have URI 'ref-ws' property"
+    assert (
+        ws_id in var_values
+    ), f"SortedInto fluent '{clause.id}': no value for ws '{ws_id}', available vars: {list(var_values.keys())}"
+    ws_value_str = _var_val_to_str(var_val=var_values[ws_id], ns_manager=ns_manager)
+
+    return f'"{obj_value_str}" are sorted into "{ws_value_str}"'
+
+
 DEFAULT_FLUENT_CLAUSE_STR_GENS = {
     URI_BDD_TYPE_LOCATED_AT: get_fc_str_located_at,
     URI_BDD_TYPE_IS_HELD: get_fc_str_is_held,
     URI_BDD_TYPE_MOVE_SAFE: get_fc_str_move_safe,
+    URI_BDD_TYPE_SORTED: get_fc_str_sorted,
 }
 
 
@@ -352,7 +384,7 @@ class GherkinClauseStrGen(object):
     ) -> str:
         clause_str = None
         for fluent_type in self._fc_str_gens:
-            if fluent_type not in clause.fluent.types:
+            if fluent_type not in clause.types:
                 continue
             clause_str = self._fc_str_gens[fluent_type](
                 clause=clause, var_values=var_values, ns_manager=ns_manager
