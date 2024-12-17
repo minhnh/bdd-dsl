@@ -6,8 +6,10 @@ from bdd_dsl.behave import (
     CLAUSE_BG_WORKSPACES,
     CLAUSE_BHV_PICKPLACE,
     CLAUSE_FL_LOCATED_AT,
+    CLAUSE_FL_MOVE_SAFE,
     CLAUSE_TC_AFTER_EVT,
     CLAUSE_TC_BEFORE_EVT,
+    CLAUSE_TC_DURING,
 )
 from bdd_dsl.execution.mockup import (
     given_objects_mockup,
@@ -15,7 +17,8 @@ from bdd_dsl.execution.mockup import (
     given_workspaces_mockup,
     given_agents_mockup,
     is_located_at_mockup,
-    behaviour_mockup
+    move_safe_mockup,
+    behaviour_mockup,
 )
 
 
@@ -28,5 +31,6 @@ given(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_BEFORE_EVT}")(is_located_at_mockup)
 given(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_AFTER_EVT}")(is_located_at_mockup)
 then(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_BEFORE_EVT}")(is_located_at_mockup)
 then(f"{CLAUSE_FL_LOCATED_AT} {CLAUSE_TC_AFTER_EVT}")(is_located_at_mockup)
+then(f"{CLAUSE_FL_MOVE_SAFE} {CLAUSE_TC_DURING}")(move_safe_mockup)
 
 when(CLAUSE_BHV_PICKPLACE)(behaviour_mockup)

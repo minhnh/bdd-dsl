@@ -26,6 +26,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_ROWS,
     URI_BDD_PRED_VAR_LIST,
     URI_BDD_TYPE_CART_PRODUCT,
+    URI_BDD_TYPE_MOVE_SAFE,
     URI_BDD_TYPE_TABLE_VAR,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
@@ -37,9 +38,11 @@ from bdd_dsl.models.urirefs import (
     URI_BHV_PRED_TARGET_WS,
     URI_BHV_TYPE_PICK,
     URI_BHV_TYPE_PLACE,
-    URI_TIME_PRED_REF_EVT,
+    URI_TIME_PRED_BEFORE_EVT,
+    URI_TIME_PRED_AFTER_EVT,
     URI_TIME_TYPE_AFTER_EVT,
     URI_TIME_TYPE_BEFORE_EVT,
+    URI_TIME_TYPE_DURING,
 )
 from bdd_dsl.models.user_story import (
     ForAllModel,
@@ -121,7 +124,7 @@ class TimeConstraintToStringProtocol(Protocol):
 
 
 def get_tc_str_before_event(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
-    evt_uri = tc.get_attr(key=URI_TIME_PRED_REF_EVT)
+    evt_uri = tc.get_attr(key=URI_TIME_PRED_BEFORE_EVT)
     assert isinstance(
         evt_uri, URIRef
     ), f"TimeConstraint '{tc.id}' of types '{tc.types}' doesn't ref an event's URI: {evt_uri}"
@@ -130,7 +133,7 @@ def get_tc_str_before_event(tc: TimeConstraintModel, ns_manager: NamespaceManage
 
 
 def get_tc_str_after_event(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
-    evt_uri = tc.get_attr(key=URI_TIME_PRED_REF_EVT)
+    evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
     assert isinstance(
         evt_uri, URIRef
     ), f"TimeConstraint '{tc.id}' of types '{tc.types}' doesn't ref an event's URI: {evt_uri}"
@@ -138,9 +141,26 @@ def get_tc_str_after_event(tc: TimeConstraintModel, ns_manager: NamespaceManager
     return f'after event "{evt_uri_str}"'
 
 
+def get_tc_str_during_events(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
+    from_evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
+    assert isinstance(
+        from_evt_uri, URIRef
+    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' missing 'from-event' pred to URI: {from_evt_uri}"
+    from_evt_uri_str = from_evt_uri.n3(ns_manager)
+
+    until_evt_uri = tc.get_attr(key=URI_TIME_PRED_BEFORE_EVT)
+    assert isinstance(
+        until_evt_uri, URIRef
+    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' missing 'until-event' pred to URI: {until_evt_uri}"
+    until_evt_uri_str = until_evt_uri.n3(ns_manager)
+
+    return f'from "{from_evt_uri_str}" until "{until_evt_uri_str}"'
+
+
 DEFAULT_TIME_CSTR_STR_GENS = {
     URI_TIME_TYPE_BEFORE_EVT: get_tc_str_before_event,
     URI_TIME_TYPE_AFTER_EVT: get_tc_str_after_event,
+    URI_TIME_TYPE_DURING: get_tc_str_during_events,
 }
 
 
@@ -233,9 +253,27 @@ def get_fc_str_is_held(
     return f'"{obj_value_str}" is held by "{agn_value_str}"'
 
 
+def get_fc_str_move_safe(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    assert (
+        URI_BDD_PRED_REF_AGN in clause.variable_by_role
+    ), f"MoveSafe fluent '{clause.id}' does not have 'ref-agn' property"
+    agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
+    assert isinstance(
+        agn_id, URIRef
+    ), f"MoveSafe fluent '{clause.id}' does not have URI 'ref-agn' property"
+    assert (
+        agn_id in var_values
+    ), f"MoveSafe fluent '{clause.id}': no value for agn '{agn_id}', available vars: {list(var_values.keys())}"
+    agn_value_str = _var_val_to_str(var_val=var_values[agn_id], ns_manager=ns_manager)
+    return f'"{agn_value_str}" moves safely'
+
+
 DEFAULT_FLUENT_CLAUSE_STR_GENS = {
     URI_BDD_TYPE_LOCATED_AT: get_fc_str_located_at,
     URI_BDD_TYPE_IS_HELD: get_fc_str_is_held,
+    URI_BDD_TYPE_MOVE_SAFE: get_fc_str_move_safe,
 }
 
 
@@ -312,25 +350,30 @@ class GherkinClauseStrGen(object):
     def get_fluent_clause_str(
         self, clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
     ) -> str:
+        clause_str = None
         for fluent_type in self._fc_str_gens:
             if fluent_type not in clause.fluent.types:
                 continue
+            clause_str = self._fc_str_gens[fluent_type](
+                clause=clause, var_values=var_values, ns_manager=ns_manager
+            )
+            break
+        assert (
+            clause_str is not None
+        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled fluent types: {clause.fluent.types}"
 
-            for tc_type in self._tc_str_gens:
-                if tc_type not in clause.time_constraint.types:
-                    continue
+        tc_str = None
+        for tc_type in self._tc_str_gens:
+            if tc_type not in clause.time_constraint.types:
+                continue
 
-                clause_str = self._fc_str_gens[fluent_type](
-                    clause=clause, var_values=var_values, ns_manager=ns_manager
-                )
-                tc_str = self._tc_str_gens[tc_type](
-                    tc=clause.time_constraint, ns_manager=ns_manager
-                )
-                return f"{clause_str} {tc_str}"
+            tc_str = self._tc_str_gens[tc_type](tc=clause.time_constraint, ns_manager=ns_manager)
+            break
+        assert (
+            tc_str is not None
+        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled time constraint types: {clause.time_constraint.types}"
 
-        raise RuntimeError(
-            f"get_fluent_clause_str: clause '{clause.id}' has unhandled fluent types: {clause.fluent.types}"
-        )
+        return f"{clause_str} {tc_str}"
 
     def get_bhv_str(
         self,

@@ -198,6 +198,23 @@ def is_located_at_mockup(context: Context, **kwargs: Any):
     assert evt_uri is not None, f"can't parse '{params[PARAM_EVT]}' as URI"
 
 
+def move_safe_mockup(context: Context, **kwargs: Any):
+    assert context.model_graph is not None, "no 'model_graph' in context"
+    assert (
+        context.current_scenario is not None
+    ), "no 'current_scenario' in context, expected an ScenarioVariantModel"
+
+    params = load_str_params(param_names=[PARAM_AGN], **kwargs)
+    _, pickplace_agn_uris = parse_str_param(
+        param_str=params[PARAM_AGN], ns_manager=context.model_graph.namespace_manager
+    )
+    for agn_uri in pickplace_agn_uris:
+        agn_model = context.current_scenario.scene.load_agn_model(
+            graph=context.model_graph, agent_id=agn_uri
+        )
+        assert agn_model is not None, f"can't load model for agent {agn_uri}"
+
+
 class PickplaceBehaviourMockup(Behaviour):
     agn_ids: Optional[list[URIRef]]
     obj_ids: Optional[list[URIRef]]
