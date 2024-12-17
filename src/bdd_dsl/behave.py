@@ -16,13 +16,17 @@ PARAM_OBJ = "obj_str"
 PARAM_WS = "ws_str"
 PARAM_AGN = "agn_str"
 PARAM_EVT = "evt_str"
+PARAM_FROM_EVT = "from_evt_str"
+PARAM_UNTIL_EVT = "until_evt_str"
 CLAUSE_BG_OBJECTS = "a set of objects"
 CLAUSE_BG_WORKSPACES = "a set of workspaces"
 CLAUSE_BG_AGENTS = "a set of agents"
 CLAUSE_BG_SCENE = "the scene is set up"
-CLAUSE_FL_LOCATED_AT = f'"{{{PARAM_OBJ}}}" is located at "{{{PARAM_WS}}}"'
 CLAUSE_TC_BEFORE_EVT = f'before event "{{{PARAM_EVT}}}"'
 CLAUSE_TC_AFTER_EVT = f'after event "{{{PARAM_EVT}}}"'
+CLAUSE_TC_DURING = f'from "{{{PARAM_FROM_EVT}}}" until "{{{PARAM_UNTIL_EVT}}}"'
+CLAUSE_FL_LOCATED_AT = f'"{{{PARAM_OBJ}}}" is located at "{{{PARAM_WS}}}"'
+CLAUSE_FL_MOVE_SAFE = f'"{{{PARAM_AGN}}}" moves safely'
 CLAUSE_BHV_PICKPLACE = (
     f'"{{{PARAM_AGN}}}" picks "{{{PARAM_OBJ}}}" and places it at "{{{PARAM_WS}}}"'
 )

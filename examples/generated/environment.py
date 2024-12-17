@@ -21,7 +21,8 @@ MODELS = {
     #    f"{URL_SECORO_M}/acceptance-criteria/bdd/pickplace-secorolab-isaac.var.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/templates/sorting.tmpl.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/sorting-secorolab-isaac.var.json": "json-ld",
-    f"{URL_SECORO_M}/acceptance-criteria/bdd/pickplace-secorolab-isaac.exec.json": "json-ld",
+    f"{URL_SECORO_M}/acceptance-criteria/bdd/execution/pickplace-secorolab-isaac.exec.json": "json-ld",
+    f"{URL_SECORO_M}/acceptance-criteria/bdd/execution/pickplace-secorolab-mockup.bhv.exec.json": "json-ld",
 }
 
 

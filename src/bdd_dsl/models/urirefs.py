@@ -106,7 +106,9 @@ URI_BHV_PRED_TARGET_AGN = NS_MM_BHV["target-agent"]
 # Time
 URI_TIME_TYPE_BEFORE_EVT = NS_MM_TIME["BeforeEventConstraint"]
 URI_TIME_TYPE_AFTER_EVT = NS_MM_TIME["AfterEventConstraint"]
-URI_TIME_PRED_REF_EVT = NS_MM_TIME["ref-event"]
+URI_TIME_TYPE_DURING = NS_MM_TIME["DuringEventsConstraint"]
+URI_TIME_PRED_BEFORE_EVT = NS_MM_TIME["before-event"]
+URI_TIME_PRED_AFTER_EVT = NS_MM_TIME["after-event"]
 
 # Task
 URI_TASK_TYPE_TASK = NS_MM_TASK["Task"]
@@ -140,6 +142,7 @@ URI_BDD_TYPE_FLUENT = NS_MM_BDD["Fluent"]
 URI_BDD_TYPE_FLUENT_CLAUSE = NS_MM_BDD["FluentClause"]
 URI_BDD_TYPE_LOCATED_AT = NS_MM_BDD["LocatedAtPredicate"]
 URI_BDD_TYPE_IS_HELD = NS_MM_BDD["IsHeldPredicate"]
+URI_BDD_TYPE_MOVE_SAFE = NS_MM_BDD["MoveSafelyPredicate"]
 URI_BDD_TYPE_SCENARIO_EXEC = NS_MM_BDD["ScenarioExecution"]
 URI_BDD_TYPE_BHV_IMPL = NS_MM_BDD["BehaviourImplementation"]
 URI_BDD_PRED_GIVEN = NS_MM_BDD["given"]

@@ -12,15 +12,18 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_REF_WS,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
+    URI_BDD_TYPE_MOVE_SAFE,
     URI_BHV_PRED_OF_BHV,
     URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
     URI_BHV_PRED_TARGET_WS,
     URI_BHV_TYPE_PICK,
     URI_BHV_TYPE_PLACE,
+    URI_TIME_TYPE_DURING,
     URI_TIME_TYPE_AFTER_EVT,
     URI_TIME_TYPE_BEFORE_EVT,
-    URI_TIME_PRED_REF_EVT,
+    URI_TIME_PRED_AFTER_EVT,
+    URI_TIME_PRED_BEFORE_EVT,
 )
 
 
@@ -29,19 +32,46 @@ class TimeConstraintModel(ModelBase):
         super().__init__(graph=graph, node_id=tc_id)
 
 
-def process_time_constraint_model(constraint: TimeConstraintModel, graph: Graph):
-    if URI_TIME_TYPE_BEFORE_EVT in constraint.types or URI_TIME_TYPE_AFTER_EVT in constraint.types:
-        event_ids = list(graph.objects(subject=constraint.id, predicate=URI_TIME_PRED_REF_EVT))
-        if len(event_ids) != 1:
-            raise BDDConstraintViolation(
-                f"TimeConstraint '{constraint.id}' of  type '{constraint.types}'"
-                f" does not refer to exactly 1 event: {event_ids}"
-            )
-        assert isinstance(event_ids[0], URIRef), f"event ref not a URIRef: {event_ids[0]}"
-        assert not constraint.has_attr(
-            key=URI_TIME_PRED_REF_EVT
-        ), f"contraint '{constraint.id}' doesn't have :ref-event attribute"
-        constraint.set_attr(key=URI_TIME_PRED_REF_EVT, val=event_ids[0])
+def process_time_constraint_model(constraint: TimeConstraintModel, graph: Graph) -> None:
+    if URI_TIME_TYPE_BEFORE_EVT in constraint.types:
+        before_evt_uri = graph.value(
+            subject=constraint.id, predicate=URI_TIME_PRED_BEFORE_EVT, any=False
+        )
+        assert isinstance(
+            before_evt_uri, URIRef
+        ), f"BeforeEvent TC '{constraint.id}' missing 'before-event' pred to URI: {before_evt_uri}"
+        constraint.set_attr(key=URI_TIME_PRED_BEFORE_EVT, val=before_evt_uri)
+        return
+
+    if URI_TIME_TYPE_AFTER_EVT in constraint.types:
+        after_evt_uri = graph.value(
+            subject=constraint.id, predicate=URI_TIME_PRED_AFTER_EVT, any=False
+        )
+        assert isinstance(
+            after_evt_uri, URIRef
+        ), f"AfterEvent TC '{constraint.id}' missing 'after-event' pred to URI: {after_evt_uri}"
+        constraint.set_attr(key=URI_TIME_PRED_AFTER_EVT, val=after_evt_uri)
+        return
+
+    if URI_TIME_TYPE_DURING in constraint.types:
+        before_evt_uri = graph.value(
+            subject=constraint.id, predicate=URI_TIME_PRED_BEFORE_EVT, any=False
+        )
+        assert isinstance(
+            before_evt_uri, URIRef
+        ), f"DuringEvents TC '{constraint.id}' missing 'before-event' pred to URI: {before_evt_uri}"
+        constraint.set_attr(key=URI_TIME_PRED_BEFORE_EVT, val=before_evt_uri)
+
+        after_evt_uri = graph.value(
+            subject=constraint.id, predicate=URI_TIME_PRED_BEFORE_EVT, any=False
+        )
+        assert isinstance(
+            after_evt_uri, URIRef
+        ), f"DuringEvents TC '{constraint.id}' missing 'after-event' pred to URI: {after_evt_uri}"
+        constraint.set_attr(key=URI_TIME_PRED_AFTER_EVT, val=after_evt_uri)
+        return
+
+    raise RuntimeError(f"unhandled types for time constraint '{constraint.id}': {constraint.types}")
 
 
 class IClause(object):
@@ -144,9 +174,20 @@ def load_held_by_info(graph: Graph, clause: FluentClauseModel) -> None:
     return
 
 
+def load_move_safe_info(graph: Graph, clause: FluentClauseModel) -> None:
+    clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_AGN)
+    if len(clause.variable_by_role[URI_BDD_PRED_REF_AGN]) != 1:
+        raise BDDConstraintViolation(
+            f"Fluent '{clause.fluent.id}' of clause '{clause.id}', type 'MoveSafely',"
+            f" does not refer to exactly 1 agent: {clause.variable_by_role[URI_BDD_PRED_REF_AGN]}"
+        )
+    return
+
+
 DEFAULT_FLUENT_LOADERS = {
     URI_BDD_TYPE_LOCATED_AT: load_located_at_info,
     URI_BDD_TYPE_IS_HELD: load_held_by_info,
+    URI_BDD_TYPE_MOVE_SAFE: load_move_safe_info,
 }
 
 
