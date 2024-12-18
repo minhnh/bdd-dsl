@@ -13,8 +13,10 @@ from rdf_utils.models.python import (
 )
 from rdf_utils.uri import NamespaceManager, try_expand_curie
 from bdd_dsl.behave import (
-    PARAM_AGN,
     PARAM_EVT,
+    PARAM_FROM_EVT,
+    PARAM_UNTIL_EVT,
+    PARAM_AGN,
     PARAM_OBJ,
     PARAM_WS,
     load_obj_models_from_table,
@@ -204,7 +206,7 @@ def move_safe_mockup(context: Context, **kwargs: Any):
         context.current_scenario is not None
     ), "no 'current_scenario' in context, expected an ScenarioVariantModel"
 
-    params = load_str_params(param_names=[PARAM_AGN], **kwargs)
+    params = load_str_params(param_names=[PARAM_AGN, PARAM_FROM_EVT, PARAM_UNTIL_EVT], **kwargs)
     _, pickplace_agn_uris = parse_str_param(
         param_str=params[PARAM_AGN], ns_manager=context.model_graph.namespace_manager
     )

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier:  GPL-3.0-or-later
 from behave import given, then, when
 from bdd_dsl.behave import (
     CLAUSE_BG_AGENTS,

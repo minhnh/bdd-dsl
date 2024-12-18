@@ -1,5 +1,8 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+import time
 from json import JSONDecodeError
+from behave.model import Step
+from behave.runner import Context
 from rdflib import ConjunctiveGraph
 from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
@@ -38,3 +41,13 @@ def before_all(context: Context):
 
     context.model_graph = g
     before_all_mockup(context)
+
+
+def before_step(context: Context, step: Step):
+    step_start = time.process_time()
+    context.step_start = step_start
+
+
+def after_step(context: Context, step: Step):
+    step_exec_time = time.process_time() - context.step_start
+    print(f"\n***Step '{step.name}': exec_time={step_exec_time:.6f}\n\n")
