@@ -160,7 +160,7 @@ def given_agents_mockup(context: Context):
 
 
 def given_scene_mockup(context: Context):
-    pass
+    print(f"***setting up scene for scenario: {context.scenario.name}")
 
 
 def is_located_at_mockup(context: Context, **kwargs: Any):

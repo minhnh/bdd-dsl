@@ -51,4 +51,6 @@ def before_step(context: Context, step: Step):
 
 def after_step(context: Context, step: Step):
     step_exec_time = time.process_time() - context.step_start
-    print(f"\n***Step '{step.name}': exec_time={step_exec_time:.6f}\n\n")
+    print(
+        f"\n***Step ({step.keyword}) '{step.name}': status={step.status}, exec_time={step_exec_time:.6f}\n\n"
+    )

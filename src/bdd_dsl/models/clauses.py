@@ -63,7 +63,7 @@ def process_time_constraint_model(constraint: TimeConstraintModel, graph: Graph)
         constraint.set_attr(key=URI_TIME_PRED_BEFORE_EVT, val=before_evt_uri)
 
         after_evt_uri = graph.value(
-            subject=constraint.id, predicate=URI_TIME_PRED_BEFORE_EVT, any=False
+            subject=constraint.id, predicate=URI_TIME_PRED_AFTER_EVT, any=False
         )
         assert isinstance(
             after_evt_uri, URIRef
