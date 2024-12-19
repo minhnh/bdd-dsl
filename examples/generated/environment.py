@@ -1,4 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+import sys
 import time
 from json import JSONDecodeError
 from behave.model import Step
@@ -7,7 +8,7 @@ from rdflib import ConjunctiveGraph
 from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
 from bdd_dsl.execution.mockup import before_all_mockup, before_scenario
-from behave.runner import Context, sys
+
 
 MODELS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/agents/isaac-sim.agn.json": "json-ld",

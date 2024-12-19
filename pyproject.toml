@@ -35,9 +35,9 @@ dependencies = [
 
 [tool.ruff]
 line-length = 100
-exclude = [
-    "examples/generated"
-]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/generated/environment.py" = ["F401"]
 
 [tool.black]
 line-length = 100
