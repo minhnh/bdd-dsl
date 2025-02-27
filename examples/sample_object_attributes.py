@@ -3,7 +3,7 @@ import sys
 from timeit import default_timer as timer
 from urllib.request import HTTPError
 from pprint import pprint
-from rdflib import ConjunctiveGraph
+from rdflib import Dataset
 import pyshacl
 from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
@@ -28,7 +28,7 @@ SHACL_URLS = {
 
 def main():
     install_resolver()
-    g = ConjunctiveGraph()
+    g = Dataset()
     for url, fmt in MODEL_URLS.items():
         try:
             g.parse(url, format=fmt)
@@ -39,7 +39,7 @@ def main():
             print(f"unhandled exception ({type(e).__name__}) for URL '{url}':\n{e}")
             sys.exit(2)
 
-    shacl_graph = ConjunctiveGraph()
+    shacl_graph = Dataset()
     for mm_url, fmt in SHACL_URLS.items():
         shacl_graph.parse(mm_url, format=fmt)
     conforms, _, report_text = pyshacl.validate(

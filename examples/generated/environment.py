@@ -5,7 +5,7 @@ from json import JSONDecodeError
 from urllib.error import HTTPError
 from behave.model import Step
 from behave.runner import Context
-from rdflib import ConjunctiveGraph
+from rdflib import Dataset
 from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
 from bdd_dsl.execution.mockup import before_all_mockup, before_scenario
@@ -28,7 +28,7 @@ MODELS = {
 
 def before_all(context: Context):
     install_resolver()
-    g = ConjunctiveGraph()
+    g = Dataset()
     for url, fmt in MODELS.items():
         try:
             g.parse(url, format=fmt)
