@@ -33,7 +33,7 @@ SPEC_MODEL_URLS = {
 }
 EXEC_MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/simulation/secorolab-isaac.sim.json": "json-ld",
-    f"{URL_SECORO_M}/acceptance-criteria/bdd/pickplace-secorolab-isaac.exec.json": "json-ld",
+    f"{URL_SECORO_M}/acceptance-criteria/bdd/execution/pickplace-secorolab-isaac.exec.json": "json-ld",
 }
 SHACL_URLS = {
     URL_MM_SIM_SHACL: "turtle",
