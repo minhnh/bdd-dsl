@@ -1,9 +1,8 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from importlib import import_module
-from typing import List, Optional, Tuple, Type, Union
+from typing import List, Optional, Tuple, Type
 from socket import _GLOBAL_DEFAULT_TIMEOUT
 import json
-import numpy as np
 from pyld import jsonld
 import py_trees as pt
 import rdflib
@@ -13,17 +12,14 @@ from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
 from bdd_dsl.models.queries import (
     EVENT_LOOP_QUERY,
     BEHAVIOUR_TREE_QUERY,
-    OBJ_POSE_COORD_QUERY,
     Q_BT_SEQUENCE,
     Q_BT_PARALLEL,
 )
 from bdd_dsl.models.frames import (
     EVENT_LOOP_FRAME,
     BEHAVIOUR_TREE_FRAME,
-    OBJ_POSE_FRAME,
     FR_NAME,
     FR_DATA,
-    FR_LIST,
     FR_EVENTS,
     FR_SUBTREE,
     FR_TYPE,
@@ -35,25 +31,7 @@ from bdd_dsl.models.frames import (
     FR_IMPL_ARG_NAMES,
     FR_IMPL_ARG_VALS,
     FR_EL,
-    FR_BODY,
-    FR_POSE,
-    FR_POSITION,
-    FR_ORIENTATION,
-    FR_OF,
-    FR_WRT,
-    FR_DISTRIBUTION,
-    FR_DIM,
-    FR_UPPER,
-    FR_LOWER,
 )
-from bdd_dsl.models.urirefs import (
-    URI_GEOM_POSE_FROM_POS_ORN,
-    URI_PROB_SAMPLED_QUANTITY,
-    URI_PROB_UNIFORM_ROTATION,
-    URI_PROB_UNIFORM,
-    URI_PROB_CONTINUOUS,
-)
-from bdd_dsl.models.namespace import NS_MANAGER
 
 
 def query_graph(graph: rdflib.Graph, query_str: str) -> dict:
@@ -105,34 +83,6 @@ def get_type_set(data: dict) -> set:
     else:
         raise RuntimeError(f"unexpected type for '{FR_TYPE}' field: {type(data[FR_TYPE])}")
     return data_types_set
-
-
-def get_el_conn_event_names(graph: rdflib.Graph, el_conn_id: str) -> Union[List[str], None]:
-    model = query_graph(graph, EVENT_LOOP_QUERY)
-    framed_model = jsonld.frame(model, EVENT_LOOP_FRAME)
-
-    assert isinstance(framed_model, dict), f"unexpected type for framed model: {type(framed_model)}"
-
-    # single match
-    if FR_DATA not in framed_model:
-        if FR_NAME not in framed_model or FR_EVENTS not in framed_model:
-            raise ValueError(
-                f"required fields '{FR_NAME}' or '{FR_EVENTS}' not in framed query result"
-            )
-        if framed_model[FR_NAME] != el_conn_id:
-            return None
-        return [event[FR_NAME] for event in framed_model[FR_EVENTS]]
-
-    # multiple match
-    for event_loop_data in framed_model[FR_DATA]:
-        el_name = event_loop_data[FR_NAME]
-        if el_conn_id != el_name:
-            continue
-
-        # first match
-        return [event[FR_NAME] for event in event_loop_data[FR_EVENTS]]
-
-    return None
 
 
 def create_event_handler_from_data(
@@ -274,106 +224,3 @@ def create_bt_from_graph(
         els_and_bts.append((event_handler, bt_root_node))
 
     return els_and_bts
-
-
-def sample_from_distribution_data(distr_data: dict):
-    distr_types = get_type_set(distr_data)
-    if URI_PROB_UNIFORM_ROTATION.n3(NS_MANAGER) in distr_types:
-        from scipy.spatial.transform import Rotation
-
-        # TODO(minhnh): Handle different types of rotation coordinates
-        # Now returning quaternions in (w, x, y, z) format
-        rand_rot = Rotation.random().as_quat()  # (x, y, x, w)
-        w = rand_rot[-1]
-        rand_rot = rand_rot[:3]
-        rand_rot = np.insert(rand_rot, 0, w)
-        return rand_rot
-
-    if URI_PROB_UNIFORM.n3(NS_MANAGER) in distr_types:
-        upper_bounds = distr_data[FR_UPPER][FR_LIST]
-        lower_bounds = distr_data[FR_LOWER][FR_LIST]
-        dimension = distr_data[FR_DIM]
-        assert dimension == len(upper_bounds) and dimension == len(lower_bounds)
-
-        if URI_PROB_CONTINUOUS.n3(NS_MANAGER) in distr_types:
-            return np.random.uniform(lower_bounds, upper_bounds)
-
-        # TODO(minhnh): also handle discrete case
-
-    raise RuntimeError(f"unhandled sampling from distribution types: {distr_types}")
-
-
-def get_position_coordinates(position_data: dict):
-    position_types = get_type_set(position_data)
-    if URI_PROB_SAMPLED_QUANTITY.n3(NS_MANAGER) in position_types:
-        assert FR_DISTRIBUTION in position_data
-        return sample_from_distribution_data(position_data[FR_DISTRIBUTION])
-
-    raise RuntimeError(f"unhandled position coordinate type: {position_types}")
-
-
-def get_orientation_coordinates(orn_data: dict):
-    orn_types = get_type_set(orn_data)
-    if URI_PROB_SAMPLED_QUANTITY.n3(NS_MANAGER) in orn_types:
-        assert FR_DISTRIBUTION in orn_data
-        return sample_from_distribution_data(orn_data[FR_DISTRIBUTION])
-
-    raise RuntimeError(f"unhandled position coordinate type: {orn_types}")
-
-
-def get_pose_coordinates(pose_data: dict) -> dict:
-    """Extract pose coordinates from JSON data"""
-    pose_types = get_type_set(pose_data)
-
-    coords = {}
-    # composition of position and coordination
-    if URI_GEOM_POSE_FROM_POS_ORN.n3(NS_MANAGER) in pose_types:
-        assert FR_POSITION in pose_data
-        assert FR_ORIENTATION in pose_data
-
-        coords[FR_POSITION] = get_position_coordinates(pose_data[FR_POSITION])
-        coords[FR_ORIENTATION] = get_position_coordinates(pose_data[FR_ORIENTATION])
-    else:
-        raise RuntimeError(f"unhandled pose coordinate type: {pose_types}")
-
-    return coords
-
-
-def get_object_poses(graph: rdflib.Graph) -> dict:
-    """Return a dictionary of object mapping to poses."""
-    transformed_model = query_graph(graph, OBJ_POSE_COORD_QUERY)
-    framed_model = jsonld.frame(transformed_model, OBJ_POSE_FRAME)
-
-    assert isinstance(framed_model, dict), f"unexpected type for framed model: {type(framed_model)}"
-
-    objects_data = framed_model[FR_DATA]
-    if isinstance(objects_data, dict):
-        raise RuntimeError("single result not handled")
-
-    obj_poses = {}
-    for obj_data in objects_data:
-        obj_id = obj_data[FR_NAME]
-        if isinstance(obj_data[FR_BODY], list):
-            raise RuntimeError("multiple bodies for one object not handled")
-        body_id = obj_data[FR_BODY][FR_NAME]
-        obj_poses[obj_id] = {FR_BODY: body_id, FR_POSE: {}, "frame_pose_map": {}}
-        poses_data = obj_data[FR_BODY][FR_POSE]
-        if isinstance(poses_data, dict):
-            poses_list = [poses_data]
-        elif isinstance(poses_data, list):
-            poses_list = poses_data
-        else:
-            raise RuntimeError(f"unrecognized poses data type: '{type(poses_data)}'")
-        for pose_data in poses_list:
-            pose_id = pose_data[FR_NAME]
-            obj_poses[obj_id][FR_POSE][pose_id] = pose_data
-            frame_id = pose_data[FR_OF][FR_NAME]
-            if frame_id not in obj_poses[obj_id]["frame_pose_map"]:
-                obj_poses[obj_id]["frame_pose_map"][frame_id] = {}
-            wrt_frame_id = pose_data[FR_WRT][FR_NAME]
-            if wrt_frame_id not in obj_poses[obj_id]["frame_pose_map"][frame_id]:
-                obj_poses[obj_id]["frame_pose_map"][frame_id][wrt_frame_id] = set()
-            obj_poses[obj_id]["frame_pose_map"][frame_id][wrt_frame_id].add(pose_id)
-            # obj_poses[obj_id][FR_POSE][pose_id]["coordinates"] = get_pose_coordinates(pose_data)
-
-    return obj_poses
