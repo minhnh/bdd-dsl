@@ -24,6 +24,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_WHEN,
     URI_BDD_TYPE_TASK_VAR,
     URI_BHV_TYPE_BHV,
+    URI_ENV_PRED_OF_OBJ,
     URI_ENV_TYPE_OBJ,
     URI_ENV_PRED_HAS_OBJ_MODEL,
     URI_ENV_TYPE_OBJ_MODEL,
@@ -36,36 +37,6 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_US,
     URI_BHV_PRED_OF_BHV,
     URI_TASK_PRED_OF_TASK,
-    URI_GEOM_RIGID_BODY,
-    URI_GEOM_SIMPLICES,
-    URI_GEOM_FRAME,
-    URI_GEOM_POSE,
-    URI_GEOM_OF,
-    URI_GEOM_WRT,
-    URI_GEOM_POSE_COORD,
-    URI_GEOM_POSITION_COORD,
-    URI_GEOM_ORIENTATION_COORD,
-    URI_GEOM_OF_POSE,
-    URI_GEOM_OF_POSITION,
-    URI_GEOM_OF_ORIENTATION,
-    URI_GEOM_POSE_FROM_POS_ORN,
-    URI_PROB_SAMPLED_QUANTITY,
-    URI_PROB_UNIFORM,
-    URI_PROB_DIM,
-    URI_PROB_LOWER,
-    URI_PROB_UPPER,
-    URI_PROB_FROM_DISTRIBUTION,
-    URI_ENV_PRED_OF_OBJ,
-    URI_TRANS_HAS_BODY,
-    URI_TRANS_HAS_POSE,
-    URI_TRANS_HAS_POSITION,
-    URI_TRANS_HAS_ORIENTATION,
-    URI_TRANS_OF,
-    URI_TRANS_WRT,
-    URI_TRANS_SAMPLED_FROM,
-    URI_TRANS_DIM,
-    URI_TRANS_UPPER,
-    URI_TRANS_LOWER,
 )
 
 # URLs to public queries
@@ -226,83 +197,6 @@ WHERE {{
         }}
     }}
 
-}}
-"""
-
-OBJ_POSE_COORD_QUERY = f"""
-prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-CONSTRUCT {{
-    ?obj {URI_TRANS_HAS_BODY.n3()} ?body .
-    ?body
-        {URI_TRANS_HAS_POSE.n3()} ?pose .
-    ?pose a ?poseCoordType ;
-        {URI_TRANS_OF.n3()} ?frame ;
-        {URI_TRANS_WRT.n3()} ?poseOriginFrame ;
-        {URI_TRANS_HAS_POSITION.n3()} ?posePosition ;
-        {URI_TRANS_HAS_ORIENTATION.n3()} ?poseOrientation .
-    ?posePosition a ?positionCoordType ;
-        {URI_TRANS_SAMPLED_FROM.n3()} ?positionDistr .
-    ?positionDistr a ?positionDistrType ;
-        {URI_TRANS_DIM.n3()} ?positionDistrDim ;
-        {URI_TRANS_LOWER.n3()} ?positionDistrLowerList ;
-        {URI_TRANS_UPPER.n3()} ?positionDistrUpperList .
-    ?positionDistrLowerListRest
-        rdf:first ?positionDistrLowerListHead ;
-        rdf:rest ?positionDistrLowerListTail .
-    ?positionDistrUpperListRest
-        rdf:first ?positionDistrUpperListHead ;
-        rdf:rest ?positionDistrUpperListTail .
-    ?poseOrientation a ?orientationCoordType ;
-        {URI_TRANS_SAMPLED_FROM.n3()} ?orientationDistr .
-    ?orientationDistr a ?orientationDistrType .
-}}
-WHERE {{
-    ?body a {URI_GEOM_RIGID_BODY.n3()} ;
-        {URI_ENV_PRED_OF_OBJ.n3()} ?obj ;
-        {URI_GEOM_SIMPLICES.n3()} ?frame .
-    ?frame a {URI_GEOM_FRAME.n3()} ;
-        ^{URI_GEOM_OF.n3()} ?pose .
-    ?pose a {URI_GEOM_POSE.n3()} ;
-        {URI_GEOM_WRT.n3()} ?poseOriginFrame ;
-        ^{URI_GEOM_OF_POSE.n3()} ?poseCoord .
-    ?poseCoord a {URI_GEOM_POSE_COORD.n3()} ;
-        a ?poseCoordType .
-    OPTIONAL {{
-        ?poseCoord a {URI_GEOM_POSE_FROM_POS_ORN.n3()} ;
-            {URI_GEOM_OF_POSITION.n3()} ?posePosition ;
-            {URI_GEOM_OF_ORIENTATION.n3()} ?poseOrientation .
-
-        ?posePosition ^{URI_GEOM_OF_POSITION.n3()} ?positionCoord .
-        ?positionCoord a {URI_GEOM_POSITION_COORD.n3()} ;
-            a ?positionCoordType .
-        OPTIONAL {{
-            ?positionCoord a {URI_PROB_SAMPLED_QUANTITY.n3()} ;
-                {URI_PROB_FROM_DISTRIBUTION.n3()} ?positionDistr .
-            ?positionDistr a ?positionDistrType .
-            OPTIONAL {{ ?positionDistr {URI_PROB_DIM.n3()} ?positionDistrDim }}
-            OPTIONAL {{
-                ?positionDistr a {URI_PROB_UNIFORM.n3()} ;
-                    {URI_PROB_LOWER.n3()} ?positionDistrLowerList ;
-                    {URI_PROB_UPPER.n3()} ?positionDistrUpperList .
-                ?positionDistrLowerList rdf:rest* ?positionDistrLowerListRest .
-                ?positionDistrLowerListRest rdf:first ?positionDistrLowerListHead ;
-                    rdf:rest ?positionDistrLowerListTail .
-                ?positionDistrUpperList rdf:rest* ?positionDistrUpperListRest .
-                ?positionDistrUpperListRest rdf:first ?positionDistrUpperListHead ;
-                    rdf:rest ?positionDistrUpperListTail .
-            }}
-        }}
-
-        ?poseOrientation ^{URI_GEOM_OF_ORIENTATION.n3()} ?orientationCoord .
-        ?orientationCoord a {URI_GEOM_ORIENTATION_COORD.n3()} ;
-            a ?orientationCoordType .
-        OPTIONAL {{
-            ?orientationCoord a {URI_PROB_SAMPLED_QUANTITY.n3()} ;
-                {URI_PROB_FROM_DISTRIBUTION.n3()} ?orientationDistr .
-            ?orientationDistr a ?orientationDistrType .
-        }}
-    }}
 }}
 """
 
