@@ -1,23 +1,23 @@
-# Metamodels for Specifying BDD Scenarios for Robotic Applications
+# Metamodels for Specifying BDD Scenarios in Robotics
 
-## Metamodel Design
+## Conceptualizing Robotic Acceptance Criteria (AC)
 
-### Quick Review of Behaviour-Driven Development (BDD)
+### Behaviour-Driven Development (BDD)
 
 Requirements in Test-Driven Development (TDD) are often represented using _User Stories_,
 typically in the following format:
 
-```
+```text
 As a [Stakeholder role]
 I want [Feature]
 So that [Benefit]
 ```
 
 In his original blog post[^north2003bdd] introducing BDD, North proposed to represent
-acceptance criteria for each user story as a list of scenarios capturing the expected behaviours
+AC for each user story as a list of scenarios capturing the expected behaviours
 of the system, each using the following formulation:
 
-``` Gherkin
+```Gherkin
 Given [Precondition]
 When [Event/Action]
 Then [Expected Outcome]
@@ -31,9 +31,9 @@ to different interpretations and extensions. Furthermore, BDD approaches, e.g. w
 [Gherkin syntax](https://cucumber.io/docs/gherkin/reference/), has wide support in the
 software engineering community for test automation in many program languages and frameworks.
 This can reduce the effort in generating executable implementations for verifying BDD
-acceptance criteria in the future.
+AC in the future.
 
-### Specifying Robotic Scenarios
+### Foundation: AC in robotic competitions & benchmarks
 
 A challenge of applying BDD to any complex domains is to deal with the myriad variations that may
 exist for the same scenario. Alferez et al.[^alferez2019] proposed to define scenario templates for
@@ -43,29 +43,65 @@ object being tested.
 
 |![Rulebook feature model](assets/img/rulebook_features-current-colored.svg)|
 |:-:|
-|Figure 1: A Feature Model of Robotic Competitions|
+|Fig. 1: A Feature Model of Robotic Competitions|
 
 We aim to apply a similar idea for representing robotic scenarios, whose variability dimensions can
 be vastly more numerous and complex compared to the application investigated by
 Alferez et al.[^alferez2019]. To this end, we analysed rulebooks from several robotic benchmarks
 and competitions[^nguyen2023rulebook] to identify common elements used to describe test scenarios
 at these events. We consolidate our findings is a
-[Feature Model](https://en.wikipedia.org/wiki/Feature_model), shown in Figure 1.
-This serves as the basis for the metamodels described below.
+[Feature Model](https://en.wikipedia.org/wiki/Feature_model), shown in Fig. 1.
+This serves as the basis for designing a metamodel for BDD robotic scenarios, as shown in Fig. 2
 
-## Metamodel Description
+### A BDD Metamodel for robotics
+
+|![Rulebook feature model](assets/img/bdd-concepts.svg)|
+|:-:|
+|Fig. 2: A metamodel to specify BDD scenarios in robotics|
+
+#### Example: modelling a pick-and-place scenario
+
+To help with understanding the design of our metamodel, let's start with a BDD specification for a
+simple pick & place application. Below is a potential Gherkin feature for this example, where the
+scenario is split into two phases for object picking and placing:
+
+```Gherkin
+Feature: Object pick and place
+
+  Scenario Outline: Object pickup
+    Given "<object>" is located at "<pick_ws>"
+    When "<robot>" picks up "<object>"
+    Then "<object>" is held by "<robot>"
+    Examples:
+      |object|pick_ws|robot|
+      |...|...|...|
+
+  Scenario Outline: Object placing
+    Given "<object>" is held by "<robot>"
+    When "<robot>" places "<object>" at "<place_ws>"
+    Then "<object>" is located at "<place_ws>"
+    Examples:
+      |object|robot|place_ws|
+      |...|...|...|
+```
+
+Here, while the semantics of `robot`, `object`, `pick_ws`, `place_ws` are partially preserved among
+clauses within a `Scenario` via string substitution, they are loss across scenarios. Other issues
+with Gherkin & current BDD frameworks, including implicit timing information & limited flexibility
+in scenario coordination, are discussed at length in [^nguyen2023rulebook]. Fig. 3 shows how this
+Gherkin specification can be modelled using our BDD metamodel. We use this visualization to help
+explaining the design of our metamodels in the following sections.
+
+|![Rulebook feature model](assets/img/bdd-example-pickplace-concepts.svg)|
+|:-:|
+|Fig. 3: A metamodel to specify BDD scenarios in robotics|
+
+## Representing Robotic AC as Knowledge Graphs
 
 We choose to represent our metamodels and models for specifying BDD scenarios with the
-[JSON-LD Schema](https://json-ld.org/). The metamodels described below can be found in the
-following files:
-
-| File | Description |
-|:---|:---|
-| [agent.json](https://hbrs-sesame.github.io/metamodels/agent.json) | Metamodel for specifying agents in a scenario |
-| [environment.json](https://hbrs-sesame.github.io/metamodels/environment.json) | Metamodel for specifying elements in the environment of a robotic scenario |
-| [task.json](https://hbrs-sesame.github.io/metamodels/task.json) | Metamodel for specifying task-related concepts and relations in a robotic scenario |
-| [event.json](https://hbrs-sesame.github.io/metamodels/coordination/event.json) | Metamodel for specifying event-driven coordination of robot behaviours |
-| [bdd.json](https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd.json) | Metamodel for specifying BDD templates and their variants |
+[JSON-LD Schema](https://json-ld.org/). The JSON-LD representation of the BDD metamodel described
+here can be found on our [metamodels](https://secorolab.github.io/metamodels/) page, and the
+corresponding models on the [models](https://secorolab.github.io/models/) page.
 
 For an overview of main JSON-LD keywords used in our models, please take a look at our
 [modelling tutorial](https://github.com/comp-rob2b/modelling-tutorial#json-ld). More details on
@@ -154,6 +190,7 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 ## Constraints
 
 ### Structural
+
 - A `bdd:Scenario` _contains_ exactly one `bdd:GivenClause`, `bdd:WhenClause`, and `bdd:ThenClause`.
   This is realized by the `bdd:given`, `bdd:when`, `bdd:then` relations for the respective clause types.
 - `bdd:GivenClause`, `bdd:WhenClause`, and `bdd:ThenClause` cannot exist by themselves, i.e. they must be
