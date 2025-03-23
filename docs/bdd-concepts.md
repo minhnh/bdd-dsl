@@ -85,16 +85,45 @@ Feature: Object pick and place
       |...|...|...|
 ```
 
-Here, while the semantics of `robot`, `object`, `pick_ws`, `place_ws` are partially preserved among
-clauses within a `Scenario` via string substitution, they are loss across scenarios. Other issues
-with Gherkin & current BDD frameworks, including implicit timing information & limited flexibility
-in scenario coordination, are discussed at length in [^nguyen2023rulebook]. Fig. 3 shows how this
-Gherkin specification can be modelled using our BDD metamodel. We use this visualization to help
-explaining the design of our metamodels in the following sections.
+Issues with Gherkin & current BDD frameworks, including implicit timing information & limited
+flexibility in coordinating scenario execution, are discussed at length in [^nguyen2023rulebook].
+Here, we use this example to help explaining the design of our metamodels in the following sections.
 
-|![Rulebook feature model](assets/img/bdd-example-pickplace-concepts.svg)|
+#### Clauses as fluents
+
+Current BDD approaches generally do not support specifying _when_ scenario clauses should hold
+true. For instance, the “is held by” clause in the Gherkin example above asserts that the robot
+holds the target object after completing the pickup behaviour. The same assertion must hold before
+the placing behaviour in the second scenario. To capture temporal element in BDD clauses, we model
+them using the fluent concept, i.e., time varying properties of the world [^miller2002]. A fluent
+includes a predicate asserting a property of interest and a term indicating when the assertion
+should be valid. Different formalisms of dynamic logic diverge mainly in how to represent the
+temporal term.
+
+|![Rulebook feature model](assets/img/bdd-example-pickplace-fluents.svg)|
 |:-:|
 |Fig. 3: A metamodel to specify BDD scenarios in robotics|
+
+Fig. 3 shows an example of how we apply the fluent concept to model BDD clauses.
+Key design points:
+
+- A `FluentClause` represents a BDD clause that is also a fluent, and can be a `Given` or a `Then`
+  clause of a BDD scenario. The concept links to the scenario via the `clause-of` relation.
+- The semantics of the fluent's predicate is introduced via additional types of
+  the `FluentClause` node, e.g. `IsHeldPredicate` & `IsLocatedPredicate` in Fig. 3.
+- A `FluentClause` composes the fluent/predicate with its subject, e.g. the `target-object`
+  to be held in Fig. 3, where the subjects are `ScenarioVariable`, and their role in the fluent
+  is encoded in the relation to the `FluentClause`, e.g. `ref-object`. Variables allow preserving
+  semantics of elements in clauses, interdependent scenarios, and variations. For example,
+  in Fig. 3 the same `target-object` should be located at `pick-ws` before picking & at `place-ws`
+  after placing.
+- A `FluentClause` also links to a `TimeConstraint`, which can have more specific types denoting
+  how the temporal term should be intepreted, e.g. `BeforeEventConstraint` & `AfterEventConstraint`
+  in Fig. 3 for assertions that should hold relative to an event, i.e. time instant. Here, the
+  example shows how the 2 "is held by" fluent clauses have different time constraints in the 2
+  scenarios -- after picking & before placing.
+
+#### Variation and Scene
 
 ## Representing Robotic AC as Knowledge Graphs
 
@@ -206,3 +235,5 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 [^alferez2019]: M. Alferez, F. Pastore, M. Sabetzadeh, et al., "Bridging the Gap between Requirements Modeling and Behavior-Driven Development," _22nd MODELS_, 2019, doi: [10.1109/MODELS.2019.00008](https://doi.org/10.1109/MODELS.2019.00008).
 
 [^ieeestd1872]: "IEEE Standard Ontologies for Robotics and Automation," in IEEE Std 1872-2015 , vol., no., pp.1-60, 10 April 2015, doi: [10.1109/IEEESTD.2015.7084073](https://doi.org/10.1109/IEEESTD.2015.7084073).
+
+[^miller2002]: R. Miller and M. Shanahan, “Some Alternative Formulations of the Event Calculus,” in Comp. Logic: Logic Programming and Beyond, vol. 2408, 2002, pp. 452–490, doi: [10.1007/3-540-45632-5_17](https://doi.org/10.1007/3-540-45632-5_17).
