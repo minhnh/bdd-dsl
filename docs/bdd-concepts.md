@@ -56,7 +56,7 @@ for BDD robotic scenarios, as shown in Fig. 2
 
 ## Conceptualizing Robotic Acceptance Criteria (AC)
 
-|![Rulebook feature model](assets/img/bdd-concepts.svg)|
+|![BDD meta-model concepts](assets/img/bdd-concepts.svg)|
 |:-:|
 |Fig. 2: A metamodel to specify BDD scenarios in robotics|
 
@@ -101,7 +101,7 @@ includes a predicate asserting a property of interest and a term indicating when
 should be valid. Different formalisms of dynamic logic diverge mainly in how to represent the
 temporal term.
 
-|![Rulebook feature model](assets/img/bdd-example-pickplace-fluents.svg)|
+|![Pick & place example model - Fluents](assets/img/bdd-example-pickplace-fluents.svg)|
 |:-:|
 |Fig. 3: Modelling BDD clauses as fluents|
 
@@ -110,6 +110,8 @@ Key design points:
 
 - A `FluentClause` represents a BDD clause that is also a fluent, and can be a `Given` or a `Then`
   clause of a BDD scenario. The concept links to the scenario via the `clause-of` relation.
+  Whether the clause connects to a `Given` or `Then` denotes its role in the scenario,
+  i.e., whether it's a pre- or post- condition of the behaviour to be verified.
 - The semantics of the fluent's predicate is introduced via additional types of
   the `FluentClause` node, e.g. `IsHeldPredicate` & `IsLocatedPredicate` in Fig. 3.
 - A `FluentClause` composes the fluent/predicate with its subject, e.g. the `target-object`
@@ -131,7 +133,7 @@ vary between variations of a scenario (possible in Gherkin via the [`Examples`](
 A scenario specification may also include invariant elements, e.g., for specifying grasping from
 cluster tasks or furnitures that remain unchanged.
 
-|![Rulebook feature model](assets/img/bdd-example-pickplace-scene_variation.svg)|
+|![Pick example model - Scene & task variation](assets/img/bdd-example-pickplace-scene_variation.svg)|
 |:-:|
 |Fig. 4: Modelling varying & invariant elements in a BDD scenario|
 
@@ -149,48 +151,40 @@ Key design points:
   scenario variations.
 - A `ScenarioVariant` composes a template and its `TaskVariation`
 
+### Scenario Template, Variant, & User Story
+
+|![Pick example model - composition](assets/img/bdd-example-pickplace-compositions.svg)|
+|:-:|
+|Fig. 5: Modelling BDD scenario template, variant & user story|
+
+Our metamodel includes two composites to represent concrete BDD scenarios, namely
+`ScenarioTemplate` and `ScenarioVariant`. `UserStory` is then a composite of scenario variants.
+Key design points:
+
+- A `ScenarioTemplate` is associated with 1 `Scene` (as described in the previous section).
+- A `ScenarioVariant` composes variations with scenario variables, as well as the template's scene
+  with concrete elements (as described in previous section).
+- A scenario variant may have additional `FluentClause` that is not part of the template, e.g.
+  `clause-not-collide-pick` in Fig. 5.
+
 ## Representing Robotic AC as Knowledge Graphs
 
 We choose to represent our metamodels and models for specifying BDD scenarios with the
 [JSON-LD Schema](https://json-ld.org/). The JSON-LD representation of the BDD metamodel described
 here can be found on our [metamodels](https://secorolab.github.io/metamodels/) page, and the
 corresponding models on the [models](https://secorolab.github.io/models/) page.
+Notable models:
+
+| Model | Description |
+|:-|:-|
+| [pickplace.tmpl.json](https://secorolab.github.io/models/acceptance-criteria/bdd/templates/pickplace.tmpl.json) | JSON-LD model for a pick & place scenario template |
+| [pickplace-secorolab-isaac.var.json](https://secorolab.github.io/models/acceptance-criteria/bdd/pickplace-secorolab-isaac.var.json) | JSON-LD model for variants of the above template |
+| [secorolab-env.scene.json](https://secorolab.github.io/models/acceptance-criteria/bdd/scenes/secorolab-env.scene.json) | JSON-LD model of scenes used in the above scenario variants |
+| [secorolab.env.json](https://secorolab.github.io/models/acceptance-criteria/bdd/environments/secorolab.env.json) | JSON-LD model for the environment elements used in the scenes & scenario variants above |
 
 For an overview of main JSON-LD keywords used in our models, please take a look at our
 [modelling tutorial](https://github.com/comp-rob2b/modelling-tutorial#json-ld). More details on
 this standard can be found on the [official online documentation](https://www.w3.org/TR/json-ld/).
-For brevity, we use [compact IRIs](https://www.w3.org/TR/json-ld/#compact-iris) (i.e. use `:` to
-separate prefix and suffix) when referring to metamodels concepts and relations below.
-
-| Prefix | Namespace IRI |
-|:-|:-|
-| `agn` | `https://hbrs-sesame.github.io/metamodels/agent#` |
-| `env` | `https://hbrs-sesame.github.io/metamodels/environment#` |
-| `task` | `https://hbrs-sesame.github.io/metamodels/task#` |
-| `evt` | `https://hbrs-sesame.github.io/metamodels/coordination/event#` |
-| `bdd` | `https://hbrs-sesame.github.io/metamodels/acceptance-criteria/bdd#` |
-
-### Agent
-
-- `agn:Agent`: we adopt the definition from the IEEE Standard Ontologies for Robotics and
-  Automation[^ieeestd1872] (cf. [prov:Agent](https://www.w3.org/TR/prov-o/#Agent)):
-
-  Agent
-    : Something or someone that can act on its own and produce changes in the world.
-
-- `agn:of-agent`: composition relation with a `agn:Agent` instance.
-- `agn:has-agent`: aggregation relation with a `agn:Agent` instance.
-
-### Environment
-
-- `env:Object`: Physical objects in the environment which an agent may interact with. Note that
-  instances of `env:Object` are not limited to objects that the agent can move around like
-  bottles or cups, but can also include typically stationary objects like tables or sofas.
-- `env:Workspace`: Abstract space in which an agent may operate. Instances can be areas surrounding
-  objects like tables or kitchen counters, or rooms in a flat. A `env:Workspace` instance may
-  contain other instances, e.g. a living room can contain a workspace surrounding the coffee table.
-- `env:has-object`, `env:has-workspace` represents aggregation relation to objects and workspaces.
-- `env:of-object` represents composition relation to an object, e.g. a property of an object.
 
 ## References
 
@@ -199,7 +193,5 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
 [^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven requirement specification for robotic competitions", [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/), May 2023.
 
 [^alferez2019]: M. Alferez, F. Pastore, M. Sabetzadeh, et al., "Bridging the Gap between Requirements Modeling and Behavior-Driven Development," _22nd MODELS_, 2019, doi: [10.1109/MODELS.2019.00008](https://doi.org/10.1109/MODELS.2019.00008).
-
-[^ieeestd1872]: "IEEE Standard Ontologies for Robotics and Automation," in IEEE Std 1872-2015 , vol., no., pp.1-60, 10 April 2015, doi: [10.1109/IEEESTD.2015.7084073](https://doi.org/10.1109/IEEESTD.2015.7084073).
 
 [^miller2002]: R. Miller and M. Shanahan, “Some Alternative Formulations of the Event Calculus,” in Comp. Logic: Logic Programming and Beyond, vol. 2408, 2002, pp. 452–490, doi: [10.1007/3-540-45632-5_17](https://doi.org/10.1007/3-540-45632-5_17).
