@@ -1,6 +1,6 @@
 # Metamodels for Specifying BDD Scenarios in Robotics
 
-## Conceptualizing Robotic Acceptance Criteria (AC)
+## Background
 
 ### Behaviour-Driven Development (BDD)
 
@@ -33,7 +33,7 @@ software engineering community for test automation in many program languages and
 This can reduce the effort in generating executable implementations for verifying BDD
 AC in the future.
 
-### Foundation: AC in robotic competitions & benchmarks
+### AC in robotic competitions & benchmarks
 
 A challenge of applying BDD to any complex domains is to deal with the myriad variations that may
 exist for the same scenario. Alferez et al.[^alferez2019] proposed to define scenario templates for
@@ -51,17 +51,18 @@ Alferez et al.[^alferez2019]. To this end, we analysed rulebooks from several ro
 and competitions[^nguyen2023rulebook] to identify common elements used to describe test scenarios
 at these events. We consolidate our findings is a
 [Feature Model](https://en.wikipedia.org/wiki/Feature_model), shown in Fig. 1.
-This serves as the basis for designing a metamodel for BDD robotic scenarios, as shown in Fig. 2
+This serves as the basis for designing a metamodel, i.e., model of model,
+for BDD robotic scenarios, as shown in Fig. 2
 
-### A BDD Metamodel for robotics
+## Conceptualizing Robotic Acceptance Criteria (AC)
 
 |![Rulebook feature model](assets/img/bdd-concepts.svg)|
 |:-:|
 |Fig. 2: A metamodel to specify BDD scenarios in robotics|
 
-#### Example: modelling a pick-and-place scenario
+### Example: modelling a pick-and-place scenario
 
-To help with understanding the design of our metamodel, let's start with a BDD specification for a
+To help with understanding the design of our MM, let's start with a BDD specification for a
 simple pick & place application. Below is a potential Gherkin feature for this example, where the
 scenario is split into two phases for object picking and placing:
 
@@ -89,7 +90,7 @@ Issues with Gherkin & current BDD frameworks, including implicit timing informat
 flexibility in coordinating scenario execution, are discussed at length in [^nguyen2023rulebook].
 Here, we use this example to help explaining the design of our metamodels in the following sections.
 
-#### Clauses as fluents
+### Clauses as fluents
 
 Current BDD approaches generally do not support specifying _when_ scenario clauses should hold
 true. For instance, the “is held by” clause in the Gherkin example above asserts that the robot
@@ -102,7 +103,7 @@ temporal term.
 
 |![Rulebook feature model](assets/img/bdd-example-pickplace-fluents.svg)|
 |:-:|
-|Fig. 3: A metamodel to specify BDD scenarios in robotics|
+|Fig. 3: Modelling BDD clauses as fluents|
 
 Fig. 3 shows an example of how we apply the fluent concept to model BDD clauses.
 Key design points:
@@ -118,12 +119,35 @@ Key design points:
   in Fig. 3 the same `target-object` should be located at `pick-ws` before picking & at `place-ws`
   after placing.
 - A `FluentClause` also links to a `TimeConstraint`, which can have more specific types denoting
-  how the temporal term should be intepreted, e.g. `BeforeEventConstraint` & `AfterEventConstraint`
+  how the temporal term should be interpreted, e.g. `BeforeEventConstraint` & `AfterEventConstraint`
   in Fig. 3 for assertions that should hold relative to an event, i.e. time instant. Here, the
   example shows how the 2 "is held by" fluent clauses have different time constraints in the 2
   scenarios -- after picking & before placing.
 
-#### Variation and Scene
+### Variation and Scene
+
+Fig. 1 lists objects, workspaces & agents as part of scenario specification. These elements may
+vary between variations of a scenario (possible in Gherkin via the [`Examples`](https://cucumber.io/docs/gherkin/reference/#examples) table).
+A scenario specification may also include invariant elements, e.g., for specifying grasping from
+cluster tasks or furnitures that remain unchanged.
+
+|![Rulebook feature model](assets/img/bdd-example-pickplace-scene_variation.svg)|
+|:-:|
+|Fig. 4: Modelling varying & invariant elements in a BDD scenario|
+
+Therefore, we introduce in our metamodel the `Scene` & `TaskVariation` concepts for specifying
+invariant & varying elements, respectively. An example of this design is shown in Fig. 4.
+Key design points:
+
+- Each `ScenarioTemplate` is associated with a `Scene`, which can be composed with objects,
+  workspaces, agents, e.g. cup & bottle in Fig. 4.
+- A `TaskVariation` composes a scenario's variables with its values in different scenario variants
+- `TaskVariation` can have additional types for specific variation mechanism. In Fig. 4,
+  `object-variation` has type `TableVariation`, which allows specifying variables' values in
+  a table similar to Gherkin's `Examples`. We also support `CartesianProductVariation` that allows
+  specifying set of values for each variable & compute the Cartesian product of these sets as the
+  scenario variations.
+- A `ScenarioVariant` composes a template and its `TaskVariation`
 
 ## Representing Robotic AC as Knowledge Graphs
 
@@ -167,64 +191,6 @@ separate prefix and suffix) when referring to metamodels concepts and relations 
   contain other instances, e.g. a living room can contain a workspace surrounding the coffee table.
 - `env:has-object`, `env:has-workspace` represents aggregation relation to objects and workspaces.
 - `env:of-object` represents composition relation to an object, e.g. a property of an object.
-
-### Task
-
-- `task:Variation`: possible variations of a scenario. A `task:Variation` instance can be
-  associated with a `bdd:ScenarioTaskVariable` via the `bdd:of-variable` relation, in which case the
-  instance denotes possible variations of the variable.
-- `task:can-be`: represents an aggregation relation from a `task:Variation` instance to the
-  possible entities of the variation.
-
-### Coordination
-
-- `evt:Event`: a time instant, conforms with
-  [time:Instant](https://www.w3.org/TR/owl-time/#time:Instant) from the Time Ontology in OWL
-  (cf. [prov:InstantaneousEvent](https://www.w3.org/TR/prov-o/#InstantaneousEvent)).
-- `evt:has-event`: aggregation relation with a `evt:Event` instance.
-
-### BDD Scenario Templates and Variants
-
-- `bdd:Scenario`: represents a BDD scenario.
-- `bdd:of-scenario`: composition relation to `bdd:Scenario`
-- `bdd:GivenClause`, `bdd:WhenClause`, `bdd:ThenClause`: represents the three basic elements of a
-  BDD formulation.
-- `bdd:given`, `bdd:when`, `bdd:then`: composition relations that link a `bdd:Scenario` to
-  _exactly one_ instance of `bdd:GivenClause`, `bdd:WhenClause`, `bdd:ThenClause`, correspondingly.
-- `bdd:WhenEvent`: associates a `bdd:WhenClause` and a `evt:Event` instances using the
-  `bdd:of-clause` and `evt:has-event` relations, respectively. Note that different interpretation
-  exists that explain the semantics of the _When_ clause in BDD. In the current iteration of
-  `bdd-dsl`, we choose to simply associate _When_ with `evt:Event` instances to denote the start
-  of the behaviour being tested.
-- `bdd:ScenarioVariant`: aggregate instances of `task:Variation` with relation `bdd:has-variation`;
-  has a composition relation `bdd:of-scenario` with a `bdd:Scenario` instance.
-- `bdd:UserStory`: aggregate instances `bdd:ScenarioVariant` with relation `bdd:has-criteria`.
-- `bdd:ScenarioTaskVariable`: represents points of variation for a scenario.
-- `bdd:of-variable`: composition relation to a `bdd:ScenarioTaskVariable`.
-- `bdd:IsHeldPredicate`, `bdd:IsNearPredicate`: domain-specific predicates relevant to
-  a pickup task.
-- `bdd:TimeConstraint`: constraint on when the predicate of `bdd:FluentClause` must hold.
-- `bdd:FluentClause`: represents a BDD clause as a
-  [fluent](https://en.wikipedia.org/wiki/Fluent_(artificial_intelligence)), i.e. a condition
-  evaluated at a point in time. A fluent clause has aggregation relations with one predicate,
-  e.g. a `bdd:IsHeldPredicate` instance, and one `bdd:TimeConstraint` instance. The relations
-  are `bdd:predicate` and `bdd:time-constraint`, respectively.
-- `bdd:clause-of`: aggregation relation between `bdd:FluentClause` instances and instance of
-  `bdd:GivenClause` and `bdd:ThenClause`. This relation allows for extending a BDD scenario template
-  with any number of clauses.
-- `bdd:ref-object`, `bdd:ref-workspace`, `bdd:ref-agent`: A `bdd:FluentClause` instance can
-  associate with a `bdd:ScenarioTaskVariable` instance via these relations, which constrain the
-  semantic of the variable in the context of the `bdd:FluentClause` instance.
-
-## Constraints
-
-### Structural
-
-- A `bdd:Scenario` _contains_ exactly one `bdd:GivenClause`, `bdd:WhenClause`, and `bdd:ThenClause`.
-  This is realized by the `bdd:given`, `bdd:when`, `bdd:then` relations for the respective clause types.
-- `bdd:GivenClause`, `bdd:WhenClause`, and `bdd:ThenClause` cannot exist by themselves, i.e. they must be
-  associated with exactly one `bdd:Scenario` via the `bdd:given`, `bdd:when`, `bdd:then` relations.
-- A `bdd:FluentClause` can only connect by `bdd:clause-of` to `bdd:GivenClause` and `bdd:ThenClause`
 
 ## References
 
