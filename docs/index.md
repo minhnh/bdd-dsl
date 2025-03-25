@@ -25,7 +25,8 @@ Details on the design of the metamodel and a tutorial on how to compose and tran
 BDD models can be found on the following pages:
 
 1. [Concepts and relations for specifying robotic scenarios](bdd-concepts.md)
-2. [Tutorial: Generating Gherkin features for a simple pickup task](bdd-tutorial-feature-gen.md)
+2. [Tutorial: Modelling a pickup task as JSON-LD graphs and generating Gherkin features](bdd-tutorial-representation.md)
+3. [Tutorial: Modelling & executing BDD tests for a pickup task](bdd-tutorial-execution.md) (WIP)
 
 ## Acknowledgement
 
