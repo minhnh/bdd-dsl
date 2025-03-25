@@ -29,7 +29,8 @@ is available at the [`minhnh/bdd-isaacsim-exec`](https://github.com/minhnh/bdd-i
 ## Tutorials
 
 1. [Concepts and relations for specifying robotic scenarios](docs/bdd-concepts.md)
-2. [Tutorial: Generating Gherkin features for a simple pickup task](docs/bdd-tutorial-feature-gen.md)
+2. [Tutorial: Modelling a pickup task as JSON-LD graphs and generating Gherkin features](docs/bdd-tutorial-representation.md)
+3. [Tutorial: Modelling & executing BDD tests for a pickup task](docs/bdd-tutorial-execution.md) (WIP)
 
 ## Acknowledgement
 
