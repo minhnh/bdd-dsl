@@ -1,28 +1,14 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from bdd_dsl.models.uri import (
     URI_TRANS,
-    URI_MM_BDD,
     URI_MM_EVENT,
     URI_MM_BT,
     URI_M_CRDN,
-    URI_M_BDD,
-    URI_M_ENV,
-    URI_M_AGENT,
+)
+from bdd_dsl.models.namespace import (
+    PREFIX_TRANS,
 )
 from bdd_dsl.models.queries import (
-    Q_PREFIX_TRANS,
-    Q_PREFIX_BDD,
-    Q_HAS_VARIATION,
-    Q_CAN_BE,
-    Q_HAS_AC,
-    Q_OF_SCENARIO,
-    Q_GIVEN,
-    Q_WHEN,
-    Q_THEN,
-    Q_HAS_CLAUSE,
-    Q_HAS_OBJECT,
-    Q_HAS_WS,
-    Q_HAS_AGENT,
     Q_HAS_EVENT,
     Q_HAS_ROOT,
     Q_HAS_EL_CONN,
@@ -38,7 +24,6 @@ from bdd_dsl.models.queries import (
     Q_PREFIX_BT,
     Q_HAS_SUBTREE,
 )
-
 
 FR_NAME = "name"
 FR_DATA = "data"
@@ -56,24 +41,19 @@ FR_IMPL_CLASS = "impl_class"
 FR_IMPL_ARG_NAMES = "impl_arg_names"
 FR_IMPL_ARG_VALS = "impl_arg_values"
 FR_CRITERIA = "criteria"
-FR_SCENARIO = "scenario"
-FR_GIVEN = "given"
-FR_WHEN = "when"
-FR_THEN = "then"
-FR_CLAUSES = "clauses"
+FR_SCENE = "scene"
 FR_VARIATIONS = "variations"
 FR_VARIABLES = "variables"
-FR_ENTITIES = "entities"
 FR_OBJECTS = "objects"
 FR_WS = "workspaces"
 FR_AGENTS = "agents"
-FR_FLUENT_DATA = "fluent_data"
+
 
 EVENT_LOOP_FRAME = {
     "@context": {
         "@base": URI_M_CRDN,
         Q_PREFIX_EVENT: URI_MM_EVENT,
-        Q_PREFIX_TRANS: URI_TRANS,
+        PREFIX_TRANS: URI_TRANS,
         FR_DATA: "@graph",
         FR_NAME: "@id",
         FR_EVENTS: Q_HAS_EVENT,
@@ -85,7 +65,7 @@ BEHAVIOUR_TREE_FRAME = {
     "@context": {
         "@base": URI_M_CRDN,
         Q_PREFIX_BT: URI_MM_BT,
-        Q_PREFIX_TRANS: URI_TRANS,
+        PREFIX_TRANS: URI_TRANS,
         FR_DATA: "@graph",
         FR_NAME: "@id",
         FR_TYPE: "@type",
@@ -103,31 +83,4 @@ BEHAVIOUR_TREE_FRAME = {
         FR_IMPL_ARG_VALS: Q_IMPL_ARG_VALUE,
     },
     FR_DATA: {FR_EL: {}},
-}
-
-BDD_FRAME = {
-    "@context": {
-        "@base": URI_M_BDD,
-        Q_PREFIX_TRANS: URI_TRANS,
-        Q_PREFIX_EVENT: URI_MM_EVENT,
-        Q_PREFIX_BDD: URI_MM_BDD,
-        "env": URI_M_ENV,
-        "agn": URI_M_AGENT,
-        f"{Q_PREFIX_EVENT}m": URI_M_CRDN,
-        FR_DATA: "@graph",
-        FR_NAME: "@id",
-        FR_TYPE: "@type",
-        FR_VARIATIONS: Q_HAS_VARIATION,
-        FR_ENTITIES: Q_CAN_BE,
-        FR_CRITERIA: Q_HAS_AC,
-        FR_SCENARIO: Q_OF_SCENARIO,
-        FR_GIVEN: Q_GIVEN,
-        FR_WHEN: Q_WHEN,
-        FR_THEN: Q_THEN,
-        FR_CLAUSES: Q_HAS_CLAUSE,
-        FR_OBJECTS: Q_HAS_OBJECT,
-        FR_WS: Q_HAS_WS,
-        FR_AGENTS: Q_HAS_AGENT,
-    },
-    FR_DATA: {FR_CRITERIA: {}},
 }

@@ -1,122 +1,634 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from numbers import Number
+from typing import Any, Iterable, Optional, Protocol
+from itertools import product
 from jinja2 import Environment, FileSystemLoader, Template
-from typing import List
-from bdd_dsl.models.queries import (
-    Q_PREDICATE,
-    Q_BDD_PRED_LOCATED_AT,
-    Q_BDD_PRED_IS_NEAR,
-    Q_BDD_PRED_IS_HELD,
-    Q_HAS_EVENT,
+from rdf_utils.models.common import ModelBase
+from rdflib import Graph, URIRef
+from rdflib.namespace import NamespaceManager
+from rdf_utils.caching import read_file_and_cache, read_url_and_cache
+from bdd_dsl.models.clauses import (
+    FluentClauseModel,
+    TimeConstraintModel,
+    WhenBehaviourModel,
 )
 from bdd_dsl.models.frames import (
-    FR_TYPE,
-    FR_NAME,
-    FR_OBJECTS,
     FR_AGENTS,
-    FR_WS,
+    FR_OBJECTS,
+    FR_SCENE,
+    FR_NAME,
     FR_CRITERIA,
-    FR_SCENARIO,
-    FR_GIVEN,
-    FR_WHEN,
-    FR_THEN,
-    FR_CLAUSES,
-    FR_FLUENT_DATA,
+    FR_VARIATIONS,
+    FR_WS,
 )
-from bdd_dsl.utils.common import get_valid_var_name
-from bdd_dsl.exception import BDDConstraintViolation
+from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_OF_SETS,
+    URI_BDD_PRED_ROWS,
+    URI_BDD_PRED_VAR_LIST,
+    URI_BDD_TYPE_CART_PRODUCT,
+    URI_BDD_TYPE_MOVE_SAFE,
+    URI_BDD_TYPE_SORTED,
+    URI_BDD_TYPE_TABLE_VAR,
+    URI_BDD_PRED_REF_AGN,
+    URI_BDD_PRED_REF_OBJ,
+    URI_BDD_PRED_REF_WS,
+    URI_BDD_TYPE_IS_HELD,
+    URI_BDD_TYPE_LOCATED_AT,
+    URI_BHV_PRED_TARGET_AGN,
+    URI_BHV_PRED_TARGET_OBJ,
+    URI_BHV_PRED_TARGET_WS,
+    URI_BHV_TYPE_PICK,
+    URI_BHV_TYPE_PLACE,
+    URI_TIME_PRED_BEFORE_EVT,
+    URI_TIME_PRED_AFTER_EVT,
+    URI_TIME_TYPE_AFTER_EVT,
+    URI_TIME_TYPE_BEFORE_EVT,
+    URI_TIME_TYPE_DURING,
+)
+from bdd_dsl.models.user_story import (
+    ForAllModel,
+    IHasClause,
+    ScenarioVariantModel,
+    TaskVariationModel,
+    ThereExistsModel,
+    UserStoryLoader,
+)
 
 
-def _load_template(template_name: str, env: Environment) -> Template:
-    return env.get_template(template_name)
+def load_template_from_file(file_path: str) -> Template:
+    """Create template instance from text content of a file.
+
+    Not using Jinja's environment loading mechanism may break more advanced features like
+    template inheritance and filters.
+    """
+    return Template(read_file_and_cache(file_path), autoescape=True)
+
+
+def load_template_from_url(url: str) -> Template:
+    """Create template instance by downloading a remote template URL.
+
+    Not using Jinja's environment loading mechanism may break more advanced features like
+    template inheritance and filters.
+    """
+    return Template(read_url_and_cache(url), autoescape=True)
 
 
 def load_template(template_name: str, dir_name: str) -> Template:
     env = Environment(loader=FileSystemLoader(dir_name), autoescape=True)
-    return _load_template(template_name, env)
+    return env.get_template(template_name)
 
 
-def load_templates(template_names: List[str], dir_name: str) -> List[Template]:
-    env = Environment(loader=FileSystemLoader(dir_name), autoescape=True)
-    return [_load_template(name, env) for name in template_names]
+def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], list[Iterable[Any]]]:
+    var_uri_list = task_var.get_attr(key=URI_BDD_PRED_VAR_LIST)
+    assert isinstance(
+        var_uri_list, list
+    ), f"TaskVariation '{task_var.id}' does not have a list of variables as attr"
+
+    if URI_BDD_TYPE_CART_PRODUCT in task_var.types:
+        var_value_sets = task_var.get_attr(key=URI_BDD_PRED_OF_SETS)
+        assert isinstance(
+            var_value_sets, list
+        ), f"TaskVariation '{task_var.id}' does not have a list of variable values as attr"
+        assert len(var_uri_list) == len(
+            var_value_sets
+        ), f"TaskVariation '{task_var.id}': number of varibles doesn't match set of values"
+
+        uri_iterables = []
+        for set_data in var_value_sets:
+            if isinstance(set_data, URIRef) and set_data in task_var.set_enums:
+                # set enumeration
+                uri_iterables.append(list(task_var.set_enums[set_data].enumerate()))
+            elif isinstance(set_data, list):
+                # list
+                uri_iterables.append(set_data)
+            else:
+                raise RuntimeError(
+                    f"TaskVariation {task_var.id}: sets for cartesian product not list or SetEnumeration URIRef: {set_data}"
+                )
+
+        return var_uri_list, list(product(*uri_iterables))
+
+    if URI_BDD_TYPE_TABLE_VAR in task_var.types:
+        uri_rows = task_var.get_attr(key=URI_BDD_PRED_ROWS)
+        assert isinstance(
+            uri_rows, list
+        ), f"TaskVariation {task_var.id}: table rows are not a list: {uri_rows}"
+        return var_uri_list, uri_rows
+
+    raise RuntimeError(f"TaskVariation '{task_var.id}' has unhandled types: {task_var.types}")
 
 
-def extract_valid_ref_names(fluent_data: dict, ref_type: str) -> list:
-    if ref_type not in fluent_data:
-        return []
+class TimeConstraintToStringProtocol(Protocol):
+    """Protocol for functions that transform fluent clauses to time constraint strings."""
 
-    names = []
-    if isinstance(fluent_data[ref_type], dict):
-        names.append(get_valid_var_name(fluent_data[ref_type][FR_NAME]))
-    elif isinstance(fluent_data[ref_type], list):
-        for agent_data in fluent_data[ref_type]:
-            names.append(get_valid_var_name(agent_data[FR_NAME]))
-    return names
+    def __call__(self, tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str: ...
 
 
-def clause_string_from_fluent_data(fluent_data: dict, feature_clauses) -> str:
-    fluent_name = fluent_data[FR_NAME]
-    fluent_data = feature_clauses[fluent_name]
-    clause_type = fluent_data[Q_PREDICATE][FR_TYPE]
+def get_tc_str_before_event(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
+    evt_uri = tc.get_attr(key=URI_TIME_PRED_BEFORE_EVT)
+    assert isinstance(
+        evt_uri, URIRef
+    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' doesn't ref an event's URI: {evt_uri}"
+    evt_uri_str = evt_uri.n3(ns_manager)
+    return f'before event "{evt_uri_str}"'
 
-    object_names = extract_valid_ref_names(fluent_data, FR_OBJECTS)
-    num_obj_refs = len(object_names)
 
-    ws_names = extract_valid_ref_names(fluent_data, FR_WS)
-    num_ws_refs = len(ws_names)
+def get_tc_str_after_event(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
+    evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
+    assert isinstance(
+        evt_uri, URIRef
+    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' doesn't ref an event's URI: {evt_uri}"
+    evt_uri_str = evt_uri.n3(ns_manager)
+    return f'after event "{evt_uri_str}"'
 
-    agent_names = extract_valid_ref_names(fluent_data, FR_AGENTS)
-    num_agent_refs = len(agent_names)
 
-    unexpected_ref_cnt_msg = (
-        f"fluent '{fluent_name}' (predicate type '{clause_type}') has unexpected reference counts:"
-        f" '{num_obj_refs}' to objects, '{num_ws_refs}' to workspaces, '{num_agent_refs}' to agents"
+def get_tc_str_during_events(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
+    from_evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
+    assert isinstance(
+        from_evt_uri, URIRef
+    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' missing 'from-event' pred to URI: {from_evt_uri}"
+    from_evt_uri_str = from_evt_uri.n3(ns_manager)
+
+    until_evt_uri = tc.get_attr(key=URI_TIME_PRED_BEFORE_EVT)
+    assert isinstance(
+        until_evt_uri, URIRef
+    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' missing 'until-event' pred to URI: {until_evt_uri}"
+    until_evt_uri_str = until_evt_uri.n3(ns_manager)
+
+    return f'from "{from_evt_uri_str}" until "{until_evt_uri_str}"'
+
+
+DEFAULT_TIME_CSTR_STR_GENS = {
+    URI_TIME_TYPE_BEFORE_EVT: get_tc_str_before_event,
+    URI_TIME_TYPE_AFTER_EVT: get_tc_str_after_event,
+    URI_TIME_TYPE_DURING: get_tc_str_during_events,
+}
+
+
+class FluentClauseToStringProtocol(Protocol):
+    """Protocol for functions that transform fluent clauses to Gherkin strings."""
+
+    def __call__(
+        self, clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+    ) -> str: ...
+
+
+def _var_val_to_str(var_val, ns_manager: NamespaceManager) -> str:
+    if isinstance(var_val, URIRef):
+        return var_val.n3(namespace_manager=ns_manager)
+
+    if isinstance(var_val, str):
+        return var_val
+
+    if isinstance(var_val, Number):
+        return str(var_val)
+
+    if isinstance(var_val, Iterable):
+        uri_str_list = []
+        for uri in var_val:
+            assert isinstance(uri, URIRef), f"not an Iterable of URIRef: {var_val}"
+            uri_str_list.append(uri.n3(namespace_manager=ns_manager))
+
+        return str(uri_str_list)
+
+    raise RuntimeError(f"_var_val_to_str: unhandled types: (type={type(var_val)}) {var_val}")
+
+
+def get_fc_str_located_at(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    assert (
+        URI_BDD_PRED_REF_OBJ in clause.variable_by_role
+    ), f"LocatedAt fluent '{clause.id}' does not have 'ref-obj' property"
+    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
+    assert isinstance(
+        obj_id, URIRef
+    ), f"LocatedAt fluent '{clause.id}' does not have URI 'ref-obj' property"
+    assert (
+        obj_id in var_values
+    ), f"LocatedAt fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
+    obj_value_str = _var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
+
+    assert (
+        URI_BDD_PRED_REF_WS in clause.variable_by_role
+    ), f"LocatedAt fluent '{clause.id}' does not have 'ref-ws' property"
+    ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
+    assert isinstance(
+        ws_id, URIRef
+    ), f"LocatedAt fluent '{clause.id}' does not have URI 'ref-ws' property"
+    assert (
+        ws_id in var_values
+    ), f"LocatedAt fluent '{clause.id}': no value for ws '{ws_id}', available vars: {list(var_values.keys())}"
+    ws_value_str = _var_val_to_str(var_val=var_values[ws_id], ns_manager=ns_manager)
+
+    return f'"{obj_value_str}" is located at "{ws_value_str}"'
+
+
+def get_fc_str_is_held(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    assert (
+        URI_BDD_PRED_REF_OBJ in clause.variable_by_role
+    ), f"IsHeldBy fluent '{clause.id}' does not have 'ref-obj' property"
+    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
+    assert isinstance(
+        obj_id, URIRef
+    ), f"IsHeldBy fluent '{clause.id}' does not have URI 'ref-obj' property"
+    assert (
+        obj_id in var_values
+    ), f"IsHeldBy fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
+    obj_value_str = _var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
+
+    assert (
+        URI_BDD_PRED_REF_AGN in clause.variable_by_role
+    ), f"IsHeldBy fluent '{clause.id}' does not have 'ref-agn' property"
+    agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
+    assert isinstance(
+        agn_id, URIRef
+    ), f"IsHeldBy fluent '{clause.id}' does not have URI 'ref-agn' property"
+    assert (
+        agn_id in var_values
+    ), f"IsHeldBy fluent '{clause.id}': no value for agn '{agn_id}', available vars: {list(var_values.keys())}"
+    agn_value_str = _var_val_to_str(var_val=var_values[agn_id], ns_manager=ns_manager)
+
+    return f'"{obj_value_str}" is held by "{agn_value_str}"'
+
+
+def get_fc_str_move_safe(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    assert (
+        URI_BDD_PRED_REF_AGN in clause.variable_by_role
+    ), f"MoveSafe fluent '{clause.id}' does not have 'ref-agn' property"
+    agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
+    assert isinstance(
+        agn_id, URIRef
+    ), f"MoveSafe fluent '{clause.id}' does not have URI 'ref-agn' property"
+    assert (
+        agn_id in var_values
+    ), f"MoveSafe fluent '{clause.id}': no value for agn '{agn_id}', available vars: {list(var_values.keys())}"
+    agn_value_str = _var_val_to_str(var_val=var_values[agn_id], ns_manager=ns_manager)
+    return f'"{agn_value_str}" moves safely'
+
+
+def get_fc_str_sorted(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    assert (
+        URI_BDD_PRED_REF_OBJ in clause.variable_by_role
+    ), f"SortedInto fluent '{clause.id}' does not have 'ref-obj' property"
+    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
+    assert isinstance(
+        obj_id, URIRef
+    ), f"SortedInto fluent '{clause.id}' does not have URI 'ref-obj' property"
+    assert (
+        obj_id in var_values
+    ), f"SortedInto fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
+    obj_value_str = _var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
+
+    assert (
+        URI_BDD_PRED_REF_WS in clause.variable_by_role
+    ), f"SortedInto fluent '{clause.id}' does not have 'ref-ws' property"
+    ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
+    assert isinstance(
+        ws_id, URIRef
+    ), f"SortedInto fluent '{clause.id}' does not have URI 'ref-ws' property"
+    assert (
+        ws_id in var_values
+    ), f"SortedInto fluent '{clause.id}': no value for ws '{ws_id}', available vars: {list(var_values.keys())}"
+    ws_value_str = _var_val_to_str(var_val=var_values[ws_id], ns_manager=ns_manager)
+
+    return f'"{obj_value_str}" are sorted into "{ws_value_str}"'
+
+
+DEFAULT_FLUENT_CLAUSE_STR_GENS = {
+    URI_BDD_TYPE_LOCATED_AT: get_fc_str_located_at,
+    URI_BDD_TYPE_IS_HELD: get_fc_str_is_held,
+    URI_BDD_TYPE_MOVE_SAFE: get_fc_str_move_safe,
+    URI_BDD_TYPE_SORTED: get_fc_str_sorted,
+}
+
+
+class WhenBhvToStringProtocol(Protocol):
+    """Protocol for functions that transform WhenBehaviour clauses to Gherkin strings."""
+
+    def __call__(
+        self,
+        when_bhv: WhenBehaviourModel,
+        var_values: dict[URIRef, Any],
+        ns_manager: NamespaceManager,
+    ) -> str: ...
+
+
+def _get_attr_var_val_str(
+    model: ModelBase, key: URIRef, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    attr_id = model.get_attr(key=key)
+    assert isinstance(
+        attr_id, URIRef
+    ), f"'{model.id}' doesn't have a URI for property '{key}': {attr_id}"
+    assert (
+        attr_id in var_values
+    ), f"'{model.id}': no value for '{attr_id}', available vars: {list(var_values.keys())}"
+    attr_val = var_values[attr_id]
+    return _var_val_to_str(var_val=attr_val, ns_manager=ns_manager)
+
+
+def get_bhv_str_pickplace(
+    when_bhv: WhenBehaviourModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    obj_val_str = _get_attr_var_val_str(
+        model=when_bhv, key=URI_BHV_PRED_TARGET_OBJ, var_values=var_values, ns_manager=ns_manager
     )
 
-    if clause_type == Q_BDD_PRED_LOCATED_AT:
-        if num_obj_refs != 1 or num_ws_refs != 1 or num_agent_refs != 0:
-            raise BDDConstraintViolation(unexpected_ref_cnt_msg)
-        return f'"<{object_names[0]}>" is located at "<{ws_names[0]}>"'
+    agn_val_str = _get_attr_var_val_str(
+        model=when_bhv, key=URI_BHV_PRED_TARGET_AGN, var_values=var_values, ns_manager=ns_manager
+    )
 
-    if clause_type == Q_BDD_PRED_IS_NEAR:
-        if num_obj_refs != 1 or num_agent_refs != 1 or num_ws_refs != 0:
-            raise BDDConstraintViolation(unexpected_ref_cnt_msg)
-        return f'"<{agent_names[0]}>" is near "<{object_names[0]}>"'
-
-    if clause_type == Q_BDD_PRED_IS_HELD:
-        if num_obj_refs != 1 or num_agent_refs != 1 or num_ws_refs != 0:
-            raise BDDConstraintViolation(unexpected_ref_cnt_msg)
-        return f'"<{object_names[0]}>" is held by "<{agent_names[0]}>"'
-
-    raise ValueError(f"unexpected predicate type '{clause_type}'")
-
-
-def create_clauses_strings(
-    scenario_clauses: List[dict], feature_clauses: dict, first_clause_prefix: str
-) -> List[str]:
-    clause_strings = []
-    for idx, clause_data in enumerate(scenario_clauses):
-        prefix = first_clause_prefix if idx == 0 else "And"
-        clause_strings.append(
-            f"{prefix} {clause_string_from_fluent_data(clause_data, feature_clauses)}"
+    if URI_BHV_TYPE_PLACE in when_bhv.behaviour.types:
+        target_ws_val_str = _get_attr_var_val_str(
+            model=when_bhv, key=URI_BHV_PRED_TARGET_WS, var_values=var_values, ns_manager=ns_manager
         )
-    return clause_strings
+
+        if URI_BHV_TYPE_PICK in when_bhv.behaviour.types:
+            # pick and place
+            return f'"{agn_val_str}" picks "{obj_val_str}" and places it at "{target_ws_val_str}"'
+        else:
+            # only place
+            return f'"{agn_val_str}" places "{obj_val_str}" at "{target_ws_val_str}"'
+
+    assert (
+        URI_BHV_TYPE_PICK in when_bhv.behaviour.types
+    ), f"get_bhv_str_pickplace: WhenBehaviour '{when_bhv.id}': bhv '{when_bhv.behaviour.id}' not a pick and place bhv"
+    # only pick
+    return f'"{agn_val_str}" picks "{obj_val_str}"'
 
 
-def create_given_clauses_strings(scenario_clauses: List[dict], feature_clauses: dict) -> List[str]:
-    return create_clauses_strings(scenario_clauses, feature_clauses, "Given")
+class GherkinClauseStrGen(object):
+    _tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol]
+    _fc_str_gens: dict[URIRef, FluentClauseToStringProtocol]
+    _wb_str_gens: list[WhenBhvToStringProtocol]
 
+    def __init__(
+        self,
+        tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol],
+        fc_str_gens: dict[URIRef, FluentClauseToStringProtocol],
+        wb_str_gens: list[WhenBhvToStringProtocol],
+    ) -> None:
+        self._tc_str_gens = tc_str_gens
+        self._fc_str_gens = fc_str_gens
+        self._wb_str_gens = wb_str_gens
 
-def create_then_clauses_strings(scenario_clauses: List[dict], feature_clauses: dict) -> List[str]:
-    return create_clauses_strings(scenario_clauses, feature_clauses, "Then")
+    def get_fluent_clause_str(
+        self, clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+    ) -> str:
+        clause_str = None
+        for fluent_type in self._fc_str_gens:
+            if fluent_type not in clause.types:
+                continue
+            clause_str = self._fc_str_gens[fluent_type](
+                clause=clause, var_values=var_values, ns_manager=ns_manager
+            )
+            break
+        assert (
+            clause_str is not None
+        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled fluent types: {clause.fluent.types}"
 
+        tc_str = None
+        for tc_type in self._tc_str_gens:
+            if tc_type not in clause.time_constraint.types:
+                continue
 
-def prepare_gherkin_feature_data(us_data: dict):
-    for scenario_data in us_data[FR_CRITERIA]:
-        scenario_data["given_clauses"] = create_given_clauses_strings(
-            scenario_data[FR_SCENARIO][FR_GIVEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
+            tc_str = self._tc_str_gens[tc_type](tc=clause.time_constraint, ns_manager=ns_manager)
+            break
+        assert (
+            tc_str is not None
+        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled time constraint types: {clause.time_constraint.types}"
+
+        return f"{clause_str} {tc_str}"
+
+    def get_bhv_str(
+        self,
+        when_bhv: WhenBehaviourModel,
+        var_values: dict[URIRef, Any],
+        ns_manager: NamespaceManager,
+    ) -> str:
+        for bhv_str_gen in self._wb_str_gens:
+            return bhv_str_gen(when_bhv=when_bhv, var_values=var_values, ns_manager=ns_manager)
+
+        raise RuntimeError(
+            f"get_bhv_str: WhenBehaviour '{when_bhv.id}' has unhandled behaviour types: {when_bhv.behaviour.types}"
         )
-        scenario_data["then_clauses"] = create_then_clauses_strings(
-            scenario_data[FR_SCENARIO][FR_THEN][FR_CLAUSES], us_data[FR_FLUENT_DATA]
+
+
+def get_gherkin_clauses_re(
+    has_clause_model: IHasClause,
+    clause_str_gen: GherkinClauseStrGen,
+    ns_manager: NamespaceManager,
+    var_values: dict[URIRef, Any],
+    clause_list: list[str],
+) -> None:
+    # prepare values for quantified var in ThereExists clauses
+    for exists_id in has_clause_model.exists_clauses:
+        exists_model = has_clause_model.clauses[exists_id]
+        assert isinstance(
+            exists_model, ThereExistsModel
+        ), f"'{exists_id}' is not a ThereExistsModel"
+        if isinstance(exists_model.in_set, list):
+            exists_set = exists_model.in_set
+        elif isinstance(exists_model.in_set, URIRef):
+            assert (
+                exists_model.in_set in var_values
+            ), f"ThereExists '{exists_model.id}': no value set for URI 'in-set', available vars: {list(var_values.keys())}"
+            exists_set = var_values[exists_model.in_set]
+            assert isinstance(
+                exists_set, Iterable
+            ), f"ThereExists '{exists_model.id}': value 'in-set' not an Iterable: {exists_set}"
+        else:
+            raise RuntimeError(
+                f"ThereExists '{exists_model.id}': unhandled type for 'in-set': {exists_model.in_set}"
+            )
+        exists_str_set = []
+        for elem_id in exists_set:
+            assert isinstance(
+                elem_id, URIRef
+            ), f"ThereExists '{exists_model.id}': not a URI: {elem_id}"
+            exists_str_set.append(elem_id.n3(namespace_manager=ns_manager))
+        var_values[exists_model.quantified_var] = f"any of {exists_str_set}"
+
+    for g_clause_id in has_clause_model.clauses_by_role[has_clause_model.scenario.given]:
+        g_clause = has_clause_model.clauses[g_clause_id]
+        if isinstance(g_clause, FluentClauseModel):
+            clause_str = clause_str_gen.get_fluent_clause_str(
+                clause=g_clause, var_values=var_values, ns_manager=ns_manager
+            )
+            clause_list.append(f"Given {clause_str}")
+            continue
+
+        if isinstance(g_clause, ThereExistsModel):
+            get_gherkin_clauses_re(
+                has_clause_model=g_clause,
+                clause_str_gen=clause_str_gen,
+                ns_manager=ns_manager,
+                var_values=var_values,
+                clause_list=clause_list,
+            )
+            continue
+
+        raise RuntimeError(f"clause '{g_clause_id}' not a fluent clause model: {type(g_clause)}")
+
+    for w_clause_id in has_clause_model.clauses_by_role[has_clause_model.scenario.when]:
+        w_clause = has_clause_model.clauses[w_clause_id]
+        if isinstance(w_clause, WhenBehaviourModel):
+            bhv_str = clause_str_gen.get_bhv_str(
+                when_bhv=w_clause, var_values=var_values, ns_manager=ns_manager
+            )
+            clause_list.append(f"When {bhv_str}")
+            continue
+
+        if isinstance(w_clause, ForAllModel):
+            if isinstance(w_clause.in_set, list):
+                forall_set = w_clause.in_set
+            elif isinstance(w_clause.in_set, URIRef):
+                assert (
+                    w_clause.in_set in var_values
+                ), f"ForAll '{w_clause.id}': no value set for URI 'in-set', available vars: {list(var_values.keys())}"
+                forall_set = var_values[w_clause.in_set]
+                assert isinstance(
+                    forall_set, Iterable
+                ), f"ForAll '{w_clause.id}': value 'in-set' not an Iterable: {forall_set}"
+            else:
+                raise RuntimeError(
+                    f"ForAll '{w_clause.id}': unhandled type for 'in-set': {w_clause.in_set}"
+                )
+
+            for quant_val in forall_set:
+                var_values[w_clause.quantified_var] = quant_val
+                get_gherkin_clauses_re(
+                    has_clause_model=w_clause,
+                    clause_str_gen=clause_str_gen,
+                    ns_manager=ns_manager,
+                    var_values=var_values,
+                    clause_list=clause_list,
+                )
+            continue
+
+    for t_clause_id in has_clause_model.clauses_by_role[has_clause_model.scenario.then]:
+        t_clause = has_clause_model.clauses[t_clause_id]
+        if isinstance(t_clause, FluentClauseModel):
+            clause_str = clause_str_gen.get_fluent_clause_str(
+                clause=t_clause, var_values=var_values, ns_manager=ns_manager
+            )
+            clause_list.append(f"Then {clause_str}")
+            continue
+
+        if isinstance(t_clause, ThereExistsModel):
+            get_gherkin_clauses_re(
+                has_clause_model=t_clause,
+                clause_str_gen=clause_str_gen,
+                ns_manager=ns_manager,
+                var_values=var_values,
+                clause_list=clause_list,
+            )
+            continue
+
+        raise RuntimeError(f"clause '{t_clause_id}' not a fluent clause model: {type(t_clause)}")
+
+
+def prepare_scenario_variant_data(
+    scr_var_model: ScenarioVariantModel,
+    ns_manager: NamespaceManager,
+    tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
+    fc_str_gens: dict[URIRef, FluentClauseToStringProtocol] = DEFAULT_FLUENT_CLAUSE_STR_GENS,
+    wb_str_gens: list[WhenBhvToStringProtocol] = [get_bhv_str_pickplace],
+) -> dict:
+    scr_var_name = scr_var_model.id.n3(namespace_manager=ns_manager)
+    scr_var_data = {FR_NAME: scr_var_name, FR_VARIATIONS: []}
+
+    var_uri_list, var_vals_list = get_task_variations(scr_var_model.task_variation)
+    var_count = 1
+    string_gen = GherkinClauseStrGen(
+        tc_str_gens=tc_str_gens,
+        fc_str_gens=fc_str_gens,
+        wb_str_gens=wb_str_gens,
+    )
+    for var_value_set in var_vals_list:
+        var_values = dict(zip(var_uri_list, var_value_set))
+
+        clauses = []
+        get_gherkin_clauses_re(
+            has_clause_model=scr_var_model,
+            clause_str_gen=string_gen,
+            ns_manager=ns_manager,
+            var_values=var_values,
+            clause_list=clauses,
         )
-        if Q_HAS_EVENT in scenario_data[FR_SCENARIO][FR_WHEN]:
-            scenario_data["when_event"] = scenario_data[FR_SCENARIO][FR_WHEN][Q_HAS_EVENT][FR_NAME]
+        scr_var_data[FR_VARIATIONS].append(
+            {FR_NAME: f"{scr_var_name} -- {var_count}", "clauses": clauses}
+        )
+        var_count += 1
+
+    return scr_var_data
+
+
+def prepare_jinja2_template_data(
+    us_loader: UserStoryLoader, full_graph: Graph, ns_manager: Optional[NamespaceManager] = None
+) -> list[dict]:
+    """TODO(minhnh): specify which template"""
+    if ns_manager is None:
+        ns_manager = full_graph.namespace_manager
+
+    us_var_dict = us_loader.get_us_scenario_variants()
+    jinja_data = []
+    for us_id, scr_var_set in us_var_dict.items():
+        us_id_str = us_id.n3(namespace_manager=ns_manager)
+        us_data = {FR_NAME: us_id_str, FR_CRITERIA: []}
+
+        # TODO(minhnh): handles a UserStory having multiple scenes, since scenes are linked to
+        # a ScenarioTemplate, multiple of which can appear in a UserStory. This can perhaps be
+        # a constraint on USs, but for now just raise an error
+        scene_data = {}
+
+        for scr_var_id in scr_var_set:
+            scr_var = us_loader.load_scenario_variant(full_graph=full_graph, variant_id=scr_var_id)
+
+            # Scene data
+            scene_id_str = scr_var.scene.id.n3(namespace_manager=ns_manager)
+            if FR_NAME not in scene_data:
+                scene_data[FR_NAME] = scene_id_str
+
+                obj_list = []
+                for obj_id in scr_var.scene.objects:
+                    obj_list.append(obj_id.n3(namespace_manager=ns_manager))
+                if len(obj_list) > 0:
+                    scene_data[FR_OBJECTS] = obj_list
+
+                ws_list = []
+                for ws_id in scr_var.scene.workspaces:
+                    ws_list.append(ws_id.n3(namespace_manager=ns_manager))
+                if len(ws_list) > 0:
+                    scene_data[FR_WS] = ws_list
+
+                agn_list = []
+                for agn_id in scr_var.scene.agents:
+                    agn_list.append(agn_id.n3(namespace_manager=ns_manager))
+                if len(agn_list) > 0:
+                    scene_data[FR_AGENTS] = agn_list
+            else:
+                if scene_id_str != scene_data[FR_NAME]:
+                    raise ValueError(
+                        f"can't handle multiple scenes for US '{us_id_str}': {scene_data[FR_NAME]}, {scene_id_str}"
+                    )
+
+            # ScenarioVariant data
+            scr_var_data = prepare_scenario_variant_data(
+                scr_var_model=scr_var, ns_manager=ns_manager
+            )
+
+            us_data[FR_CRITERIA].append(scr_var_data)
+
+        us_data[FR_SCENE] = scene_data
+
+        jinja_data.append(us_data)
+
+    return jinja_data

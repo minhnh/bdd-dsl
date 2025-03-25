@@ -1,4 +1,5 @@
-from os.path import dirname, join
+# SPDX-License-Identifier:  GPL-3.0-or-later
+from importlib.metadata import version
 
 
-META_MODELs_PATH = join(dirname(__file__), "metamodels")
+__version__ = version("bdd-dsl")

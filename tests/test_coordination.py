@@ -1,10 +1,10 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from os.path import join, dirname
 import unittest
+import rdflib
 from py_trees.trees import BehaviourTree
 from bdd_dsl.events.event_handler import SimpleEventLoop
 from bdd_dsl.utils.json import (
-    load_metamodels,
     create_event_handler_from_graph,
     create_bt_from_graph,
 )
@@ -17,7 +17,7 @@ MODELS_PATH = join(PKG_ROOT, "models")
 
 class NominalCoordination(unittest.TestCase):
     def setUp(self):
-        self.graph = load_metamodels()
+        self.graph = rdflib.Dataset()
         self.event_loop_model_file = join(MODELS_PATH, "coordination", "pickup-events.json")
         self.graph.parse(self.event_loop_model_file, format="json-ld")
         self.graph.parse(

@@ -13,18 +13,20 @@ A Domain-Specific Language (DSL) to showcase the Behaviour-Driven Development (B
 realized using the JSON-LD format. Developed in context of the SESAME project.
 """
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Development Status :: 2 - Pre-Alpha",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)"
 ]
 dependencies = [
-  'rdflib',
-  'pyld',
-  'pyshacl',
-  'jinja2',
-  'py_trees'
+  "numpy",
+  "rdflib>=7.1.0",
+  "pyld",
+  "pyshacl",
+  "jinja2",
+  "platformdirs",
+  "behave",
 ]
 
 [project.urls]
@@ -34,5 +36,15 @@ dependencies = [
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint.per-file-ignores]
+"examples/generated/environment.py" = ["F401"]
+
 [tool.black]
 line-length = 100
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--ignore=tests/test_coordination.py"
+testpaths = [
+    "tests",
+]
