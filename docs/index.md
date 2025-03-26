@@ -19,14 +19,33 @@ when evaluating robotic scenarios [^nguyen2023rulebook].
 This library is one of the tools developed for the
 [Executable Scenario Workbench](https://sesame-project.github.io/exsce/)
 
-## Content
+## Quick start
 
-Details on the design of the metamodel and a tutorial on how to compose and transform
+### Installation
+
+1. Install [rdf-utils](https://github.com/secorolab/rdf-utils/)
+1. Install `bdd-dsl` with `pip install`
+
+### Gherkin generation & mockup execution with `behave`
+
+A mockup test execution setup with [`behave`](https://behave.readthedocs.io/en/latest/) is available
+for trying out our models. To run this setup:
+
+1. Generate the Gherkin feature using the [`generate_bdd_specs.py`](https://github.com/minhnh/bdd-dsl/blob/-/examples/generate_bdd_specs.py)
+   script. This should create a `*.feature` file under the `examples/generated` directory.
+1. Execute `behave` under `examples/generated` should run the mockup setup.
+
+An execution setup with [Nvidia Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html)
+is available at the [`minhnh/bdd-isaacsim-exec`](https://github.com/minhnh/bdd-isaacsim-exec) repository.
+
+## Tutorials
+
+Details on the design of the metamodel and tutorials on how to compose and transform
 BDD models can be found on the following pages:
 
 1. [Concepts and relations for specifying robotic scenarios](bdd-concepts.md)
-2. [Tutorial: Modelling a pickup task as JSON-LD graphs and generating Gherkin features](bdd-tutorial-representation.md)
-3. [Tutorial: Modelling & executing BDD tests for a pickup task](bdd-tutorial-execution.md) (WIP)
+1. [Tutorial: Modelling a pickup task as JSON-LD graphs and generating Gherkin features](bdd-tutorial-representation.md)
+1. [Tutorial: Modelling & executing BDD tests for a pickup task](bdd-tutorial-execution.md) (WIP)
 
 ## Acknowledgement
 
