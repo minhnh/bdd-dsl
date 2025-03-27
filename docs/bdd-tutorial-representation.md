@@ -265,6 +265,7 @@ The extracted and transformed JSON data can then be used to automatically render
 [Jinja](https://jinja.palletsprojects.com/api/).
 
 ```jinja
+{% raw %}
 Feature: {{ data.name }}
 ...
 {%- for scenario_data in data.criteria %}
@@ -274,6 +275,7 @@ Feature: {{ data.name }}
     {{ clause|safe }}{% endfor %}
 {% endfor %}
 {%- endfor -%}
+{% endraw %}
 ```
 
 The complete & up-to-date version of this template
