@@ -1,10 +1,10 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Iterator
 import itertools
-from rdflib import BNode, Graph, URIRef, Literal
+from rdflib import Graph, URIRef, Literal
 from rdf_utils.models.common import ModelBase
-from rdf_utils.collection import load_list_re
 from bdd_dsl.models.namespace import NS_MM_BDD
+from bdd_dsl.models.urirefs import URI_BDD_PRED_ELEMS, URI_BDD_TYPE_CONST_SET
 
 
 URI_BDD_TYPE_COMBINATION = NS_MM_BDD["Combination"]
@@ -46,9 +46,16 @@ class SetEnumerationModel(ModelBase):
         # set to enumerate
         from_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_FROM)
         assert isinstance(
-            from_node, BNode
-        ), f"SetEnumeration: '{self.id}' does not link to a container via a 'from' property"
-        from_list = load_list_re(graph=graph, first_node=from_node, parse_uri=True, quiet=False)
+            from_node, URIRef
+        ), f"SetEnumeration: '{self.id}' does not link to URIRef via a 'from' property"
+
+        set_model = ModelBase(node_id=from_node, graph=graph)
+        assert (
+            URI_BDD_TYPE_CONST_SET in set_model.types
+        ), f"type(s) not handled for Set {set_model.id}: {set_model.types}"
+        from_list = []
+        for elem in graph.objects(subject=set_model.id, predicate=URI_BDD_PRED_ELEMS):
+            from_list.append(elem)
         self.set_attr(key=URI_BDD_PRED_FROM, val=from_list)
 
         # if no length specified, set to length of list
