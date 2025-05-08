@@ -95,15 +95,21 @@ def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], lis
 
         uri_iterables = []
         for set_data in var_value_sets:
-            if isinstance(set_data, URIRef) and set_data in task_var.set_enums:
-                # set enumeration
-                uri_iterables.append(list(task_var.set_enums[set_data].enumerate()))
+            if isinstance(set_data, URIRef):
+                if set_data in task_var.const_sets:
+                    uri_iterables.append(list(task_var.const_sets[set_data]))
+                elif set_data in task_var.set_enums:
+                    uri_iterables.append(list(task_var.set_enums[set_data].enumerate()))
+                else:
+                    raise RuntimeError(
+                        f"unhandled set URI '{set_data}' for variation '{task_var.id}'"
+                    )
             elif isinstance(set_data, list):
                 # list
                 uri_iterables.append(set_data)
             else:
                 raise RuntimeError(
-                    f"TaskVariation {task_var.id}: sets for cartesian product not list or SetEnumeration URIRef: {set_data}"
+                    f"TaskVariation {task_var.id}: sets for cartesian product not list or URIRef: {set_data}"
                 )
 
         return var_uri_list, list(product(*uri_iterables))
@@ -392,7 +398,7 @@ class GherkinClauseStrGen(object):
             break
         assert (
             clause_str is not None
-        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled fluent types: {clause.fluent.types}"
+        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled fluent types: {clause.types}"
 
         tc_str = None
         for tc_type in self._tc_str_gens:
@@ -538,9 +544,9 @@ def get_gherkin_clauses_re(
 def prepare_scenario_variant_data(
     scr_var_model: ScenarioVariantModel,
     ns_manager: NamespaceManager,
-    tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
-    fc_str_gens: dict[URIRef, FluentClauseToStringProtocol] = DEFAULT_FLUENT_CLAUSE_STR_GENS,
-    wb_str_gens: list[WhenBhvToStringProtocol] = [get_bhv_str_pickplace],
+    tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol],
+    fc_str_gens: dict[URIRef, FluentClauseToStringProtocol],
+    wb_str_gens: list[WhenBhvToStringProtocol],
 ) -> dict:
     scr_var_name = scr_var_model.id.n3(namespace_manager=ns_manager)
     scr_var_data = {FR_NAME: scr_var_name, FR_VARIATIONS: []}
@@ -572,7 +578,12 @@ def prepare_scenario_variant_data(
 
 
 def prepare_jinja2_template_data(
-    us_loader: UserStoryLoader, full_graph: Graph, ns_manager: Optional[NamespaceManager] = None
+    us_loader: UserStoryLoader,
+    full_graph: Graph,
+    ns_manager: Optional[NamespaceManager] = None,
+    tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
+    fc_str_gens: dict[URIRef, FluentClauseToStringProtocol] = DEFAULT_FLUENT_CLAUSE_STR_GENS,
+    wb_str_gens: list[WhenBhvToStringProtocol] = [get_bhv_str_pickplace],
 ) -> list[dict]:
     """TODO(minhnh): specify which template"""
     if ns_manager is None:
@@ -622,7 +633,11 @@ def prepare_jinja2_template_data(
 
             # ScenarioVariant data
             scr_var_data = prepare_scenario_variant_data(
-                scr_var_model=scr_var, ns_manager=ns_manager
+                scr_var_model=scr_var,
+                ns_manager=ns_manager,
+                tc_str_gens=tc_str_gens,
+                fc_str_gens=fc_str_gens,
+                wb_str_gens=wb_str_gens,
             )
 
             us_data[FR_CRITERIA].append(scr_var_data)

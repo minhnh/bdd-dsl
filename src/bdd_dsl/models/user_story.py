@@ -22,6 +22,7 @@ from bdd_dsl.models.clauses import (
 from bdd_dsl.models.combinatorics import SetEnumerationModel
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_ELEMS,
     URI_BDD_PRED_GIVEN,
     URI_BDD_PRED_HAS_VARIATION,
     URI_BDD_PRED_OF_SETS,
@@ -30,6 +31,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_VAR_LIST,
     URI_BDD_PRED_WHEN,
     URI_BDD_TYPE_CART_PRODUCT,
+    URI_BDD_TYPE_CONST_SET,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENE_AGN,
     URI_BDD_TYPE_SCENE_OBJ,
@@ -179,6 +181,7 @@ class TaskVariationModel(ModelBase):
     task_id: URIRef
     variables: set[URIRef]
     set_enums: dict[URIRef, SetEnumerationModel]
+    const_sets: dict[URIRef, list[Any]]
 
     def __init__(self, us_graph: Graph, full_graph: Graph, task_var_id: URIRef) -> None:
         super().__init__(graph=us_graph, node_id=task_var_id)
@@ -187,6 +190,7 @@ class TaskVariationModel(ModelBase):
         self.task_id = task_id
         self.variables = set()
         self.set_enums = {}
+        self.const_sets = {}
 
         self._process_builtin_task_var_types(full_graph)
 
@@ -211,15 +215,25 @@ class TaskVariationModel(ModelBase):
                 if isinstance(sets_data, list):
                     continue
 
-                if not isinstance(sets_data, URIRef):
-                    raise RuntimeError(
-                        f"TaskVariation '{self.id}': unexpected sets type for: {sets_data}"
-                    )
+                assert isinstance(
+                    sets_data, URIRef
+                ), f"TaskVariation '{self.id}': unexpected sets type for: {sets_data}"
 
-                if sets_data in self.set_enums:
+                # if set URI already processed
+                if sets_data in self.const_sets or sets_data in self.set_enums:
                     continue
 
-                # parse as SetEnumerationModel
+                sets_data_types = get_node_types(graph=full_graph, node_id=sets_data)
+
+                # constant sets
+                if URI_BDD_TYPE_CONST_SET in sets_data_types:
+                    sd_list = []
+                    for elem in full_graph.objects(subject=sets_data, predicate=URI_BDD_PRED_ELEMS):
+                        sd_list.append(elem)
+                    self.const_sets[sets_data] = sd_list
+                    continue
+
+                # set enumerations
                 self.set_enums[sets_data] = SetEnumerationModel(node_id=sets_data, graph=full_graph)
 
             self.set_attr(key=URI_BDD_PRED_VAR_LIST, val=var_list)
