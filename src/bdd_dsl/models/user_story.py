@@ -209,7 +209,7 @@ class TaskVariationModel(ModelBase):
 
             assert (
                 len(sets_list) == len(var_list)
-            ), f"length mismatch 'variable-list' (len={len(var_list)}) != 'of-sets' (len={len(sets_list)})"
+            ), f"Cart Product '{self.id}': length mismatch 'variable-list' (len={len(var_list)}) != 'of-sets' (len={len(sets_list)})"
 
             for sets_data in sets_list:
                 if isinstance(sets_data, list):
