@@ -99,7 +99,8 @@ def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], lis
                 if set_data in task_var.const_sets:
                     uri_iterables.append(list(task_var.const_sets[set_data]))
                 elif set_data in task_var.set_enums:
-                    uri_iterables.append(list(task_var.set_enums[set_data].enumerate()))
+                    set_data_vals = list(task_var.set_enums[set_data].enumerate())
+                    uri_iterables.append(set_data_vals)
                 else:
                     raise RuntimeError(
                         f"unhandled set URI '{set_data}' for variation '{task_var.id}'"
