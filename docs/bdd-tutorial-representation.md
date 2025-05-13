@@ -124,9 +124,9 @@ In the example above, we define `fluent-obj-held-by-robot`, which asserts that t
 by the robot at the end of the picking behaviour. This `bdd:FluentClause` instance is a
 composition linking to several elements in the template:
 
-- Instances of `bdd:ScenarioVariable`, namely `var-target-obj` and `var-pick-robot`, which are
+* Instances of `bdd:ScenarioVariable`, namely `var-target-obj` and `var-pick-robot`, which are
   the fluent's subjects.
-- Instance `ftc-after-pick` of type `bdd:TimeConstraint` & `time:AfterEventConstraint`,
+* Instance `ftc-after-pick` of type `bdd:TimeConstraint` & `time:AfterEventConstraint`,
   which represents _when_ the fluent should hold true. The latter type denotes a more specific
   type of constraint -- the fluent should hold _after_ an event.
 

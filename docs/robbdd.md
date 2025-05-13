@@ -18,11 +18,8 @@ the `examples/models` folder in the RobBDD repository.
   * [Table variation](#table-variation)
   * [Cartesian product variation](#cartesian-product-variation)
 * [From pick and place to sorting](#from-pick-and-place-to-sorting)
-  * [Set variables](#set-variables)
-  * [Quantifiers](#quantifiers)
 * [Code generation](#code-generation)
-  * [Graph generation](#graph-generation)
-  * [Gherkin generation](#gherkin-generation)
+* [References](#references)
 
 <!-- mtoc-end -->
 
@@ -49,19 +46,19 @@ Event (ns=bdd_tmpl) evt_pick_start
 Event (ns=bdd_tmpl) evt_place_end
 
 Scenario Template (ns=bdd_tmpl) tmpl_pickplace {
-    task: <tsk_pickplace>
+  task: <tsk_pickplace>
 
-    var target_object
-    var robot
-    var pick_ws
-    var place_ws
+  var target_object
+  var robot
+  var pick_ws
+  var place_ws
 
-    Given:
-        holds(<target_object> is located at <pick_ws>, before <evt_pick_start>)
-    When:
-        Behaviour (ns=bdd_tmpl) pickplace: <robot> picks <target_object> and places at <place_ws>
-    Then:
-        holds(<target_object> is located at <place_ws>, after <evt_pick_start>)
+  Given:
+    holds(<target_object> is located at <pick_ws>, before <evt_pick_start>)
+  When:
+    Behaviour (ns=bdd_tmpl) pickplace: <robot> picks <target_object> and places at <place_ws>
+  Then:
+    holds(<target_object> is located at <place_ws>, after <evt_pick_start>)
 }
 ```
 
@@ -268,16 +265,97 @@ Here, value sets can be specified in several ways:
 > [!IMPORTANT]  
 > The above syntax is only for non-set variable. Separate syntax is required for a set variable,
 > as the collection of its possible values must be a set of sets. We describe this in more details
-> in the [following section](#from-pick-and-place-to-sorting)
+> in the [following section](#from-pick-and-place-to-sorting).
 
 ## From pick and place to sorting
 
-### Set variables
+In [^hunecke2025erf], we discussed the extensions needed for our BDD tool chain to represent an
+object sorting scenario, which can be considered as repeating the pick & place behaviours for
+multiple objects and workspaces. This section describes how this extensions can be specified
+with RobBDD. Following is a template for such a sorting scenario:
 
-### Quantifiers
+```txt
+Scenario Template (ns=bdd_tmpl) tmpl_sort {
+  task: <tsk_sorting>
+
+  set var target_objects
+  set var place_workspaces
+  var robot
+  var pick_ws
+
+  for all ( var x in <target_objects> ) {
+    Given:
+    (
+      holds(<x> is located at <pick_ws>, before <evt_pick_start>)
+    )
+    When:
+      Behaviour (ns=bdd_tmpl) pickplace: <robot> picks <x> and places at <place_workspaces>
+    Then:
+      ( var y exists in <place_workspaces> ) such that {
+          holds(<x> is located at <y>, after <evt_place_end>)
+      }
+  }
+  Then:
+      holds(<target_objects> are sorted into <place_workspaces>, after <evt_place_end>)
+}
+```
+
+Here, we introduce set quantifiers and set variables to represent the sorting scenario:
+
+* A set variable, e.g. `set var target_objects`, is used for a set of element that can change
+  across scenario variations. In the example, the concept is used for the set of objects to be
+  sorted and the set of workspaces they should be sorted into. Set variables are also expected
+  by the sorting clause at the end of the template.
+* Set quantifiers, namely universal & existential quantifiers, are used for specifying clauses
+  for sets of elements. Both declares a variable, e.g. `x`, `y`, that the contained clauses can
+  refer to. Both must refer to a set variable, e.g. `set var target_objects`,
+  as the quantified set.
+  - The universal quantifier, e.g. `for all var x in <target_objects>`:
+    + repeats contained clauses for all elements in the object set
+    + cannot exist in the same scope with the behaviour clause, as the behaviour needs to be
+      executed every iteration
+  - The existential quantifier evaluates true if the contained expression holds true for
+    any of the set elements.
+
+```txt
+Scenario simple_pick {
+  template: <tmpl_sort>
+  scene: <sorting_scene>
+
+  variation:
+    set var <tmpl_sort.target_objects>: select 3 combinations from <pickplace_objects>
+    var <tmpl_sort.pick_ws>: {
+      <lab_workspaces.table_ws>, <lab_workspaces.shelf_ws>
+    }
+    set var <tmpl_sort.place_workspaces>: select 2 combinations from <sort_ws_set>
+    set var <tmpl_sort.place_workspaces>: {
+      { <lab_workspaces.container_1_ws>, <lab_workspaces.container_2_ws> },
+      { <lab_workspaces.container_2_ws>, <lab_workspaces.container_1_ws> }
+    }
+    var <tmpl_sort.robot>: agn set <isaac_agents>
+}
+```
+
+In the scenario variant, variation of a set variable needs to resolve to a set of sets, and
+can be specified in 2 main ways:
+
+* set enumeration syntax, e.g. `select [size] combinations from <[linked set]>`:
+  - both combination & permutation of sets are supported
+  - `repeated` can be added to combination syntax, e.g. `select 2 repeated combinations...`
+    to specify that elements can be repeated in enumerations
+  - linked set can be explicitly declared sets or scene sets, e.g. `pickplace_objects`
+* explicitly listing set of sets elements, like with `place_workspaces` in the excerpt.
 
 ## Code generation
 
-### Graph generation
+Details on the supported generators and addititonal arguments are documented on the
+[RobBDD repository](https://github.com/minhnh/robbdd). Generating the Gherkin feature file
+from a RobBDD model can be done with:
 
-### Gherkin generation
+```console
+foo@bar:~$ textx generate path/to/model.bdd --target gherkin -o path/to/generated/dir
+```
+
+## References
+
+[^hunecke2025erf]: B. Hunecke, M. Nguyen, N. Hochgeschwender, S. Wrede, "Specification and Execution of Robotic Acceptance Tests for Object Sorting", In: [_European Robotics Forum 2025_](https://link.springer.com/book/9783031894701). Springer Proceedings in Advanced Robotics, vol 36, June 2025.
