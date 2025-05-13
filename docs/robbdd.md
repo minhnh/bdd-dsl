@@ -91,6 +91,57 @@ A scenario template consists of the following essential elements:
 
 ## Specifying a scene
 
+To vary the above template, we must first specify the possible objects, workspaces, and agents
+that can appear in the scene. To this end, RobBDD includes a scene specification DSL:
+
+```txt
+// pickplace.scene
+ns lab_env='https://secorolab.github.io/models/environments/secorolab/'
+ns isaac_agn='https://secorolab.github.io/models/agents/isaac-sim/'
+
+obj set (ns=lab_env) pickplace_objects {
+  object box1,
+  object box2,
+  object ball,
+  object bottle
+}
+obj set (ns=lab_env) ws_objects {
+  object dining_table,
+  object shelf
+}
+ws set (ns=lab_env) lab_workspaces {
+  workspace table_ws,
+  workspace shelf_ws
+}
+agn set (ns=isaac_agn) isaac_agents {
+  agent panda,
+  agent ur10,
+  agent kinova
+}
+comp (ns=lab_env) comp_table_pickplace of ws <lab_workspaces.table_ws> {
+  obj <ws_objects.dining_table>
+}
+comp (ns=lab_env) comp_shelf_pickplace of ws <lab_workspaces.shelf_ws> {
+  obj <ws_objects.shelf>
+}
+```
+
+As shown in the exceprt, sets of scene elements can be declared, e.g. with
+`obj set (ns=lab_env) pickplace_objects`, where the set elements inherit the set's namespace.
+RobBDD also includes mechanism to specify compositions of workspaces, e.g.
+`comp (ns=lab_env comp_table_pickplace)`. A workspace composition can contain objects, workspaces,
+and other compositions. A scene model can then be specified by linking to element sets &
+workspace compositions, e.g. in the excerpt below.
+
+```txt
+scene (ns=scene_lab) pickplace_scene {
+    obj set <pickplace_objects>
+    ws comp <comp_table_pickplace>
+    ws comp <comp_shelf_pickplace>
+    agn set <isaac_agents>
+}
+```
+
 ## Specifying a scenario variant
 
 ### Table variation
