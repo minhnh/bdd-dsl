@@ -6,6 +6,26 @@ Domain-Specific-Language (DSL) to model robotics acceptance criteria and generat
 execution of pick & place scenarios. The following model examples can also be found under
 the `examples/models` folder in the RobBDD repository.
 
+## Table of contents
+
+<!-- mtoc-start -->
+
+* [Specifying a scenario template](#specifying-a-scenario-template)
+  * [Identifiers](#identifiers)
+  * [Template elements](#template-elements)
+* [Specifying a scene](#specifying-a-scene)
+* [Specifying user stories and scenario variants](#specifying-user-stories-and-scenario-variants)
+  * [Table variation](#table-variation)
+  * [Cartesian product variation](#cartesian-product-variation)
+* [From pick and place to sorting](#from-pick-and-place-to-sorting)
+  * [Set variables](#set-variables)
+  * [Quantifiers](#quantifiers)
+* [Code generation](#code-generation)
+  * [Graph generation](#graph-generation)
+  * [Gherkin generation](#gherkin-generation)
+
+<!-- mtoc-end -->
+
 ## Specifying a scenario template
 
 We begins with specifying a simple pick & place scenario, which in Gherkin may look like
@@ -61,33 +81,36 @@ as long as they refer the model's IRI.
 
 A scenario template consists of the following essential elements:
 
-- A template reference a `Task`. For now, this is not exploited but can be extended with more
+* A template reference a `Task`. For now, this is not exploited but can be extended with more
   specific task models in the future.
-- Declared variables, e.g. `var target_object`, can be referred to by clauses & behaviour.
-  A later section describes how scenario variations can be introduced via these variables.
-- A declared behaviour, e.g. `Behaviour (ns=bdd_tmpl) pickplace`, where the following part
+* Declared variables, e.g. `var target_object`, can be referred to by clauses & behaviour.
+  The [section about scenario variations](#specifying-user-stories-and-scenario-variants) describes how
+  variations can be introduced via these variables.
+  - RobBDD syntax also includes set variables with syntax `set var var_name` for sets that can
+    vary across scenario variants. Usage of this syntax will be explained in [a later section](#from-pick-and-place-to-sorting).
+* A declared behaviour, e.g. `Behaviour (ns=bdd_tmpl) pickplace`, where the following part
   link to variable parameter of the behaviour. For now, only pick & place behaviours are
   supported, via the following syntax:
   - `<agn> picks <obj>`
   - `<agn> places <obj> at <ws>`
   - `<agn> picks <obj> and places at <ws>`
-- A fluent clause, e.g. `holds(...)`, can be added to the `Given` & `Then` parts of the scenario,
+* A fluent clause, e.g. `holds(...)`, can be added to the `Given` & `Then` parts of the scenario,
   and composes a predicate, e.g. `is located at`, a time constraint, e.g. `before ...`, with
   corresponding variables, e.g. `<target_object>`. More details on this composition is described
   on [the "concepts" page](./bdd-concepts). A general language for predicates is not available
   at the moment. Available syntax:
   - supported predicates (all can generate RDF graphs, but some won't generate Gherkin for now):
-    - `<obj> is located at <ws>`: fully supported
-    - `<obj> is held by <agn>`: fully supported
-    - `<obj> are sorted into <ws_set>`: fully supported
-    - `<subject> has config <config>`: Gherkin gen. N/A
-    - `<agn> can reach <obj>`: Gherkin gen. N/A
-    - `<agn> does not drop <obj>`: Gherkin gen. N/A
-    - `<agn> does not collide <target>`: Gherkin gen. N/A
+    + `<obj> is located at <ws>`: fully supported
+    + `<obj> is held by <agn>`: fully supported
+    + `<obj> are sorted into <ws_set>`: fully supported
+    + `<subject> has config <config>`: Gherkin gen. N/A
+    + `<agn> can reach <obj>`: Gherkin gen. N/A
+    + `<agn> does not drop <obj>`: Gherkin gen. N/A
+    + `<agn> does not collide <target>`: Gherkin gen. N/A
   - supported time constraints (all works with all generators):
-    - `before <event>`
-    - `after <event>`
-    - `from <start_event> until <end_event>`
+    + `before <event>`
+    + `after <event>`
+    + `from <start_event> until <end_event>`
 
 ## Specifying a scene
 
@@ -106,10 +129,14 @@ obj set (ns=lab_env) pickplace_objects {
   object bottle
 }
 obj set (ns=lab_env) ws_objects {
+  object container_1,
+  object container_2,
   object dining_table,
   object shelf
 }
 ws set (ns=lab_env) lab_workspaces {
+  workspace container_1_ws,
+  workspace container_2_ws,
   workspace table_ws,
   workspace shelf_ws
 }
@@ -134,20 +161,123 @@ and other compositions. A scene model can then be specified by linking to elemen
 workspace compositions, e.g. in the excerpt below.
 
 ```txt
+// pickplace.scene
 scene (ns=scene_lab) pickplace_scene {
-    obj set <pickplace_objects>
-    ws comp <comp_table_pickplace>
-    ws comp <comp_shelf_pickplace>
-    agn set <isaac_agents>
+  obj set <pickplace_objects>
+  ws comp <comp_table_pickplace>
+  ws comp <comp_shelf_pickplace>
+  agn set <isaac_agents>
 }
 ```
 
-## Specifying a scenario variant
+For a sorting scenario where the robot place objects, in 2 containers, the scene composition
+can be specified as follows:
+
+```txt
+comp (ns=lab_env) comp_container1 of ws <lab_workspaces.container_1_ws> { obj <ws_objects.container_1> }
+comp (ns=lab_env) comp_container2 of ws <lab_workspaces.container_2_ws> { obj <ws_objects.container_2> }
+comp (ns=lab_env) comp_table_sort of ws <lab_workspaces.table_ws> {
+  obj <ws_objects.dining_table>
+  ws comp <comp_container1>
+  ws comp <comp_container2>
+}
+scene (ns=scene_lab) sorting_scene {
+  obj set <pickplace_objects>
+  ws comp <comp_table_sort>
+  agn set <isaac_agents>
+}
+```
+
+The scenario variant can link to specific scene model, as described further in
+[the next section](#specifying-user-stories-and-scenario-variants).
+
+## Specifying user stories and scenario variants
+
+With the scene composition available, we can now specify variants of the above scenario template.
+Here, a user story needs to be declared, e.g. `(ns=bdd_var) us_pickplace` below, as a collection
+of scenario variants, e.g. `table_pick` below. a scenario variant links to a template,
+a scene model, and declares variation of the scenario's variables.
+Two types of variation are currently supported by RobBDD: table form like with
+[Gherkin's `Examples` table in a `ScenarioOutline`](https://cucumber.io/docs/gherkin/reference/#scenario-outline),
+and as the Cartesian products of sets of variable values.
 
 ### Table variation
 
+The table-style variation links to scenario variables in the header row, separated from the
+corresponding value rows by `|---|`. Each value rows will replace the variables in the scenario
+clauses, similar to Gherkin's `Examples` table. Cell values can be links to scene elements,
+e.g. `<pickplace_objects.box1>`, links to set of elements, e.g. `obj set <pickplace_objects>`,
+or literal values like strings or numbers.
+
+```txt
+User Story (ns=bdd_var) us_pickplace {
+  As A "Function Developer"
+  I Want "Pick and place behaviour"
+  So That "I can transport objects"
+
+  Scenarios:
+    Scenario table_pick {
+      template: <tmpl_pickplace>
+      scene: <pickplace_scene>
+
+      variation:
+      | <tmpl_pickplace.target_object> | <tmpl_pickplace.pick_ws> | <tmpl_pickplace.place_ws> | <tmpl_pickplace.robot> |
+      |---|
+      | <pickplace_objects.box1> | <lab_workspaces.table_ws> | <lab_workspaces.shelf_ws> |  <isaac_agents.panda> |
+      | <pickplace_objects.ball> | <lab_workspaces.shelf_ws> | <lab_workspaces.table_ws> |  <isaac_agents.ur10> |
+      | <pickplace_objects.bottle> | <lab_workspaces.table_ws> | <lab_workspaces.shelf_ws> | <isaac_agents.kinova> |
+    }
+}
+```
+
 ### Cartesian product variation
+
+In addition to the table syntax, a scenario variation can also be speficied as the
+Cartesian product of sets of possible values:
+
+```txt
+Scenario simple_pick {
+  template: <tmpl_pickplace>
+  scene: <pickplace_scene>
+
+  variation:
+    var <tmpl_pickplace.target_object>: obj set <pickplace_objects>
+    var <tmpl_pickplace.pick_ws>: set <ws_set>
+    var <tmpl_pickplace.place_ws>: set <ws_set>
+    var <tmpl_pickplace.robot>: {
+      <isaac_agents.panda>, <isaac_agents.ur10>
+    }
+}
+```
+
+Here, value sets can be specified in several ways:
+
+* as a link to scene element sets, e.g. `obj set <pickplace_objects>`
+* as inline explicit set, e.g. with `<tmpl_pickplace.robot>`, via the syntax `{ elem1, elem2, ... }`
+* link to an explicit set declared before scenario templates, e.g. `ws_set`:
+
+  ```txt
+  ...
+  const set (ns=bdd_var) ws_set {
+    <lab_workspaces.table_ws>, <lab_workspaces.shelf_ws>
+  }
+  Scenario Template (ns=bdd_tmpl) tmpl_pickplace {
+  ...
+  ```
+
+> [!IMPORTANT]  
+> The above syntax is only for non-set variable. Separate syntax is required for a set variable,
+> as the collection of its possible values must be a set of sets. We describe this in more details
+> in the [following section](#from-pick-and-place-to-sorting)
+
+## From pick and place to sorting
+
+### Set variables
+
+### Quantifiers
 
 ## Code generation
 
-## From pick & place to sorting
+### Graph generation
+
+### Gherkin generation

@@ -7,6 +7,24 @@ is then presented to show how to transform this model into a
 [Gherkin](https://cucumber.io/docs/gherkin/reference/) feature for integration with appropriate
 BDD tool chains, e.g. `behave`[^behave] for the Python language.
 
+## Table of content
+
+<!-- mtoc-start -->
+
+* [Example: BDD Scenario for a Robotic Pickup Task](#example-bdd-scenario-for-a-robotic-pickup-task)
+* [Specifying BDD Acceptance Criteria for A Pickup Task](#specifying-bdd-acceptance-criteria-for-a-pickup-task)
+  * [Specifying Scenario Templates](#specifying-scenario-templates)
+  * [Specifying A Concrete Scenario Variant](#specifying-a-concrete-scenario-variant)
+    * [Specifying Concrete Agents, Environment, and Coordination Models](#specifying-concrete-agents-environment-and-coordination-models)
+    * [Specifying Variations](#specifying-variations)
+* [Generating Gherkin Features from BDD Models](#generating-gherkin-features-from-bdd-models)
+  * [Parsing JSON-LD models](#parsing-json-ld-models)
+  * [Generating from Jinja Templates](#generating-from-jinja-templates)
+  * [Additional tools](#additional-tools)
+* [References](#references)
+
+<!-- mtoc-end -->
+
 ## Example: BDD Scenario for a Robotic Pickup Task
 
 Consider a simple robotic pickup task, where a robot must pick an object from a surface.

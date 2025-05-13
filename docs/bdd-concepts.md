@@ -1,5 +1,22 @@
 # Metamodels for Specifying BDD Scenarios in Robotics
 
+## Table of content
+
+<!-- mtoc-start -->
+
+* [Background](#background)
+  * [Behaviour-Driven Development (BDD)](#behaviour-driven-development-bdd)
+  * [AC in robotic competitions & benchmarks](#ac-in-robotic-competitions--benchmarks)
+* [Conceptualizing Robotic Acceptance Criteria (AC)](#conceptualizing-robotic-acceptance-criteria-ac)
+  * [Example: modelling a pick-and-place scenario](#example-modelling-a-pick-and-place-scenario)
+  * [Clauses as fluents](#clauses-as-fluents)
+  * [Variation and Scene](#variation-and-scene)
+  * [Scenario Template, Variant, & User Story](#scenario-template-variant--user-story)
+* [Representing Robotic AC as Knowledge Graphs](#representing-robotic-ac-as-knowledge-graphs)
+* [References](#references)
+
+<!-- mtoc-end -->
+
 ## Background
 
 ### Behaviour-Driven Development (BDD)
