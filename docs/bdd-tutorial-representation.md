@@ -7,6 +7,24 @@ is then presented to show how to transform this model into a
 [Gherkin](https://cucumber.io/docs/gherkin/reference/) feature for integration with appropriate
 BDD tool chains, e.g. `behave`[^behave] for the Python language.
 
+## Table of content
+
+<!-- mtoc-start -->
+
+* [Example: BDD Scenario for a Robotic Pickup Task](#example-bdd-scenario-for-a-robotic-pickup-task)
+* [Specifying BDD Acceptance Criteria for A Pickup Task](#specifying-bdd-acceptance-criteria-for-a-pickup-task)
+  * [Specifying Scenario Templates](#specifying-scenario-templates)
+  * [Specifying A Concrete Scenario Variant](#specifying-a-concrete-scenario-variant)
+    * [Specifying Concrete Agents, Environment, and Coordination Models](#specifying-concrete-agents-environment-and-coordination-models)
+    * [Specifying Variations](#specifying-variations)
+* [Generating Gherkin Features from BDD Models](#generating-gherkin-features-from-bdd-models)
+  * [Parsing JSON-LD models](#parsing-json-ld-models)
+  * [Generating from Jinja Templates](#generating-from-jinja-templates)
+  * [Additional tools](#additional-tools)
+* [References](#references)
+
+<!-- mtoc-end -->
+
 ## Example: BDD Scenario for a Robotic Pickup Task
 
 Consider a simple robotic pickup task, where a robot must pick an object from a surface.
@@ -106,9 +124,9 @@ In the example above, we define `fluent-obj-held-by-robot`, which asserts that t
 by the robot at the end of the picking behaviour. This `bdd:FluentClause` instance is a
 composition linking to several elements in the template:
 
-- Instances of `bdd:ScenarioVariable`, namely `var-target-obj` and `var-pick-robot`, which are
+* Instances of `bdd:ScenarioVariable`, namely `var-target-obj` and `var-pick-robot`, which are
   the fluent's subjects.
-- Instance `ftc-after-pick` of type `bdd:TimeConstraint` & `time:AfterEventConstraint`,
+* Instance `ftc-after-pick` of type `bdd:TimeConstraint` & `time:AfterEventConstraint`,
   which represents _when_ the fluent should hold true. The latter type denotes a more specific
   type of constraint -- the fluent should hold _after_ an event.
 

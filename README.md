@@ -6,6 +6,8 @@ This repository provides tooling to support the specification and execution of a
 robotic scenarios using the [Behaviour-Driven Development (BDD)](https://dannorth.net/introducing-bdd/)
 methodology. Further documentation can be found below and on the
 [maintained GitHub page for the repository](https://secorolab.github.io/bdd-dsl/).
+A more user-friendly DSL that can generate valid RDF graphs for working with `bdd-dsl`
+can be found on the [RobBDD](https://github.com/minhnh/robbdd) repository.
 
 ## Quick start
 
@@ -29,8 +31,9 @@ is available at the [`minhnh/bdd-isaacsim-exec`](https://github.com/minhnh/bdd-i
 ## Tutorials
 
 1. [Concepts and relations for specifying robotic scenarios](docs/bdd-concepts.md)
-2. [Tutorial: Modelling a pickup task as JSON-LD graphs and generating Gherkin features](docs/bdd-tutorial-representation.md)
-3. [Tutorial: Modelling & executing BDD tests for a pickup task](docs/bdd-tutorial-execution.md) (WIP)
+2. [Tutorial: Modelling a pickup task using RobBDD & generating Gherkin features](docs/robbd.md)
+3. [Tutorial: Modelling a pickup task as JSON-LD graphs and generating Gherkin features](docs/bdd-tutorial-representation.md)
+4. [Tutorial: Modelling & executing BDD tests for a pickup task](docs/bdd-tutorial-execution.md) (WIP)
 
 ## Acknowledgement
 

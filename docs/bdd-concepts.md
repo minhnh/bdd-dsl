@@ -1,5 +1,22 @@
 # Metamodels for Specifying BDD Scenarios in Robotics
 
+## Table of content
+
+<!-- mtoc-start -->
+
+* [Background](#background)
+  * [Behaviour-Driven Development (BDD)](#behaviour-driven-development-bdd)
+  * [AC in robotic competitions & benchmarks](#ac-in-robotic-competitions--benchmarks)
+* [Conceptualizing Robotic Acceptance Criteria (AC)](#conceptualizing-robotic-acceptance-criteria-ac)
+  * [Example: modelling a pick-and-place scenario](#example-modelling-a-pick-and-place-scenario)
+  * [Clauses as fluents](#clauses-as-fluents)
+  * [Variation and Scene](#variation-and-scene)
+  * [Scenario Template, Variant, & User Story](#scenario-template-variant--user-story)
+* [Representing Robotic AC as Knowledge Graphs](#representing-robotic-ac-as-knowledge-graphs)
+* [References](#references)
+
+<!-- mtoc-end -->
+
 ## Background
 
 ### Behaviour-Driven Development (BDD)
@@ -108,19 +125,19 @@ temporal term.
 Fig. 3 shows an example of how we apply the fluent concept to model BDD clauses.
 Key design points:
 
-- A `FluentClause` represents a BDD clause that is also a fluent, and can be a `Given` or a `Then`
+* A `FluentClause` represents a BDD clause that is also a fluent, and can be a `Given` or a `Then`
   clause of a BDD scenario. The concept links to the scenario via the `clause-of` relation.
   Whether the clause connects to a `Given` or `Then` denotes its role in the scenario,
   i.e., whether it's a pre- or post- condition of the behaviour to be verified.
-- The semantics of the fluent's predicate is introduced via additional types of
+* The semantics of the fluent's predicate is introduced via additional types of
   the `FluentClause` node, e.g. `IsHeldPredicate` & `IsLocatedPredicate` in Fig. 3.
-- A `FluentClause` composes the fluent/predicate with its subject, e.g. the `target-object`
+* A `FluentClause` composes the fluent/predicate with its subject, e.g. the `target-object`
   to be held in Fig. 3, where the subjects are `ScenarioVariable`, and their role in the fluent
   is encoded in the relation to the `FluentClause`, e.g. `ref-object`. Variables allow preserving
   semantics of elements in clauses, interdependent scenarios, and variations. For example,
   in Fig. 3 the same `target-object` should be located at `pick-ws` before picking & at `place-ws`
   after placing.
-- A `FluentClause` also links to a `TimeConstraint`, which can have more specific types denoting
+* A `FluentClause` also links to a `TimeConstraint`, which can have more specific types denoting
   how the temporal term should be interpreted, e.g. `BeforeEventConstraint` & `AfterEventConstraint`
   in Fig. 3 for assertions that should hold relative to an event, i.e. time instant. Here, the
   example shows how the 2 "is held by" fluent clauses have different time constraints in the 2
@@ -141,15 +158,15 @@ Therefore, we introduce in our metamodel the `Scene` & `TaskVariation` concepts 
 invariant & varying elements, respectively. An example of this design is shown in Fig. 4.
 Key design points:
 
-- Each `ScenarioTemplate` is associated with a `Scene`, which can be composed with objects,
+* Each `ScenarioTemplate` is associated with a `Scene`, which can be composed with objects,
   workspaces, agents, e.g. cup & bottle in Fig. 4.
-- A `TaskVariation` composes a scenario's variables with its values in different scenario variants
-- `TaskVariation` can have additional types for specific variation mechanism. In Fig. 4,
+* A `TaskVariation` composes a scenario's variables with its values in different scenario variants
+* `TaskVariation` can have additional types for specific variation mechanism. In Fig. 4,
   `object-variation` has type `TableVariation`, which allows specifying variables' values in
   a table similar to Gherkin's `Examples`. We also support `CartesianProductVariation` that allows
   specifying set of values for each variable & compute the Cartesian product of these sets as the
   scenario variations.
-- A `ScenarioVariant` composes a template and its `TaskVariation`
+* A `ScenarioVariant` composes a template and its `TaskVariation`
 
 ### Scenario Template, Variant, & User Story
 
@@ -161,10 +178,10 @@ Our metamodel includes two composites to represent concrete BDD scenarios, namel
 `ScenarioTemplate` and `ScenarioVariant`. `UserStory` is then a composite of scenario variants.
 Key design points:
 
-- A `ScenarioTemplate` is associated with 1 `Scene` (as described in the previous section).
-- A `ScenarioVariant` composes variations with scenario variables, as well as the template's scene
+* A `ScenarioTemplate` is associated with 1 `Scene` (as described in the previous section).
+* A `ScenarioVariant` composes variations with scenario variables, as well as the template's scene
   with concrete elements (as described in previous section).
-- A scenario variant may have additional `FluentClause` that is not part of the template, e.g.
+* A scenario variant may have additional `FluentClause` that is not part of the template, e.g.
   `clause-not-collide-pick` in Fig. 5.
 
 ## Representing Robotic AC as Knowledge Graphs
