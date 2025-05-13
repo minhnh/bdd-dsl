@@ -9,12 +9,16 @@ the robotic system and its state, the "When" clause describes an event that the 
 should react to, while the "Then" clause specifies the desired or expected behaviour.
 However, applying traditional BDD approaches to MRS applications can be challenging
 due to the complex interplay of multiple variability dimensions and domains involved in
-describing robotic scenarios. To address these challenges more effectively, `bdd-dsl`
-introduces a metamodel for defining composable BDD scenario templates that can be
-customized to specific robotic use cases. The metamodel design takes inspiration from
-a similar approach used for managing data structures [^alferez2019] and is further supported
-by an analysis of competition rulebooks to identify the variability dimensions that may arise
-when evaluating robotic scenarios [^nguyen2023rulebook].
+describing robotic scenarios.
+
+To address these challenges more effectively, `bdd-dsl` introduces a metamodel for defining
+composable BDD scenario templates that can be customized to specific robotic use cases.
+The metamodel design takes inspiration from a similar approach used for managing
+data structures [^alferez2019] and is further supported by an analysis of competition rulebooks
+to identify the variability dimensions that may arise when evaluating
+robotic scenarios [^nguyen2023rulebook]. A more user-friendly DSL that can generate valid
+RDF graphs for working with `bdd-dsl` can be found on the
+[RobBDD](https://github.com/minhnh/robbdd) repository.
 
 This library is one of the tools developed for the
 [Executable Scenario Workbench](https://sesame-project.github.io/exsce/)
@@ -44,6 +48,7 @@ Details on the design of the metamodel and tutorials on how to compose and trans
 BDD models can be found on the following pages:
 
 1. [Concepts and relations for specifying robotic scenarios](bdd-concepts.md)
+1. [Tutorial: Modelling a pickup task using RobBDD & generating Gherkin features](robbd.md)
 1. [Tutorial: Modelling a pickup task as JSON-LD graphs and generating Gherkin features](bdd-tutorial-representation.md)
 1. [Tutorial: Modelling & executing BDD tests for a pickup task](bdd-tutorial-execution.md) (WIP)
 
