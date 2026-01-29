@@ -4,7 +4,11 @@
 
 This repository provides tooling to support the specification and execution of acceptance tests for
 robotic scenarios using the [Behaviour-Driven Development (BDD)](https://dannorth.net/introducing-bdd/)
-methodology. Further documentation can be found below and on the
+methodology. The underlying metamodel design is described in our
+[paper](https://secorolab.github.io/nguyen2025iros/), which was presented at the
+2025 IEEE/RSJ International Conference on Intelligent Robots and Systems ([IROS 2025](https://iros25.org/)).
+
+Further documentation can be found below and on the
 [maintained GitHub page for the repository](https://secorolab.github.io/bdd-dsl/).
 A more user-friendly DSL that can generate valid RDF graphs for working with `bdd-dsl`
 can be found on the [RobBDD](https://github.com/minhnh/robbdd) repository.
