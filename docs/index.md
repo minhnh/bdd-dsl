@@ -11,7 +11,7 @@ However, applying traditional BDD approaches to MRS applications can be challeng
 due to the complex interplay of multiple variability dimensions and domains involved in
 describing robotic scenarios.
 
-To address these challenges more effectively, `bdd-dsl` introduces a metamodel for defining
+To address these challenges more effectively, `bdd-dsl` [^nguyen2025bdd] introduces a metamodel for defining
 composable BDD scenario templates that can be customized to specific robotic use cases.
 The metamodel design takes inspiration from a similar approach used for managing
 data structures [^alferez2019] and is further supported by an analysis of competition rulebooks
@@ -62,6 +62,11 @@ under grant agreement No 101017258.
 [^north2003bdd]: D. North, "Behavior Modification: The evolution of behaviour-driven development",
     _Better Software_, 2006 ([Original blog post](https://dannorth.net/introducing-bdd/)).
 
+[^nguyen2025bdd]: M. Nguyen, S. Wrede, N. Hochgeschwender,
+    ["Automated Behaviour-Driven Acceptance Testing of Robotic Systems"](https://secorolab.github.io/nguyen2025iros/),
+    _2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)_, Oct. 2025,
+    doi: [IROS60139.2025.11246121](https://doi.org/10.1109/IROS60139.2025.11246121)
+
 [^alferez2019]: M. Alferez, F. Pastore, M. Sabetzadeh, et al., "Bridging the Gap between
     Requirements Modeling and Behavior-Driven Development," _22nd MODELS_, 2019,
     doi: [10.1109/MODELS.2019.00008](https://doi.org/10.1109/MODELS.2019.00008).
@@ -69,4 +74,5 @@ under grant agreement No 101017258.
 [^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven
     requirement specification for robotic competitions",
     [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/),
-    May 2023.
+    May 2023,
+    doi: [10.1007/978-3-030-35699-6_15](https://doi.org/10.1007/978-3-030-35699-6_15).
