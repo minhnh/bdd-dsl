@@ -75,4 +75,4 @@ under grant agreement No 101017258.
     requirement specification for robotic competitions",
     [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/),
     May 2023,
-    doi: [10.1007/978-3-030-35699-6_15](https://doi.org/10.1007/978-3-030-35699-6_15).
+    doi: [10.1109/RoSE59155.2023.00008](https://doi.org/10.1109/RoSE59155.2023.00008).
