@@ -108,15 +108,12 @@ limiting our metamodel to this single representation.
 ```json
 { "@id": "tmpl:evt-pick-end", "@type": "time:Event" },
 {
-   "@id": "tmpl:ftc-after-pick", "@type": ["time:TimeConstraint", "time:AfterEventConstraint"],
-   "after-event": "tmpl:evt-pick-end"
-},
-{
-   "@id": "tmpl:flc-obj-held-by-robot", "@type": ["bdd:FluentClause", "bdd:IsHeldPredicate"],
+   "@id": "tmpl:flc-obj-held-by-robot",
+   "@type": ["bdd:FluentClause", "bdd:IsHeldPredicate", "time:TimeConstraint", "time:AfterEventConstraint"],
    "clause-of": "tmpl:pickup-then",
-   "holds-at": "tmpl:ftc-after-pick",
    "ref-object": "tmpl:var-target-obj",
-   "ref-agent": "tmpl:var-pick-robot"
+   "ref-agent": "tmpl:var-pick-robot",
+   "after-event": "tmpl:evt-pick-end"
 }
 ```
 
