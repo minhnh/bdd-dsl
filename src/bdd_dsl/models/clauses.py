@@ -5,7 +5,6 @@ from rdf_utils.models.common import ModelBase
 from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_CLAUSE_OF,
-    URI_BDD_PRED_HOLDS_AT,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
@@ -24,15 +23,11 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
+    URI_TIME_TYPE_TC,
 )
 
 
-class TimeConstraintModel(ModelBase):
-    def __init__(self, graph: Graph, tc_id: URIRef) -> None:
-        super().__init__(graph=graph, node_id=tc_id)
-
-
-def process_time_constraint_model(constraint: TimeConstraintModel, graph: Graph) -> None:
+def process_time_constraint_model(constraint: ModelBase, graph: Graph) -> None:
     if URI_TIME_TYPE_BEFORE_EVT in constraint.types:
         before_evt_uri = graph.value(
             subject=constraint.id, predicate=URI_TIME_PRED_BEFORE_EVT, any=False
@@ -86,7 +81,6 @@ class IClause(object):
 
 
 class FluentClauseModel(ModelBase, IClause):
-    time_constraint: TimeConstraintModel
     variable_by_role: dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
     role_by_variable: dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
 
@@ -97,13 +91,10 @@ class FluentClauseModel(ModelBase, IClause):
         self.variable_by_role = {}
         self.role_by_variable = {}
 
-        tc_id = graph.value(subject=clause_id, predicate=URI_BDD_PRED_HOLDS_AT)
-        assert isinstance(
-            tc_id, URIRef
-        ), f"FluentClause '{self.id}': holds-at doesn't link to URIRef"
-        tc = TimeConstraintModel(graph=graph, tc_id=tc_id)
-        process_time_constraint_model(constraint=tc, graph=graph)
-        self.time_constraint = tc
+        assert (
+            URI_TIME_TYPE_TC in self.types
+        ), f"FluentClause '{self.id}': is missing type {URI_TIME_TYPE_TC}"
+        process_time_constraint_model(constraint=self, graph=graph)
 
     def add_variables_by_role(self, graph: Graph, role_pred: URIRef):
         if role_pred not in self.variable_by_role:

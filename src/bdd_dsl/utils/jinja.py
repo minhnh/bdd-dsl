@@ -9,7 +9,6 @@ from rdflib.namespace import NamespaceManager
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
 from bdd_dsl.models.clauses import (
     FluentClauseModel,
-    TimeConstraintModel,
     WhenBehaviourModel,
 )
 from bdd_dsl.models.frames import (
@@ -128,10 +127,10 @@ def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], lis
 class TimeConstraintToStringProtocol(Protocol):
     """Protocol for functions that transform fluent clauses to time constraint strings."""
 
-    def __call__(self, tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str: ...
+    def __call__(self, tc: ModelBase, ns_manager: NamespaceManager) -> str: ...
 
 
-def get_tc_str_before_event(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
+def get_tc_str_before_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
     evt_uri = tc.get_attr(key=URI_TIME_PRED_BEFORE_EVT)
     assert isinstance(
         evt_uri, URIRef
@@ -140,7 +139,7 @@ def get_tc_str_before_event(tc: TimeConstraintModel, ns_manager: NamespaceManage
     return f'before event "{evt_uri_str}"'
 
 
-def get_tc_str_after_event(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
+def get_tc_str_after_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
     evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
     assert isinstance(
         evt_uri, URIRef
@@ -149,7 +148,7 @@ def get_tc_str_after_event(tc: TimeConstraintModel, ns_manager: NamespaceManager
     return f'after event "{evt_uri_str}"'
 
 
-def get_tc_str_during_events(tc: TimeConstraintModel, ns_manager: NamespaceManager) -> str:
+def get_tc_str_during_events(tc: ModelBase, ns_manager: NamespaceManager) -> str:
     from_evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
     assert isinstance(
         from_evt_uri, URIRef
@@ -403,14 +402,14 @@ class GherkinClauseStrGen(object):
 
         tc_str = None
         for tc_type in self._tc_str_gens:
-            if tc_type not in clause.time_constraint.types:
+            if tc_type not in clause.types:
                 continue
 
-            tc_str = self._tc_str_gens[tc_type](tc=clause.time_constraint, ns_manager=ns_manager)
+            tc_str = self._tc_str_gens[tc_type](tc=clause, ns_manager=ns_manager)
             break
         assert (
             tc_str is not None
-        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled time constraint types: {clause.time_constraint.types}"
+        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled time constraint types: {clause.types}"
 
         return f"{clause_str} {tc_str}"
 
