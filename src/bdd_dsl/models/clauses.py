@@ -194,6 +194,8 @@ class WhenBehaviourModel(ModelBase, IClause):
         ), f"WhenBehaviour '{self.id}' does not ref a behaviour URI: {bhv_id}"
         self.behaviour = ModelBase(node_id=bhv_id, graph=graph)
 
+        process_time_constraint_model(constraint=self, graph=graph)
+
 
 class WhenBhvLoaderProtocol(Protocol):
     """Protocol for functions that load relevant info for WhenBehaviour."""

@@ -18,6 +18,7 @@ from bdd_dsl.models.clauses import (
     WhenBehaviourModel,
     WhenBhvLoader,
     WhenBhvLoaderProtocol,
+    process_time_constraint_model,
 )
 from bdd_dsl.models.combinatorics import SetEnumerationModel
 from bdd_dsl.models.queries import Q_USER_STORY
@@ -475,7 +476,7 @@ class ScenarioVariantModel(IHasClause):
     """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
 
     us_id: URIRef
-    tmpl_id: URIRef
+    tmpl: ModelBase
     scene: SceneModel
     task_variation: TaskVariationModel
 
@@ -508,7 +509,8 @@ class ScenarioVariantModel(IHasClause):
         assert node_val is not None and isinstance(
             node_val, URIRef
         ), f"ScenarioVariant '{var_id}' does not refer to a ScenarioTemplate"
-        self.tmpl_id = node_val
+        self.tmpl = ModelBase(node_id=node_val, graph=full_graph)
+        process_time_constraint_model(constraint=self.tmpl, graph=full_graph)
 
         scene_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_HAS_SCENE)
         assert scene_id is not None and isinstance(
@@ -526,7 +528,7 @@ class ScenarioVariantModel(IHasClause):
         self._variant_clauses = set()
 
         clause_set = set()
-        self._load_clauses_re(node_id=self.tmpl_id, graph=full_graph, has_clause_set=clause_set)
+        self._load_clauses_re(node_id=self.tmpl.id, graph=full_graph, has_clause_set=clause_set)
         self._load_clauses_re(node_id=self.id, graph=full_graph, has_clause_set=clause_set)
 
         task_var_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_HAS_VARIATION)
