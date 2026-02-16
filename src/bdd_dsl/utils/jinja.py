@@ -1,7 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from numbers import Number
 from typing import Any, Iterable, Optional, Protocol
-from itertools import product
 from jinja2 import Environment, FileSystemLoader, Template
 from rdf_utils.models.common import ModelBase
 from rdflib import Graph, URIRef
@@ -21,13 +20,8 @@ from bdd_dsl.models.frames import (
     FR_WS,
 )
 from bdd_dsl.models.urirefs import (
-    URI_BDD_PRED_OF_SETS,
-    URI_BDD_PRED_ROWS,
-    URI_BDD_PRED_VAR_LIST,
-    URI_BDD_TYPE_CART_PRODUCT,
     URI_BDD_TYPE_MOVE_SAFE,
     URI_BDD_TYPE_SORTED,
-    URI_BDD_TYPE_TABLE_VAR,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
@@ -48,10 +42,10 @@ from bdd_dsl.models.user_story import (
     ForAllModel,
     IHasClause,
     ScenarioVariantModel,
-    TaskVariationModel,
     ThereExistsModel,
     UserStoryLoader,
 )
+from bdd_dsl.models.variation import get_task_variations
 
 
 def load_template_from_file(file_path: str) -> Template:
@@ -75,53 +69,6 @@ def load_template_from_url(url: str) -> Template:
 def load_template(template_name: str, dir_name: str) -> Template:
     env = Environment(loader=FileSystemLoader(dir_name), autoescape=True)
     return env.get_template(template_name)
-
-
-def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], list[Iterable[Any]]]:
-    var_uri_list = task_var.get_attr(key=URI_BDD_PRED_VAR_LIST)
-    assert isinstance(
-        var_uri_list, list
-    ), f"TaskVariation '{task_var.id}' does not have a list of variables as attr"
-
-    if URI_BDD_TYPE_CART_PRODUCT in task_var.types:
-        var_value_sets = task_var.get_attr(key=URI_BDD_PRED_OF_SETS)
-        assert isinstance(
-            var_value_sets, list
-        ), f"TaskVariation '{task_var.id}' does not have a list of variable values as attr"
-        assert len(var_uri_list) == len(
-            var_value_sets
-        ), f"TaskVariation '{task_var.id}': number of varibles doesn't match set of values"
-
-        uri_iterables = []
-        for set_data in var_value_sets:
-            if isinstance(set_data, URIRef):
-                if set_data in task_var.const_sets:
-                    uri_iterables.append(list(task_var.const_sets[set_data]))
-                elif set_data in task_var.set_enums:
-                    set_data_vals = list(task_var.set_enums[set_data].enumerate())
-                    uri_iterables.append(set_data_vals)
-                else:
-                    raise RuntimeError(
-                        f"unhandled set URI '{set_data}' for variation '{task_var.id}'"
-                    )
-            elif isinstance(set_data, list):
-                # list
-                uri_iterables.append(set_data)
-            else:
-                raise RuntimeError(
-                    f"TaskVariation {task_var.id}: sets for cartesian product not list or URIRef: {set_data}"
-                )
-
-        return var_uri_list, list(product(*uri_iterables))
-
-    if URI_BDD_TYPE_TABLE_VAR in task_var.types:
-        uri_rows = task_var.get_attr(key=URI_BDD_PRED_ROWS)
-        assert isinstance(
-            uri_rows, list
-        ), f"TaskVariation {task_var.id}: table rows are not a list: {uri_rows}"
-        return var_uri_list, uri_rows
-
-    raise RuntimeError(f"TaskVariation '{task_var.id}' has unhandled types: {task_var.types}")
 
 
 class TimeConstraintToStringProtocol(Protocol):
