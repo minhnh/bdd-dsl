@@ -3,7 +3,6 @@ import unittest
 import rdflib
 from rdf_utils.resolver import install_resolver
 from rdf_utils.uri import URL_SECORO_M
-from bdd_dsl.models.clauses import WhenBehaviourModel
 from bdd_dsl.models.user_story import UserStoryLoader
 from bdd_dsl.models.frames import FR_CRITERIA, FR_VARIATIONS
 from bdd_dsl.utils.jinja import prepare_jinja2_template_data
@@ -40,10 +39,8 @@ class BDDSpecTest(unittest.TestCase):
         for scr_var_set in us_var_dict.values():
             for scr_var_id in scr_var_set:
                 scr_var = us_loader.load_scenario_variant(full_graph=graph, variant_id=scr_var_id)
-                when_bhv = scr_var.get_clause_model(clause_id=scr_var.when_bhv_id)
-                assert isinstance(when_bhv, WhenBehaviourModel)
                 self.assertTrue(
-                    when_bhv.behaviour.id == scr_var.scenario.bhv_id,
+                    scr_var.when_bhv_model.behaviour.id == scr_var.scenario.bhv_id,
                     "behaviour id in WhenBehaviour clause doesn't match that for ScenarioVariant '{scr_var.id}'",
                 )
 
