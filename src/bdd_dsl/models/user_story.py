@@ -502,6 +502,14 @@ class ScenarioVariantModel(IHasClause):
         ), f"ScenarioVariant '{self.id}': forall '{self._forall_id}' not added as ForAllModel"
         return forall.when_bhv_id
 
+    @property
+    def when_bhv_model(self) -> WhenBehaviourModel:
+        whn_bhv = self.get_clause_model(clause_id=self.when_bhv_id)
+        assert isinstance(
+            whn_bhv, WhenBehaviourModel
+        ), f"Model for '{self.when_bhv_id}' not a WhenBehaviourModel: {type(whn_bhv)}"
+        return whn_bhv
+
 
 class UserStoryLoader(object):
     def __init__(self, graph: Graph, shacl_check=True, quiet=False) -> None:
