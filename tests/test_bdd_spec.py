@@ -3,6 +3,7 @@ import unittest
 import rdflib
 from rdf_utils.resolver import install_resolver
 from rdf_utils.uri import URL_SECORO_M
+from bdd_dsl.models.clauses import WhenBehaviourModel
 from bdd_dsl.models.user_story import UserStoryLoader
 from bdd_dsl.models.frames import FR_CRITERIA, FR_VARIATIONS
 from bdd_dsl.utils.jinja import prepare_jinja2_template_data
@@ -12,21 +13,64 @@ MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/agents/isaac-sim.agn.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/scenes/secorolab-env.scene.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/scenes/isaac-agents.scene.json": "json-ld",
+}
+PP_MODELS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/templates/pickplace.tmpl.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/pickplace-secorolab-isaac.var.json": "json-ld",
+}
+SORT_MODELS = {
+    f"{URL_SECORO_M}/acceptance-criteria/bdd/templates/sorting.tmpl.json": "json-ld",
+    f"{URL_SECORO_M}/acceptance-criteria/bdd/sorting-secorolab-isaac.var.json": "json-ld",
 }
 
 
 class BDDSpecTest(unittest.TestCase):
     def setUp(self):
         install_resolver()
-        self.graph = rdflib.Dataset()
-        for url, fmt in MODEL_URLS.items():
-            self.graph.parse(url, format=fmt)
 
-    def test_bdd_jinja(self):
-        us_loader = UserStoryLoader(self.graph)
-        processed_bdd_data = prepare_jinja2_template_data(us_loader, self.graph)
+    def test_scenario_properties(self):
+        graph = rdflib.Dataset()
+        for url, fmt in MODEL_URLS.items():
+            graph.parse(url, format=fmt)
+        for url, fmt in SORT_MODELS.items():
+            graph.parse(url, format=fmt)
+
+        us_loader = UserStoryLoader(graph)
+        us_var_dict = us_loader.get_us_scenario_variants()
+        for scr_var_set in us_var_dict.values():
+            for scr_var_id in scr_var_set:
+                scr_var = us_loader.load_scenario_variant(full_graph=graph, variant_id=scr_var_id)
+                when_bhv = scr_var.get_clause_model(clause_id=scr_var.when_bhv_id)
+                assert isinstance(when_bhv, WhenBehaviourModel)
+                self.assertTrue(
+                    when_bhv.behaviour.id == scr_var.scenario.bhv_id,
+                    "behaviour id in WhenBehaviour clause doesn't match that for ScenarioVariant '{scr_var.id}'",
+                )
+
+    def test_pickplace_jinja(self):
+        graph = rdflib.Dataset()
+        for url, fmt in MODEL_URLS.items():
+            graph.parse(url, format=fmt)
+        for url, fmt in PP_MODELS.items():
+            graph.parse(url, format=fmt)
+
+        us_loader = UserStoryLoader(graph)
+        processed_bdd_data = prepare_jinja2_template_data(us_loader, graph)
+        for us_data in processed_bdd_data:
+            for scenario_data in us_data[FR_CRITERIA]:
+                self.assertTrue(len(scenario_data[FR_VARIATIONS]) > 0)
+                for var_data in scenario_data[FR_VARIATIONS]:
+                    self.assertTrue(len(var_data["clauses"]) > 0)
+
+    def test_sorting_jinja(self):
+        graph = rdflib.Dataset()
+        for url, fmt in MODEL_URLS.items():
+            graph.parse(url, format=fmt)
+        for url, fmt in SORT_MODELS.items():
+            graph.parse(url, format=fmt)
+
+        us_loader = UserStoryLoader(graph)
+        processed_bdd_data = prepare_jinja2_template_data(us_loader, graph)
         for us_data in processed_bdd_data:
             for scenario_data in us_data[FR_CRITERIA]:
                 self.assertTrue(len(scenario_data[FR_VARIATIONS]) > 0)
