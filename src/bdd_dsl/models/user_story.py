@@ -177,6 +177,7 @@ class IHasClause(ModelBase):
     _bhv_loader: Optional[WhenBhvLoader]
     exists_clauses: set[URIRef]
     clauses: dict[URIRef, IClause]
+    _path_to_clauses: dict[URIRef, URIRef | None]
     clauses_by_role: dict[URIRef, list[URIRef]]  # given/when/then URI -> clause URI
     variables: set[URIRef]
     scenario: ScenarioModel
@@ -200,6 +201,7 @@ class IHasClause(ModelBase):
         self._when_bhv_id = None
         self._fluent_loader = fluent_loader
         self._bhv_loader = bhv_loader
+        self._path_to_clauses = {}
 
     def _process_iclause(self, clause: IClause):
         assert isinstance(
@@ -212,6 +214,11 @@ class IHasClause(ModelBase):
         assert clause.id not in self.clauses, f"{self.id}: duplicate clause: {clause.id}"
         self.clauses[clause.id] = clause
         self.clauses_by_role[clause.clause_of].append(clause.id)
+
+        assert (
+            clause.id not in self._path_to_clauses
+        ), f"{self.id}: multiple '{clause.id}' in clause hierarchy"
+        self._path_to_clauses[clause.id] = None
 
     def _load_clauses_re(self, node_id: URIRef, graph: Graph, has_clause_set: set[URIRef]) -> None:
         if node_id in has_clause_set:
@@ -261,6 +268,12 @@ class IHasClause(ModelBase):
                 forall_model._load_clauses_re(
                     node_id=forall_model.id, graph=graph, has_clause_set=has_clause_set
                 )
+                for clause_id in forall_model._path_to_clauses:
+                    assert (
+                        clause_id not in self._path_to_clauses
+                    ), f"{self.id}: multiple {clause_id} of {forall_model.id} in clause hierarchy"
+                    assert clause_id in forall_model._path_to_clauses
+                    self._path_to_clauses[clause_id] = forall_model.id
                 continue
 
             if URI_BDD_TYPE_EXISTS in clause_types:
@@ -276,6 +289,12 @@ class IHasClause(ModelBase):
                 exists_model._load_clauses_re(
                     node_id=exists_model.id, graph=graph, has_clause_set=has_clause_set
                 )
+                for clause_id in exists_model._path_to_clauses:
+                    assert (
+                        clause_id not in self._path_to_clauses
+                    ), f"{self.id}: multiple {clause_id} of {exists_model.id} in clause hierarchy"
+                    assert clause_id in exists_model._path_to_clauses
+                    self._path_to_clauses[clause_id] = exists_model.id
                 continue
 
             if URI_BDD_TYPE_WHEN_BHV in clause_types:
@@ -292,6 +311,22 @@ class IHasClause(ModelBase):
                 continue
 
             raise RuntimeError(f"Clause '{clause_id}' has unexpected types: {clause_types}")
+
+    def get_clause_model(self, clause_id: URIRef) -> IClause | None:
+        if clause_id not in self._path_to_clauses:
+            return None
+
+        p_to_clause_id = self._path_to_clauses[clause_id]
+        if p_to_clause_id is None:
+            assert clause_id in self.clauses, f"'{clause_id}' not added to clause collection"
+            return self.clauses[clause_id]
+
+        assert (
+            p_to_clause_id in self.clauses
+        ), f"path to '{clause_id}', {p_to_clause_id}, not in clause collection"
+        p_to_clause_model = self.clauses[p_to_clause_id]
+        assert isinstance(p_to_clause_model, IHasClause)
+        return p_to_clause_model.get_clause_model(clause_id)
 
 
 class ForAllModel(IHasClause, IClause):
@@ -329,6 +364,23 @@ class ForAllModel(IHasClause, IClause):
             in_set_node, URIRef
         ), f"ForAll {self.id}: 'in-set' is not a URI: {in_set_node}"
         self.in_set = in_set_node
+
+    @property
+    def when_bhv_id(self) -> URIRef:
+        if self._forall_id is None:
+            assert (
+                self._when_bhv_id is not None
+            ), f"ForAllModel '{self.id}': no inner forall or WhenBehaviour clause"
+            return self._when_bhv_id
+
+        assert (
+            self._forall_id in self.clauses
+        ), f"ForAllModel '{self.id}': inner forall '{self._forall_id}' not added to clause collection"
+        inner_forall = self.clauses[self._forall_id]
+        assert isinstance(
+            inner_forall, ForAllModel
+        ), f"ForAllModel '{self.id}': inner forall '{self._forall_id}' not added as ForAllModel"
+        return inner_forall.when_bhv_id
 
 
 class ThereExistsModel(IHasClause, IClause):
@@ -432,6 +484,23 @@ class ScenarioVariantModel(IHasClause):
         self.task_variation = TaskVariationModel(
             us_graph=us_graph, full_graph=full_graph, task_var_id=task_var_id
         )
+
+    @property
+    def when_bhv_id(self) -> URIRef:
+        if self._forall_id is None:
+            assert (
+                self._when_bhv_id is not None
+            ), f"ScenarioVariant '{self.id}': no inner forall or WhenBehaviour clause"
+            return self._when_bhv_id
+
+        assert (
+            self._forall_id in self.clauses
+        ), f"ScenarioVariant '{self.id}': forall '{self._forall_id}' not added to clause collection"
+        forall = self.clauses[self._forall_id]
+        assert isinstance(
+            forall, ForAllModel
+        ), f"ScenarioVariant '{self.id}': forall '{self._forall_id}' not added as ForAllModel"
+        return forall.when_bhv_id
 
 
 class UserStoryLoader(object):
