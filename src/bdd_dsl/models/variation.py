@@ -253,6 +253,6 @@ def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], lis
     raise RuntimeError(f"TaskVariation '{task_var.id}' has unhandled types: {task_var.types}")
 
 
-def get_task_var_dicts(task_var: TaskVariationModel) -> list[dict[URIRef, Iterable[Any]]]:
+def get_task_var_dicts(task_var: TaskVariationModel) -> list[dict[URIRef, Any]]:
     var_uri_list, var_value_sets = get_task_variations(task_var=task_var)
     return [dict(zip(var_uri_list, val_set)) for val_set in var_value_sets]
