@@ -7,6 +7,7 @@ from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.models.environment import EnvModelLoader, ObjectModel, WorkspaceModel
 from bdd_dsl.models.agent import AgentModel, AgnModelLoader
+from bdd_dsl.models.time_constraint import process_time_constraint_model
 from bdd_dsl.models.clauses import (
     load_bhv_pickplace,
     DEFAULT_FLUENT_LOADERS,
@@ -17,7 +18,6 @@ from bdd_dsl.models.clauses import (
     WhenBehaviourModel,
     WhenBhvLoader,
     WhenBhvLoaderProtocol,
-    process_time_constraint_model,
 )
 from bdd_dsl.models.variation import TaskVariationModel
 from bdd_dsl.models.queries import Q_USER_STORY
