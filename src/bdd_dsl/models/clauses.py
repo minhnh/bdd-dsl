@@ -18,55 +18,9 @@ from bdd_dsl.models.urirefs import (
     URI_BHV_PRED_TARGET_WS,
     URI_BHV_TYPE_PICK,
     URI_BHV_TYPE_PLACE,
-    URI_TIME_TYPE_DURING,
-    URI_TIME_TYPE_AFTER_EVT,
-    URI_TIME_TYPE_BEFORE_EVT,
-    URI_TIME_PRED_AFTER_EVT,
-    URI_TIME_PRED_BEFORE_EVT,
     URI_TIME_TYPE_TC,
 )
-
-
-def process_time_constraint_model(constraint: ModelBase, graph: Graph) -> None:
-    if URI_TIME_TYPE_BEFORE_EVT in constraint.types:
-        before_evt_uri = graph.value(
-            subject=constraint.id, predicate=URI_TIME_PRED_BEFORE_EVT, any=False
-        )
-        assert isinstance(
-            before_evt_uri, URIRef
-        ), f"BeforeEvent TC '{constraint.id}' missing 'before-event' pred to URI: {before_evt_uri}"
-        constraint.set_attr(key=URI_TIME_PRED_BEFORE_EVT, val=before_evt_uri)
-        return
-
-    if URI_TIME_TYPE_AFTER_EVT in constraint.types:
-        after_evt_uri = graph.value(
-            subject=constraint.id, predicate=URI_TIME_PRED_AFTER_EVT, any=False
-        )
-        assert isinstance(
-            after_evt_uri, URIRef
-        ), f"AfterEvent TC '{constraint.id}' missing 'after-event' pred to URI: {after_evt_uri}"
-        constraint.set_attr(key=URI_TIME_PRED_AFTER_EVT, val=after_evt_uri)
-        return
-
-    if URI_TIME_TYPE_DURING in constraint.types:
-        before_evt_uri = graph.value(
-            subject=constraint.id, predicate=URI_TIME_PRED_BEFORE_EVT, any=False
-        )
-        assert isinstance(
-            before_evt_uri, URIRef
-        ), f"DuringEvents TC '{constraint.id}' missing 'before-event' pred to URI: {before_evt_uri}"
-        constraint.set_attr(key=URI_TIME_PRED_BEFORE_EVT, val=before_evt_uri)
-
-        after_evt_uri = graph.value(
-            subject=constraint.id, predicate=URI_TIME_PRED_AFTER_EVT, any=False
-        )
-        assert isinstance(
-            after_evt_uri, URIRef
-        ), f"DuringEvents TC '{constraint.id}' missing 'after-event' pred to URI: {after_evt_uri}"
-        constraint.set_attr(key=URI_TIME_PRED_AFTER_EVT, val=after_evt_uri)
-        return
-
-    raise RuntimeError(f"unhandled types for time constraint '{constraint.id}': {constraint.types}")
+from bdd_dsl.models.time_constraint import process_time_constraint_model
 
 
 class IClause(object):

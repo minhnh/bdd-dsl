@@ -50,6 +50,7 @@ URI_TIME_TYPE_AFTER_EVT = NS_MM_TIME["AfterEventConstraint"]
 URI_TIME_TYPE_DURING = NS_MM_TIME["DuringEventsConstraint"]
 URI_TIME_PRED_BEFORE_EVT = NS_MM_TIME["before-event"]
 URI_TIME_PRED_AFTER_EVT = NS_MM_TIME["after-event"]
+URI_TIME_PRED_HRZN_SEC = NS_MM_TIME["horizon-seconds"]
 
 # Task
 URI_TASK_TYPE_TASK = NS_MM_TASK["Task"]
