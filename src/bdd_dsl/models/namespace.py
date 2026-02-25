@@ -4,6 +4,7 @@ from bdd_dsl.models.uri import (
     URI_MM_BDD,
     URI_MM_BHV,
     URI_MM_SIM,
+    URI_MM_OBS,
     URI_MM_TASK,
 )
 
@@ -12,12 +13,14 @@ NS_MM_BDD = Namespace(URI_MM_BDD)
 NS_MM_BHV = Namespace(URI_MM_BHV)
 NS_MM_TASK = Namespace(URI_MM_TASK)
 NS_MM_SIM = Namespace(URI_MM_SIM)
+NS_MM_OBS = Namespace(URI_MM_OBS)
 
 # Prefixes
 PREFIX_GEOM = "geom"
 PREFIX_GEOM_REL = "geom-rel"
 PREFIX_GEOM_COORD = "geom-coord"
 PREFIX_ENV = "mm-env"
+PREFIX_OBS = "obs"
 
 PREFIX_TRANS = "trans"
 
@@ -27,4 +30,5 @@ __tmp.bind(PREFIX_GEOM, NS_MM_GEOM)
 __tmp.bind(PREFIX_GEOM_REL, NS_MM_GEOM_REL)
 __tmp.bind(PREFIX_GEOM_COORD, NS_MM_GEOM_COORD)
 __tmp.bind(PREFIX_ENV, NS_MM_ENV)
+__tmp.bind(PREFIX_OBS, NS_MM_OBS)
 NS_MANAGER = __tmp.namespace_manager
