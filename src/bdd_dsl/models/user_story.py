@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Iterable, Optional
+from typing import Any, Generator, Iterable, Optional
 from rdflib import RDF, Graph, URIRef, BNode
 from rdflib.query import ResultRow
 from rdf_utils.models.common import ModelBase, get_node_types
@@ -327,6 +327,17 @@ class IHasClause(ModelBase):
         p_to_clause_model = self.clauses[p_to_clause_id]
         assert isinstance(p_to_clause_model, IHasClause)
         return p_to_clause_model.get_clause_model(clause_id)
+
+    def fluent_clauses(self) -> Generator[FluentClauseModel, None, None]:
+        for fc in self.clauses.values():
+            if isinstance(fc, FluentClauseModel):
+                yield fc
+            elif isinstance(fc, WhenBehaviourModel):
+                continue
+            elif isinstance(fc, IHasClause):
+                yield from fc.fluent_clauses()
+            else:
+                raise ValueError(f"Unexpected clause type ({type(fc)}): {fc}")
 
 
 class ForAllModel(IHasClause, IClause):

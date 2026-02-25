@@ -7,6 +7,7 @@ from rdf_utils.namespace import (
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
+    NS_MM_OBS,
     NS_MM_SIM,
     NS_MM_TASK,
 )
@@ -59,6 +60,10 @@ URI_SIM_TYPE_SYS_RES = NS_MM_SIM["SystemResource"]
 URI_SIM_TYPE_RES_PATH = NS_MM_SIM["ResourceWithPath"]
 URI_SIM_PRED_HAS_CONFIG = NS_MM_SIM["has-config"]
 URI_SIM_PRED_PATH = NS_MM_SIM["path"]
+
+# Observation
+URI_OBS_TYPE_POLICY = NS_MM_OBS["ObservationPolicy"]
+URI_OBS_TYPE_PROVIDER = NS_MM_OBS["ObservationProvider"]
 
 # BDD
 URI_BDD_TYPE_US = NS_MM_BDD["UserStory"]
