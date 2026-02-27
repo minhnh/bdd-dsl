@@ -1,11 +1,14 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
-from rdflib import URIRef
+from rdflib import Graph, URIRef
 from trinary import Trinary
 
+from rdf_utils.models.common import AttrLoaderProtocol
 from bdd_dsl.models.clauses import FluentClauseModel
+from bdd_dsl.models.user_story import ScenarioVariantModel
 from bdd_dsl.models.time_constraint import get_duration
 from bdd_dsl.models.urirefs import (
     URI_TIME_PRED_AFTER_EVT,
@@ -92,15 +95,11 @@ class FluentTimeline(object):
         if end_t is None:
             end_t = self._trinary_timeline[-1].stamp
 
-        while True:
+        while len(self._trinary_timeline) > 0:
             first_trin_t = self._trinary_timeline[0].stamp
             start_t = end_t - self.horizon
             if first_trin_t > start_t:
                 break
-            if len(self._trinary_timeline) < 2:
-                raise ValueError(
-                    f"{self.fluent_id}: Last trinary out of horizon (horizon too short?): {first_trin_t} not in [{start_t}, {end_t}]"
-                )
             self._trinary_timeline.pop(0)
 
     def add_trinary(self, trin_st: TrinaryStamped):
@@ -175,3 +174,73 @@ class FluentTimeline(object):
             raise ValueError(
                 f"fluent {self.fluent_id}: matching end event '{self.end_event}' for wrong duration type: {self.duration_type}"
             )
+
+
+class ObservationManager(object):
+    fluent_timelines: dict[URIRef, FluentTimeline]
+    event_timelines: dict[URIRef, list[float]]
+    _fluent_event_registry: dict[URIRef, set[URIRef]]
+
+    def __init__(self) -> None:
+        self.fluent_timelines = {}
+        self.event_timelines = {}
+        self._fluent_event_registry = {}
+
+    def _insert_evt_stamp_in_order(self, evt_uri: URIRef, evt_t: float):
+        # Find insertion point (from end)
+        for i in range(len(self.event_timelines[evt_uri]) - 1, -1, -1):
+            if self.event_timelines[evt_uri][i] < evt_t:
+                self.event_timelines[evt_uri].insert(i + 1, evt_t)
+                return
+
+        # Insert at beginning if smallest
+        self.event_timelines[evt_uri].insert(0, evt_t)
+
+    def _register_fluent_event(self, evt_uri: URIRef | None, fc_id: URIRef) -> None:
+        if evt_uri is None:
+            return
+
+        if evt_uri not in self._fluent_event_registry:
+            self._fluent_event_registry[evt_uri] = {fc_id}
+            return
+
+        self._fluent_event_registry[evt_uri].add(fc_id)
+
+    def register_fluent_obs(
+        self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol]
+    ):
+        if fc.id not in self.fluent_timelines:
+            f_tl = FluentTimeline(fc=fc)
+            self.fluent_timelines[fc.id] = f_tl
+            self._register_fluent_event(evt_uri=f_tl.start_event, fc_id=fc.id)
+            self._register_fluent_event(evt_uri=f_tl.end_event, fc_id=fc.id)
+
+        for obs_ldr in obs_loaders:
+            obs_ldr(graph=graph, model=fc)
+
+    def update_fpolicy_assertion(self, fc_uri: URIRef, trin_st: TrinaryStamped):
+        assert fc_uri in self.fluent_timelines, f"No Timeline created for '{fc_uri}'"
+        self.fluent_timelines[fc_uri].add_trinary(trin_st)
+
+    def on_event(self, evt_uri: URIRef, evt_t: float):
+        if evt_uri not in self.event_timelines:
+            self.event_timelines[evt_uri] = [evt_t]
+        else:
+            self._insert_evt_stamp_in_order(evt_uri=evt_uri, evt_t=evt_t)
+
+        if evt_uri not in self._fluent_event_registry:
+            return
+
+        for fc_uri in self._fluent_event_registry[evt_uri]:
+            assert fc_uri in self.fluent_timelines
+            self.fluent_timelines[fc_uri].on_event(evt_uri=evt_uri, evt_stamp=evt_t)
+
+    @classmethod
+    def from_scenario_variant(
+        cls, graph: Graph, scr_var: ScenarioVariantModel, obs_loaders: list[AttrLoaderProtocol]
+    ) -> ObservationManager:
+        obs_manager = ObservationManager()
+
+        for fc in scr_var.fluent_clauses():
+            obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders)
+        return obs_manager
