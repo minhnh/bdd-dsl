@@ -84,7 +84,8 @@ class FluentTimeline(object):
         Discard TrinaryStamped objects outside of the time horizon, calculated either
         from the end event or the latest TrinaryStamped instance.
         """
-        if len(self.trinary_timeline) < 1:
+        if len(self.trinary_timeline) < 1 or self.end_time is not None:
+            # if no trinary registered or timeline finished
             return
 
         assert self.horizon is not None, (
