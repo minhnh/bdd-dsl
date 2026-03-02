@@ -1,10 +1,10 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional, Protocol
 
 from rdflib import Graph, URIRef
-from trinary import Trinary
+from trinary import Trinary, Unknown
 
 from rdf_utils.models.common import AttrLoaderProtocol
 from bdd_dsl.models.clauses import FluentClauseModel
@@ -27,7 +27,7 @@ class TrinaryStamped:
 
 
 class FluentTimeline(object):
-    _trinary_timeline: list[TrinaryStamped]
+    trinary_timeline: list[TrinaryStamped]
 
     start_time: Optional[float]
     end_time: Optional[float]
@@ -39,7 +39,7 @@ class FluentTimeline(object):
     horizon: Optional[float]
 
     def __init__(self, fc: FluentClauseModel) -> None:
-        self._trinary_timeline = []
+        self.trinary_timeline = []
 
         self.start_time = None
         self.end_time = None
@@ -66,17 +66,17 @@ class FluentTimeline(object):
             self.horizon = dur_spec[URI_TIME_PRED_HRZN_SEC]
 
         else:
-            raise ValueError(f"Unhandled duration types:\n{'\n  '.join(fc.types)}")
+            raise ValueError("Unhandled duration types:\n" + "\n  ".join(fc.types))
 
     def _insert_trin_stamped_in_order(self, trin_st: TrinaryStamped):
         # Find insertion point (from end)
-        for i in range(len(self._trinary_timeline) - 1, -1, -1):
-            if self._trinary_timeline[i].stamp < trin_st.stamp:
-                self._trinary_timeline.insert(i + 1, trin_st)
+        for i in range(len(self.trinary_timeline) - 1, -1, -1):
+            if self.trinary_timeline[i].stamp < trin_st.stamp:
+                self.trinary_timeline.insert(i + 1, trin_st)
                 return
 
         # Insert at beginning if smallest
-        self._trinary_timeline.insert(0, trin_st)
+        self.trinary_timeline.insert(0, trin_st)
 
     def _discard_out_of_horizon_trin(self):
         """Clean up trinary queue for BeforeEvent type.
@@ -84,23 +84,23 @@ class FluentTimeline(object):
         Discard TrinaryStamped objects outside of the time horizon, calculated either
         from the end event or the latest TrinaryStamped instance.
         """
-        if len(self._trinary_timeline) < 1:
+        if len(self.trinary_timeline) < 1:
             return
 
-        assert (
-            self.horizon is not None
-        ), f"{self.fluent_id}: _discard_out_of_horizon_trin called with no horizon specified for type: {self.duration_type}"
+        assert self.horizon is not None, (
+            f"{self.fluent_id}: _discard_out_of_horizon_trin called with no horizon specified for type: {self.duration_type}"
+        )
 
         end_t = self.end_time
         if end_t is None:
-            end_t = self._trinary_timeline[-1].stamp
+            end_t = self.trinary_timeline[-1].stamp
 
-        while len(self._trinary_timeline) > 0:
-            first_trin_t = self._trinary_timeline[0].stamp
+        while len(self.trinary_timeline) > 0:
+            first_trin_t = self.trinary_timeline[0].stamp
             start_t = end_t - self.horizon
             if first_trin_t > start_t:
                 break
-            self._trinary_timeline.pop(0)
+            self.trinary_timeline.pop(0)
 
     def add_trinary(self, trin_st: TrinaryStamped):
         if self.duration_type == URI_TIME_TYPE_BEFORE_EVT:
@@ -244,3 +244,20 @@ class ObservationManager(object):
         for fc in scr_var.fluent_clauses():
             obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders)
         return obs_manager
+
+
+class TrinariesPolicyProtocol(Protocol):
+    """Protocol for functions that load model attributes."""
+
+    def __call__(self, trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary: ...
+
+
+def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary:
+    if len(trinaries) == 0:
+        return Unknown
+
+    result = True
+    for trin_st in trinaries:
+        result &= trin_st.trinary
+
+    return result
