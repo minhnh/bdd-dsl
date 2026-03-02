@@ -27,6 +27,7 @@ class TrinaryStamped:
 
 
 class FluentTimeline(object):
+    representation: str
     trinary_timeline: list[TrinaryStamped]
 
     start_time: Optional[float]
@@ -39,6 +40,8 @@ class FluentTimeline(object):
     horizon: Optional[float]
 
     def __init__(self, fc: FluentClauseModel) -> None:
+        self.representation = fc.id.toPython()
+
         self.trinary_timeline = []
 
         self.start_time = None
