@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, Protocol
 
 from rdflib import Graph, URIRef
+from rdflib.namespace import NamespaceManager
 from trinary import Trinary, Unknown
 
 from rdf_utils.models.common import AttrLoaderProtocol
@@ -39,8 +40,13 @@ class FluentTimeline(object):
     end_event: Optional[URIRef]
     horizon: Optional[float]
 
-    def __init__(self, fc: FluentClauseModel) -> None:
-        self.representation = fc.id.toPython()
+    _ns_manager: Optional[NamespaceManager]
+
+    def __init__(
+        self, fc: FluentClauseModel, ns_manager: Optional[NamespaceManager] = None
+    ) -> None:
+        self._ns_manager = ns_manager
+        self.representation = fc.id.n3(self._ns_manager)
 
         self.trinary_timeline = []
 
@@ -181,11 +187,29 @@ class FluentTimeline(object):
 
 
 class ObservationManager(object):
+    scr_start_event: URIRef
+    scr_end_event: URIRef
+    scr_start_time: Optional[float]
+    scr_end_time: Optional[float]
+
     fluent_timelines: dict[URIRef, FluentTimeline]
     event_timelines: dict[URIRef, list[float]]
     _fluent_event_registry: dict[URIRef, set[URIRef]]
+    _ns_manager: Optional[NamespaceManager]
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        scr_start_event: URIRef,
+        scr_end_event: URIRef,
+        ns_manager: Optional[NamespaceManager] = None,
+    ) -> None:
+        self._ns_manager = ns_manager
+
+        self.scr_start_event = scr_start_event
+        self.scr_end_event = scr_end_event
+        self.scr_start_time = None
+        self.scr_end_time = None
+
         self.fluent_timelines = {}
         self.event_timelines = {}
         self._fluent_event_registry = {}
@@ -214,7 +238,7 @@ class ObservationManager(object):
         self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol]
     ):
         if fc.id not in self.fluent_timelines:
-            f_tl = FluentTimeline(fc=fc)
+            f_tl = FluentTimeline(fc=fc, ns_manager=graph.namespace_manager)
             self.fluent_timelines[fc.id] = f_tl
             self._register_fluent_event(evt_uri=f_tl.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=f_tl.end_event, fc_id=fc.id)
@@ -232,6 +256,11 @@ class ObservationManager(object):
         else:
             self._insert_evt_stamp_in_order(evt_uri=evt_uri, evt_t=evt_t)
 
+        if evt_uri == self.scr_start_event:
+            self.scr_start_time = evt_t
+        elif evt_uri == self.scr_end_event:
+            self.scr_end_time = evt_t
+
         if evt_uri not in self._fluent_event_registry:
             return
 
@@ -243,7 +272,23 @@ class ObservationManager(object):
     def from_scenario_variant(
         cls, graph: Graph, scr_var: ScenarioVariantModel, obs_loaders: list[AttrLoaderProtocol]
     ) -> ObservationManager:
-        obs_manager = ObservationManager()
+        dur = get_duration(scr_var.tmpl)
+        ns_manager = graph.namespace_manager
+        assert URI_TIME_PRED_AFTER_EVT in dur and URI_TIME_PRED_BEFORE_EVT in dur, (
+            f"ScenarioVariant '{scr_var.id.n3(ns_manager)}' does not have before/after event attributes"
+        )
+
+        scr_start_event = dur[URI_TIME_PRED_AFTER_EVT]
+        scr_end_event = dur[URI_TIME_PRED_BEFORE_EVT]
+        assert scr_start_event != scr_end_event, (
+            f"ScenarioVariant '{scr_var.id.n3(ns_manager)}' has same start/end events: {scr_start_event}"
+        )
+
+        obs_manager = ObservationManager(
+            scr_start_event=scr_start_event,
+            scr_end_event=scr_end_event,
+            ns_manager=ns_manager,
+        )
 
         for fc in scr_var.fluent_clauses():
             obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders)
