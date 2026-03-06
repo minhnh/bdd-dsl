@@ -1,5 +1,4 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from numbers import Number
 from typing import Any, Iterable, Optional, Protocol
 from jinja2 import Environment, FileSystemLoader, Template
 from rdf_utils.models.common import ModelBase
@@ -27,13 +26,6 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_REF_WS,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
-    URI_BHV_PRED_TARGET_AGN,
-    URI_BHV_PRED_TARGET_OBJ,
-    URI_BHV_PRED_TARGET_WS,
-    URI_BHV_TYPE_PICK,
-    URI_BHV_TYPE_PLACE,
-    URI_TIME_PRED_BEFORE_EVT,
-    URI_TIME_PRED_AFTER_EVT,
     URI_TIME_TYPE_AFTER_EVT,
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
@@ -46,6 +38,15 @@ from bdd_dsl.models.user_story import (
     UserStoryLoader,
 )
 from bdd_dsl.models.variation import get_task_variations
+from bdd_dsl.representation import (
+    get_str_tc_after_event,
+    get_str_tc_before_event,
+    get_str_tc_during_events,
+    get_tmpl_bhv_pickplace,
+    get_tmpl_fc_is_held,
+    get_tmpl_fc_located_at,
+    var_val_to_str,
+)
 
 
 def load_template_from_file(file_path: str) -> Template:
@@ -77,44 +78,10 @@ class TimeConstraintToStringProtocol(Protocol):
     def __call__(self, tc: ModelBase, ns_manager: NamespaceManager) -> str: ...
 
 
-def get_tc_str_before_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
-    evt_uri = tc.get_attr(key=URI_TIME_PRED_BEFORE_EVT)
-    assert isinstance(
-        evt_uri, URIRef
-    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' doesn't ref an event's URI: {evt_uri}"
-    evt_uri_str = evt_uri.n3(ns_manager)
-    return f'before event "{evt_uri_str}"'
-
-
-def get_tc_str_after_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
-    evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
-    assert isinstance(
-        evt_uri, URIRef
-    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' doesn't ref an event's URI: {evt_uri}"
-    evt_uri_str = evt_uri.n3(ns_manager)
-    return f'after event "{evt_uri_str}"'
-
-
-def get_tc_str_during_events(tc: ModelBase, ns_manager: NamespaceManager) -> str:
-    from_evt_uri = tc.get_attr(key=URI_TIME_PRED_AFTER_EVT)
-    assert isinstance(
-        from_evt_uri, URIRef
-    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' missing 'from-event' pred to URI: {from_evt_uri}"
-    from_evt_uri_str = from_evt_uri.n3(ns_manager)
-
-    until_evt_uri = tc.get_attr(key=URI_TIME_PRED_BEFORE_EVT)
-    assert isinstance(
-        until_evt_uri, URIRef
-    ), f"TimeConstraint '{tc.id}' of types '{tc.types}' missing 'until-event' pred to URI: {until_evt_uri}"
-    until_evt_uri_str = until_evt_uri.n3(ns_manager)
-
-    return f'from "{from_evt_uri_str}" until "{until_evt_uri_str}"'
-
-
 DEFAULT_TIME_CSTR_STR_GENS = {
-    URI_TIME_TYPE_BEFORE_EVT: get_tc_str_before_event,
-    URI_TIME_TYPE_AFTER_EVT: get_tc_str_after_event,
-    URI_TIME_TYPE_DURING: get_tc_str_during_events,
+    URI_TIME_TYPE_BEFORE_EVT: get_str_tc_before_event,
+    URI_TIME_TYPE_AFTER_EVT: get_str_tc_after_event,
+    URI_TIME_TYPE_DURING: get_str_tc_during_events,
 }
 
 
@@ -126,130 +93,65 @@ class FluentClauseToStringProtocol(Protocol):
     ) -> str: ...
 
 
-def _var_val_to_str(var_val, ns_manager: NamespaceManager) -> str:
-    if isinstance(var_val, URIRef):
-        return var_val.n3(namespace_manager=ns_manager)
-
-    if isinstance(var_val, str):
-        return var_val
-
-    if isinstance(var_val, Number):
-        return str(var_val)
-
-    if isinstance(var_val, Iterable):
-        uri_str_list = []
-        for uri in var_val:
-            assert isinstance(uri, URIRef), f"not an Iterable of URIRef: {var_val}"
-            uri_str_list.append(uri.n3(namespace_manager=ns_manager))
-
-        return str(uri_str_list)
-
-    raise RuntimeError(f"_var_val_to_str: unhandled types: (type={type(var_val)}) {var_val}")
-
-
 def get_fc_str_located_at(
     clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    assert (
-        URI_BDD_PRED_REF_OBJ in clause.variable_by_role
-    ), f"LocatedAt fluent '{clause.id}' does not have 'ref-obj' property"
-    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
-    assert isinstance(
-        obj_id, URIRef
-    ), f"LocatedAt fluent '{clause.id}' does not have URI 'ref-obj' property"
-    assert (
-        obj_id in var_values
-    ), f"LocatedAt fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
-    obj_value_str = _var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
-
-    assert (
-        URI_BDD_PRED_REF_WS in clause.variable_by_role
-    ), f"LocatedAt fluent '{clause.id}' does not have 'ref-ws' property"
-    ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
-    assert isinstance(
-        ws_id, URIRef
-    ), f"LocatedAt fluent '{clause.id}' does not have URI 'ref-ws' property"
-    assert (
-        ws_id in var_values
-    ), f"LocatedAt fluent '{clause.id}': no value for ws '{ws_id}', available vars: {list(var_values.keys())}"
-    ws_value_str = _var_val_to_str(var_val=var_values[ws_id], ns_manager=ns_manager)
-
-    return f'"{obj_value_str}" is located at "{ws_value_str}"'
+    tmpl = get_tmpl_fc_located_at(clause=clause)
+    assert tmpl is not None, f"LocatedAt clause {clause.id.n3(ns_manager)} has wrong types"
+    return tmpl.render(var_values=var_values, ns_manager=ns_manager)
 
 
 def get_fc_str_is_held(
     clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    assert (
-        URI_BDD_PRED_REF_OBJ in clause.variable_by_role
-    ), f"IsHeldBy fluent '{clause.id}' does not have 'ref-obj' property"
-    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
-    assert isinstance(
-        obj_id, URIRef
-    ), f"IsHeldBy fluent '{clause.id}' does not have URI 'ref-obj' property"
-    assert (
-        obj_id in var_values
-    ), f"IsHeldBy fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
-    obj_value_str = _var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
-
-    assert (
-        URI_BDD_PRED_REF_AGN in clause.variable_by_role
-    ), f"IsHeldBy fluent '{clause.id}' does not have 'ref-agn' property"
-    agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
-    assert isinstance(
-        agn_id, URIRef
-    ), f"IsHeldBy fluent '{clause.id}' does not have URI 'ref-agn' property"
-    assert (
-        agn_id in var_values
-    ), f"IsHeldBy fluent '{clause.id}': no value for agn '{agn_id}', available vars: {list(var_values.keys())}"
-    agn_value_str = _var_val_to_str(var_val=var_values[agn_id], ns_manager=ns_manager)
-
-    return f'"{obj_value_str}" is held by "{agn_value_str}"'
+    tmpl = get_tmpl_fc_is_held(clause=clause)
+    assert tmpl is not None, f"IsHeld clause {clause.id.n3(ns_manager)} has wrong types"
+    return tmpl.render(var_values=var_values, ns_manager=ns_manager)
 
 
 def get_fc_str_move_safe(
     clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    assert (
-        URI_BDD_PRED_REF_AGN in clause.variable_by_role
-    ), f"MoveSafe fluent '{clause.id}' does not have 'ref-agn' property"
+    assert URI_BDD_PRED_REF_AGN in clause.variable_by_role, (
+        f"MoveSafe fluent '{clause.id}' does not have 'ref-agn' property"
+    )
     agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
-    assert isinstance(
-        agn_id, URIRef
-    ), f"MoveSafe fluent '{clause.id}' does not have URI 'ref-agn' property"
-    assert (
-        agn_id in var_values
-    ), f"MoveSafe fluent '{clause.id}': no value for agn '{agn_id}', available vars: {list(var_values.keys())}"
-    agn_value_str = _var_val_to_str(var_val=var_values[agn_id], ns_manager=ns_manager)
+    assert isinstance(agn_id, URIRef), (
+        f"MoveSafe fluent '{clause.id}' does not have URI 'ref-agn' property"
+    )
+    assert agn_id in var_values, (
+        f"MoveSafe fluent '{clause.id}': no value for agn '{agn_id}', available vars: {list(var_values.keys())}"
+    )
+    agn_value_str = var_val_to_str(var_val=var_values[agn_id], ns_manager=ns_manager)
     return f'"{agn_value_str}" moves safely'
 
 
 def get_fc_str_sorted(
     clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    assert (
-        URI_BDD_PRED_REF_OBJ in clause.variable_by_role
-    ), f"SortedInto fluent '{clause.id}' does not have 'ref-obj' property"
+    assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role, (
+        f"SortedInto fluent '{clause.id}' does not have 'ref-obj' property"
+    )
     obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
-    assert isinstance(
-        obj_id, URIRef
-    ), f"SortedInto fluent '{clause.id}' does not have URI 'ref-obj' property"
-    assert (
-        obj_id in var_values
-    ), f"SortedInto fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
-    obj_value_str = _var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
+    assert isinstance(obj_id, URIRef), (
+        f"SortedInto fluent '{clause.id}' does not have URI 'ref-obj' property"
+    )
+    assert obj_id in var_values, (
+        f"SortedInto fluent '{clause.id}': no value for obj '{obj_id}', available vars: {list(var_values.keys())}"
+    )
+    obj_value_str = var_val_to_str(var_val=var_values[obj_id], ns_manager=ns_manager)
 
-    assert (
-        URI_BDD_PRED_REF_WS in clause.variable_by_role
-    ), f"SortedInto fluent '{clause.id}' does not have 'ref-ws' property"
+    assert URI_BDD_PRED_REF_WS in clause.variable_by_role, (
+        f"SortedInto fluent '{clause.id}' does not have 'ref-ws' property"
+    )
     ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
-    assert isinstance(
-        ws_id, URIRef
-    ), f"SortedInto fluent '{clause.id}' does not have URI 'ref-ws' property"
-    assert (
-        ws_id in var_values
-    ), f"SortedInto fluent '{clause.id}': no value for ws '{ws_id}', available vars: {list(var_values.keys())}"
-    ws_value_str = _var_val_to_str(var_val=var_values[ws_id], ns_manager=ns_manager)
+    assert isinstance(ws_id, URIRef), (
+        f"SortedInto fluent '{clause.id}' does not have URI 'ref-ws' property"
+    )
+    assert ws_id in var_values, (
+        f"SortedInto fluent '{clause.id}': no value for ws '{ws_id}', available vars: {list(var_values.keys())}"
+    )
+    ws_value_str = var_val_to_str(var_val=var_values[ws_id], ns_manager=ns_manager)
 
     return f'"{obj_value_str}" are sorted into "{ws_value_str}"'
 
@@ -273,48 +175,14 @@ class WhenBhvToStringProtocol(Protocol):
     ) -> str: ...
 
 
-def _get_attr_var_val_str(
-    model: ModelBase, key: URIRef, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
-) -> str:
-    attr_id = model.get_attr(key=key)
-    assert isinstance(
-        attr_id, URIRef
-    ), f"'{model.id}' doesn't have a URI for property '{key}': {attr_id}"
-    assert (
-        attr_id in var_values
-    ), f"'{model.id}': no value for '{attr_id}', available vars: {list(var_values.keys())}"
-    attr_val = var_values[attr_id]
-    return _var_val_to_str(var_val=attr_val, ns_manager=ns_manager)
-
-
 def get_bhv_str_pickplace(
     when_bhv: WhenBehaviourModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    obj_val_str = _get_attr_var_val_str(
-        model=when_bhv, key=URI_BHV_PRED_TARGET_OBJ, var_values=var_values, ns_manager=ns_manager
+    tmpl = get_tmpl_bhv_pickplace(when_bhv=when_bhv)
+    assert tmpl is not None, (
+        f"WhenBehaviour '{when_bhv.id.n3(ns_manager)}' has wrong types: {when_bhv.types}"
     )
-
-    agn_val_str = _get_attr_var_val_str(
-        model=when_bhv, key=URI_BHV_PRED_TARGET_AGN, var_values=var_values, ns_manager=ns_manager
-    )
-
-    if URI_BHV_TYPE_PLACE in when_bhv.behaviour.types:
-        target_ws_val_str = _get_attr_var_val_str(
-            model=when_bhv, key=URI_BHV_PRED_TARGET_WS, var_values=var_values, ns_manager=ns_manager
-        )
-
-        if URI_BHV_TYPE_PICK in when_bhv.behaviour.types:
-            # pick and place
-            return f'"{agn_val_str}" picks "{obj_val_str}" and places it at "{target_ws_val_str}"'
-        else:
-            # only place
-            return f'"{agn_val_str}" places "{obj_val_str}" at "{target_ws_val_str}"'
-
-    assert (
-        URI_BHV_TYPE_PICK in when_bhv.behaviour.types
-    ), f"get_bhv_str_pickplace: WhenBehaviour '{when_bhv.id}': bhv '{when_bhv.behaviour.id}' not a pick and place bhv"
-    # only pick
-    return f'"{agn_val_str}" picks "{obj_val_str}"'
+    return tmpl.render(var_values=var_values, ns_manager=ns_manager)
 
 
 class GherkinClauseStrGen(object):
@@ -343,9 +211,9 @@ class GherkinClauseStrGen(object):
                 clause=clause, var_values=var_values, ns_manager=ns_manager
             )
             break
-        assert (
-            clause_str is not None
-        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled fluent types: {clause.types}"
+        assert clause_str is not None, (
+            f"get_fluent_clause_str: clause '{clause.id}' has unhandled fluent types: {clause.types}"
+        )
 
         tc_str = None
         for tc_type in self._tc_str_gens:
@@ -354,9 +222,9 @@ class GherkinClauseStrGen(object):
 
             tc_str = self._tc_str_gens[tc_type](tc=clause, ns_manager=ns_manager)
             break
-        assert (
-            tc_str is not None
-        ), f"get_fluent_clause_str: clause '{clause.id}' has unhandled time constraint types: {clause.types}"
+        assert tc_str is not None, (
+            f"get_fluent_clause_str: clause '{clause.id}' has unhandled time constraint types: {clause.types}"
+        )
 
         return f"{clause_str} {tc_str}"
 
@@ -384,28 +252,28 @@ def get_gherkin_clauses_re(
     # prepare values for quantified var in ThereExists clauses
     for exists_id in has_clause_model.exists_clauses:
         exists_model = has_clause_model.clauses[exists_id]
-        assert isinstance(
-            exists_model, ThereExistsModel
-        ), f"'{exists_id}' is not a ThereExistsModel"
+        assert isinstance(exists_model, ThereExistsModel), (
+            f"'{exists_id}' is not a ThereExistsModel"
+        )
         if isinstance(exists_model.in_set, list):
             exists_set = exists_model.in_set
         elif isinstance(exists_model.in_set, URIRef):
-            assert (
-                exists_model.in_set in var_values
-            ), f"ThereExists '{exists_model.id}': no value set for URI 'in-set', available vars: {list(var_values.keys())}"
+            assert exists_model.in_set in var_values, (
+                f"ThereExists '{exists_model.id}': no value set for URI 'in-set', available vars: {list(var_values.keys())}"
+            )
             exists_set = var_values[exists_model.in_set]
-            assert isinstance(
-                exists_set, Iterable
-            ), f"ThereExists '{exists_model.id}': value 'in-set' not an Iterable: {exists_set}"
+            assert isinstance(exists_set, Iterable), (
+                f"ThereExists '{exists_model.id}': value 'in-set' not an Iterable: {exists_set}"
+            )
         else:
             raise RuntimeError(
                 f"ThereExists '{exists_model.id}': unhandled type for 'in-set': {exists_model.in_set}"
             )
         exists_str_set = []
         for elem_id in exists_set:
-            assert isinstance(
-                elem_id, URIRef
-            ), f"ThereExists '{exists_model.id}': not a URI: {elem_id}"
+            assert isinstance(elem_id, URIRef), (
+                f"ThereExists '{exists_model.id}': not a URI: {elem_id}"
+            )
             exists_str_set.append(elem_id.n3(namespace_manager=ns_manager))
         var_values[exists_model.quantified_var] = f"any of {exists_str_set}"
 
@@ -443,13 +311,13 @@ def get_gherkin_clauses_re(
             if isinstance(w_clause.in_set, list):
                 forall_set = w_clause.in_set
             elif isinstance(w_clause.in_set, URIRef):
-                assert (
-                    w_clause.in_set in var_values
-                ), f"ForAll '{w_clause.id}': no value set for URI 'in-set', available vars: {list(var_values.keys())}"
+                assert w_clause.in_set in var_values, (
+                    f"ForAll '{w_clause.id}': no value set for URI 'in-set', available vars: {list(var_values.keys())}"
+                )
                 forall_set = var_values[w_clause.in_set]
-                assert isinstance(
-                    forall_set, Iterable
-                ), f"ForAll '{w_clause.id}': value 'in-set' not an Iterable: {forall_set}"
+                assert isinstance(forall_set, Iterable), (
+                    f"ForAll '{w_clause.id}': value 'in-set' not an Iterable: {forall_set}"
+                )
             else:
                 raise RuntimeError(
                     f"ForAll '{w_clause.id}': unhandled type for 'in-set': {w_clause.in_set}"
