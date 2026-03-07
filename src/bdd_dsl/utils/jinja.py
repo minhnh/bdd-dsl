@@ -1,7 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Any, Iterable, Optional, Protocol
 from jinja2 import Environment, FileSystemLoader, Template
-from rdf_utils.models.common import ModelBase
 from rdflib import Graph, URIRef
 from rdflib.namespace import NamespaceManager
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
@@ -39,6 +38,7 @@ from bdd_dsl.models.user_story import (
 )
 from bdd_dsl.models.variation import get_task_variations
 from bdd_dsl.representation import (
+    ModelToStrProtocol,
     get_str_tc_after_event,
     get_str_tc_before_event,
     get_str_tc_during_events,
@@ -72,12 +72,6 @@ def load_template(template_name: str, dir_name: str) -> Template:
     return env.get_template(template_name)
 
 
-class TimeConstraintToStringProtocol(Protocol):
-    """Protocol for functions that transform fluent clauses to time constraint strings."""
-
-    def __call__(self, tc: ModelBase, ns_manager: NamespaceManager) -> str: ...
-
-
 DEFAULT_TIME_CSTR_STR_GENS = {
     URI_TIME_TYPE_BEFORE_EVT: get_str_tc_before_event,
     URI_TIME_TYPE_AFTER_EVT: get_str_tc_after_event,
@@ -96,7 +90,7 @@ class FluentClauseToStringProtocol(Protocol):
 def get_fc_str_located_at(
     clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    tmpl = get_tmpl_fc_located_at(clause=clause)
+    tmpl = get_tmpl_fc_located_at(model=clause)
     assert tmpl is not None, f"LocatedAt clause {clause.id.n3(ns_manager)} has wrong types"
     return tmpl.render(var_values=var_values, ns_manager=ns_manager)
 
@@ -104,7 +98,7 @@ def get_fc_str_located_at(
 def get_fc_str_is_held(
     clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    tmpl = get_tmpl_fc_is_held(clause=clause)
+    tmpl = get_tmpl_fc_is_held(model=clause)
     assert tmpl is not None, f"IsHeld clause {clause.id.n3(ns_manager)} has wrong types"
     return tmpl.render(var_values=var_values, ns_manager=ns_manager)
 
@@ -186,13 +180,13 @@ def get_bhv_str_pickplace(
 
 
 class GherkinClauseStrGen(object):
-    _tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol]
+    _tc_str_gens: dict[URIRef, ModelToStrProtocol]
     _fc_str_gens: dict[URIRef, FluentClauseToStringProtocol]
     _wb_str_gens: list[WhenBhvToStringProtocol]
 
     def __init__(
         self,
-        tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol],
+        tc_str_gens: dict[URIRef, ModelToStrProtocol],
         fc_str_gens: dict[URIRef, FluentClauseToStringProtocol],
         wb_str_gens: list[WhenBhvToStringProtocol],
     ) -> None:
@@ -220,7 +214,7 @@ class GherkinClauseStrGen(object):
             if tc_type not in clause.types:
                 continue
 
-            tc_str = self._tc_str_gens[tc_type](tc=clause, ns_manager=ns_manager)
+            tc_str = self._tc_str_gens[tc_type](model=clause, ns_manager=ns_manager)
             break
         assert tc_str is not None, (
             f"get_fluent_clause_str: clause '{clause.id}' has unhandled time constraint types: {clause.types}"
@@ -359,7 +353,7 @@ def get_gherkin_clauses_re(
 def prepare_scenario_variant_data(
     scr_var_model: ScenarioVariantModel,
     ns_manager: NamespaceManager,
-    tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol],
+    tc_str_gens: dict[URIRef, ModelToStrProtocol],
     fc_str_gens: dict[URIRef, FluentClauseToStringProtocol],
     wb_str_gens: list[WhenBhvToStringProtocol],
 ) -> dict:
@@ -396,7 +390,7 @@ def prepare_jinja2_template_data(
     us_loader: UserStoryLoader,
     full_graph: Graph,
     ns_manager: Optional[NamespaceManager] = None,
-    tc_str_gens: dict[URIRef, TimeConstraintToStringProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
+    tc_str_gens: dict[URIRef, ModelToStrProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
     fc_str_gens: dict[URIRef, FluentClauseToStringProtocol] = DEFAULT_FLUENT_CLAUSE_STR_GENS,
     wb_str_gens: list[WhenBhvToStringProtocol] = [get_bhv_str_pickplace],
 ) -> list[dict]:

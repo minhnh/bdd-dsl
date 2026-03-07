@@ -19,6 +19,9 @@ from bdd_dsl.models.urirefs import (
     URI_BHV_TYPE_PLACE,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
+    URI_TIME_TYPE_AFTER_EVT,
+    URI_TIME_TYPE_BEFORE_EVT,
+    URI_TIME_TYPE_DURING,
 )
 
 
@@ -63,27 +66,53 @@ def get_model_rep(
     return tmpl_str.format(**subs)
 
 
-def get_str_tc_before_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
+class ModelToStrProtocol(Protocol):
+    """Protocol for functions that create a string from a model object.
+
+    Should return None if model is invalid, e.g., wrong types.
+    """
+
+    def __call__(
+        self, model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
+    ) -> Optional[str]: ...
+
+
+def get_str_tc_before_event(
+    model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
+) -> Optional[str]:
+    if URI_TIME_TYPE_BEFORE_EVT not in model.types:
+        return None
+
     return get_model_rep(
-        model=tc,
+        model=model,
         tmpl_str='before event "{evt_uri}"',
         attr_mappings={URI_TIME_PRED_BEFORE_EVT: "evt_uri"},
         ns_manager=ns_manager,
     )
 
 
-def get_str_tc_after_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
+def get_str_tc_after_event(
+    model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
+) -> Optional[str]:
+    if URI_TIME_TYPE_AFTER_EVT not in model.types:
+        return None
+
     return get_model_rep(
-        model=tc,
+        model=model,
         tmpl_str='after event "{evt_uri}"',
         attr_mappings={URI_TIME_PRED_AFTER_EVT: "evt_uri"},
         ns_manager=ns_manager,
     )
 
 
-def get_str_tc_during_events(tc: ModelBase, ns_manager: NamespaceManager) -> str:
+def get_str_tc_during_events(
+    model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
+) -> Optional[str]:
+    if URI_TIME_TYPE_DURING not in model.types:
+        return None
+
     return get_model_rep(
-        model=tc,
+        model=model,
         tmpl_str='from "{start_evt_uri}" until "{end_evt_uri}"',
         attr_mappings={
             URI_TIME_PRED_AFTER_EVT: "start_evt_uri",
@@ -127,6 +156,79 @@ class VarTmplCreatorProtocol(Protocol):
     """
 
     def __call__(self, model: ModelBase, **kwargs: Any) -> Optional[VariableStrTemplate]: ...
+
+
+class ClauseRepBuilder:
+    _clause_templates: dict[URIRef, VariableStrTemplate | None]
+    _clause_tmpl_creators: list[VarTmplCreatorProtocol]
+    _tc_str_gens: list[ModelToStrProtocol]
+
+    def __init__(
+        self,
+        tmpl_creators: list[VarTmplCreatorProtocol],
+        tc_str_gens: list[ModelToStrProtocol],
+    ) -> None:
+        self._clause_templates = {}
+        self._clause_tmpl_creators = tmpl_creators
+        self._tc_str_gens = tc_str_gens
+
+    def render_fluent_clause(
+        self,
+        clause: FluentClauseModel,
+        val_dict: dict[URIRef, Any],
+        ns_manager: Optional[NamespaceManager],
+    ) -> str:
+        clause_rep = self._render_var_clause(
+            clause=clause, val_dict=val_dict, ns_manager=ns_manager
+        )
+        tc_rep = self._render_tc(clause=clause, ns_manager=ns_manager)
+        return f"{clause_rep} {tc_rep}"
+
+    def render_when_bhv_clause(
+        self,
+        clause: FluentClauseModel,
+        val_dict: dict[URIRef, Any],
+        ns_manager: Optional[NamespaceManager],
+    ) -> str:
+        return self._render_var_clause(clause=clause, val_dict=val_dict, ns_manager=ns_manager)
+
+    def _render_var_clause(
+        self,
+        clause: FluentClauseModel | WhenBehaviourModel,
+        val_dict: dict[URIRef, Any],
+        ns_manager: Optional[NamespaceManager],
+    ) -> str:
+        if clause.id not in self._clause_templates:
+            for tmpl_crtr in self._clause_tmpl_creators:
+                tmpl = tmpl_crtr(model=clause)
+                self._clause_templates[clause.id] = tmpl
+                if tmpl is not None:
+                    break
+
+        tmpl = self._clause_templates[clause.id]
+        if tmpl is None:
+            clause_rep = clause.id.n3(ns_manager)
+        else:
+            clause_rep = tmpl.render(var_values=val_dict, ns_manager=ns_manager)
+
+        return clause_rep
+
+    def _render_tc(
+        self,
+        clause: FluentClauseModel | WhenBehaviourModel,
+        ns_manager: Optional[NamespaceManager],
+    ) -> str:
+
+        # Render time constraint
+        tc_rep = None
+        for tc_gen in self._tc_str_gens:
+            tc_rep = tc_gen(model=clause, ns_manager=ns_manager)
+            if tc_rep is not None:
+                break
+        if tc_rep is None:
+            tc_rep = f"(no TimeConstraint rep for '{clause.id.n3(ns_manager)}')"
+
+        return tc_rep
 
 
 def get_tmpl_bhv_pickplace(when_bhv: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
