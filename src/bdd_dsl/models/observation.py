@@ -19,7 +19,7 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
-from bdd_dsl.representation import ClauseRepBuilder
+from bdd_dsl.representation import ClauseRepBuilder, get_clause_role_rep
 
 
 @dataclass
@@ -292,8 +292,9 @@ class ObservationManager(object):
         )
 
         for fc in scr_var.fluent_clauses():
+            fc_role = get_clause_role_rep(scenario=scr_var.scenario, clause=fc)
             fc_rep = clause_rep_builder.render_fluent_clause(
-                clause=fc, val_dict=val_dict, ns_manager=ns_manager
+                role=fc_role, clause=fc, val_dict=val_dict, ns_manager=ns_manager
             )
             obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders, rep=fc_rep)
         return obs_manager

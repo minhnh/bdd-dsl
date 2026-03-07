@@ -5,7 +5,7 @@ from rdf_utils.models.common import ModelBase
 from rdflib import URIRef
 from rdflib.namespace import NamespaceManager
 
-from bdd_dsl.models.clauses import FluentClauseModel, WhenBehaviourModel
+from bdd_dsl.models.clauses import FluentClauseModel, IClause, WhenBehaviourModel
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
@@ -23,6 +23,17 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
+from bdd_dsl.models.user_story import IHasClause, ScenarioModel
+
+
+def get_clause_role_rep(scenario: ScenarioModel, clause: IClause) -> str:
+    if clause.clause_of == scenario.given:
+        return "Given"
+    if clause.clause_of == scenario.when:
+        return "When"
+    if clause.clause_of == scenario.then:
+        return "Then"
+    raise ValueError(f"Role '{clause.clause_of}' is not Given/When/Then of '{IHasClause.id}'")
 
 
 def var_val_to_str(var_val: Any, ns_manager: Optional[NamespaceManager] = None) -> str:
@@ -174,6 +185,7 @@ class ClauseRepBuilder:
 
     def render_fluent_clause(
         self,
+        role: str,
         clause: FluentClauseModel,
         val_dict: dict[URIRef, Any],
         ns_manager: Optional[NamespaceManager],
@@ -182,7 +194,7 @@ class ClauseRepBuilder:
             clause=clause, val_dict=val_dict, ns_manager=ns_manager
         )
         tc_rep = self._render_tc(clause=clause, ns_manager=ns_manager)
-        return f"{clause_rep} {tc_rep}"
+        return f"{role} {clause_rep} {tc_rep}"
 
     def render_when_bhv_clause(
         self,
@@ -190,7 +202,10 @@ class ClauseRepBuilder:
         val_dict: dict[URIRef, Any],
         ns_manager: Optional[NamespaceManager],
     ) -> str:
-        return self._render_var_clause(clause=clause, val_dict=val_dict, ns_manager=ns_manager)
+        clause_rep = self._render_var_clause(
+            clause=clause, val_dict=val_dict, ns_manager=ns_manager
+        )
+        return f"When {clause_rep}"
 
     def _render_var_clause(
         self,
