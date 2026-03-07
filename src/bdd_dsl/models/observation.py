@@ -19,7 +19,7 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
-from bdd_dsl.representation import VarTmplCreatorProtocol, VariableStrTemplate
+from bdd_dsl.representation import ClauseRepBuilder
 
 
 @dataclass
@@ -270,8 +270,7 @@ class ObservationManager(object):
         graph: Graph,
         scr_var: ScenarioVariantModel,
         obs_loaders: list[AttrLoaderProtocol],
-        var_tmpls: dict[URIRef, VariableStrTemplate | None],
-        tmpl_creators: list[VarTmplCreatorProtocol],
+        clause_rep_builder: ClauseRepBuilder,
         val_dict: dict[URIRef, Any],
     ) -> ObservationManager:
         dur = get_duration(scr_var.tmpl)
@@ -293,17 +292,9 @@ class ObservationManager(object):
         )
 
         for fc in scr_var.fluent_clauses():
-            if fc.id not in var_tmpls:
-                for tmpl_crtr in tmpl_creators:
-                    var_tmpls[fc.id] = tmpl_crtr(model=fc)
-                    if var_tmpls[fc.id] is not None:
-                        break
-
-            tmpl = var_tmpls[fc.id]
-            if tmpl is None:
-                fc_rep = fc.id.n3(graph.namespace_manager)
-            else:
-                fc_rep = tmpl.render(var_values=val_dict, ns_manager=graph.namespace_manager)
+            fc_rep = clause_rep_builder.render_fluent_clause(
+                clause=fc, val_dict=val_dict, ns_manager=ns_manager
+            )
             obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders, rep=fc_rep)
         return obs_manager
 
