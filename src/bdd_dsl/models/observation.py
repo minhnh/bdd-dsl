@@ -19,6 +19,7 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
+from bdd_dsl.representation import VarTmplCreatorProtocol, VariableStrTemplate
 
 
 @dataclass
@@ -40,13 +41,8 @@ class FluentTimeline(object):
     end_event: Optional[URIRef]
     horizon: Optional[float]
 
-    _ns_manager: Optional[NamespaceManager]
-
-    def __init__(
-        self, fc: FluentClauseModel, ns_manager: Optional[NamespaceManager] = None
-    ) -> None:
-        self._ns_manager = ns_manager
-        self.representation = fc.id.n3(self._ns_manager)
+    def __init__(self, fc: FluentClauseModel, rep: str) -> None:
+        self.representation = rep
 
         self.trinary_timeline = []
 
@@ -235,10 +231,10 @@ class ObservationManager(object):
         self._fluent_event_registry[evt_uri].add(fc_id)
 
     def register_fluent_obs(
-        self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol]
+        self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol], rep: str
     ):
         if fc.id not in self.fluent_timelines:
-            f_tl = FluentTimeline(fc=fc, ns_manager=graph.namespace_manager)
+            f_tl = FluentTimeline(fc=fc, rep=rep)
             self.fluent_timelines[fc.id] = f_tl
             self._register_fluent_event(evt_uri=f_tl.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=f_tl.end_event, fc_id=fc.id)
@@ -270,7 +266,13 @@ class ObservationManager(object):
 
     @classmethod
     def from_scenario_variant(
-        cls, graph: Graph, scr_var: ScenarioVariantModel, obs_loaders: list[AttrLoaderProtocol]
+        cls,
+        graph: Graph,
+        scr_var: ScenarioVariantModel,
+        obs_loaders: list[AttrLoaderProtocol],
+        var_tmpls: dict[URIRef, VariableStrTemplate | None],
+        tmpl_creators: list[VarTmplCreatorProtocol],
+        val_dict: dict[URIRef, Any],
     ) -> ObservationManager:
         dur = get_duration(scr_var.tmpl)
         ns_manager = graph.namespace_manager
@@ -291,7 +293,18 @@ class ObservationManager(object):
         )
 
         for fc in scr_var.fluent_clauses():
-            obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders)
+            if fc.id not in var_tmpls:
+                for tmpl_crtr in tmpl_creators:
+                    var_tmpls[fc.id] = tmpl_crtr(model=fc)
+                    if var_tmpls[fc.id] is not None:
+                        break
+
+            tmpl = var_tmpls[fc.id]
+            if tmpl is None:
+                fc_rep = fc.id.n3(graph.namespace_manager)
+            else:
+                fc_rep = tmpl.render(var_values=val_dict, ns_manager=graph.namespace_manager)
+            obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders, rep=fc_rep)
         return obs_manager
 
 

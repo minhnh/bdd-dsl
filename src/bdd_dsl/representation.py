@@ -1,6 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from numbers import Number
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, Protocol
 from rdf_utils.models.common import ModelBase
 from rdflib import URIRef
 from rdflib.namespace import NamespaceManager
@@ -20,33 +20,6 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
 )
-
-
-class VariableStrTemplate:
-    tmpl_str: str
-    var_map: dict[URIRef, str]
-
-    def __init__(self, tmpl_str: str, var_map: dict[URIRef, str]) -> None:
-        self.tmpl_str = tmpl_str
-        self.var_map = var_map
-
-        # Ensure mappings is valid at template creation time
-        try:
-            _ = self.tmpl_str.format(**{m: "" for m in self.var_map.values()})
-        except KeyError as e:
-            raise ValueError(f"VariableStrTemplate: invalid mappings for '{self.tmpl_str}': {e}")
-
-    def render(
-        self, var_values: dict[URIRef, Any], ns_manager: Optional[NamespaceManager] = None
-    ) -> str:
-        subs = {}
-        for uri, uri_map in self.var_map.items():
-            assert uri in var_values, (
-                f"VariableStrTemplate.render: no value supplied for {uri.n3(ns_manager)}"
-            )
-            subs[uri_map] = var_val_to_str(var_val=var_values[uri], ns_manager=ns_manager)
-
-        return self.tmpl_str.format(**subs)
 
 
 def var_val_to_str(var_val: Any, ns_manager: Optional[NamespaceManager] = None) -> str:
@@ -90,7 +63,75 @@ def get_model_rep(
     return tmpl_str.format(**subs)
 
 
-def get_tmpl_bhv_pickplace(when_bhv: WhenBehaviourModel) -> Optional[VariableStrTemplate]:
+def get_str_tc_before_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
+    return get_model_rep(
+        model=tc,
+        tmpl_str='before event "{evt_uri}"',
+        attr_mappings={URI_TIME_PRED_BEFORE_EVT: "evt_uri"},
+        ns_manager=ns_manager,
+    )
+
+
+def get_str_tc_after_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
+    return get_model_rep(
+        model=tc,
+        tmpl_str='after event "{evt_uri}"',
+        attr_mappings={URI_TIME_PRED_AFTER_EVT: "evt_uri"},
+        ns_manager=ns_manager,
+    )
+
+
+def get_str_tc_during_events(tc: ModelBase, ns_manager: NamespaceManager) -> str:
+    return get_model_rep(
+        model=tc,
+        tmpl_str='from "{start_evt_uri}" until "{end_evt_uri}"',
+        attr_mappings={
+            URI_TIME_PRED_AFTER_EVT: "start_evt_uri",
+            URI_TIME_PRED_BEFORE_EVT: "end_evt_uri",
+        },
+        ns_manager=ns_manager,
+    )
+
+
+class VariableStrTemplate:
+    tmpl_str: str
+    var_map: dict[URIRef, str]
+
+    def __init__(self, tmpl_str: str, var_map: dict[URIRef, str]) -> None:
+        self.tmpl_str = tmpl_str
+        self.var_map = var_map
+
+        # Ensure mappings is valid at template creation time
+        try:
+            _ = self.tmpl_str.format(**{m: "" for m in self.var_map.values()})
+        except KeyError as e:
+            raise ValueError(f"VariableStrTemplate: invalid mappings for '{self.tmpl_str}': {e}")
+
+    def render(
+        self, var_values: dict[URIRef, Any], ns_manager: Optional[NamespaceManager] = None
+    ) -> str:
+        subs = {}
+        for uri, uri_map in self.var_map.items():
+            assert uri in var_values, (
+                f"VariableStrTemplate.render: no value supplied for {uri.n3(ns_manager)}"
+            )
+            subs[uri_map] = var_val_to_str(var_val=var_values[uri], ns_manager=ns_manager)
+
+        return self.tmpl_str.format(**subs)
+
+
+class VarTmplCreatorProtocol(Protocol):
+    """Protocol for functions that create VariableStrTemplate from model objects.
+
+    Should return None if model is invalid, e.g., wrong types.
+    """
+
+    def __call__(self, model: ModelBase, **kwargs: Any) -> Optional[VariableStrTemplate]: ...
+
+
+def get_tmpl_bhv_pickplace(when_bhv: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(when_bhv, WhenBehaviourModel):
+        return None
 
     is_pick = URI_BHV_TYPE_PICK in when_bhv.behaviour.types
     is_place = URI_BHV_TYPE_PLACE in when_bhv.behaviour.types
@@ -143,24 +184,27 @@ def get_tmpl_bhv_pickplace(when_bhv: WhenBehaviourModel) -> Optional[VariableStr
     )
 
 
-def get_tmpl_fc_located_at(clause: FluentClauseModel) -> Optional[VariableStrTemplate]:
-    if URI_BDD_TYPE_LOCATED_AT not in clause.types:
+def get_tmpl_fc_located_at(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(model, FluentClauseModel):
         return None
 
-    assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role, (
-        f"LocatedAt fluent '{clause.id}' does not have 'ref-obj' property"
+    if URI_BDD_TYPE_LOCATED_AT not in model.types:
+        return None
+
+    assert URI_BDD_PRED_REF_OBJ in model.variable_by_role, (
+        f"LocatedAt fluent '{model.id}' does not have 'ref-obj' property"
     )
-    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
+    obj_id = model.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
     assert isinstance(obj_id, URIRef), (
-        f"LocatedAt fluent '{clause.id}' does not have URI 'ref-obj' property"
+        f"LocatedAt fluent '{model.id}' does not have URI 'ref-obj' property"
     )
 
-    assert URI_BDD_PRED_REF_WS in clause.variable_by_role, (
-        f"LocatedAt fluent '{clause.id}' does not have 'ref-ws' property"
+    assert URI_BDD_PRED_REF_WS in model.variable_by_role, (
+        f"LocatedAt fluent '{model.id}' does not have 'ref-ws' property"
     )
-    ws_id = clause.variable_by_role[URI_BDD_PRED_REF_WS][0]
+    ws_id = model.variable_by_role[URI_BDD_PRED_REF_WS][0]
     assert isinstance(ws_id, URIRef), (
-        f"LocatedAt fluent '{clause.id}' does not have URI 'ref-ws' property"
+        f"LocatedAt fluent '{model.id}' does not have URI 'ref-ws' property"
     )
 
     return VariableStrTemplate(
@@ -169,56 +213,29 @@ def get_tmpl_fc_located_at(clause: FluentClauseModel) -> Optional[VariableStrTem
     )
 
 
-def get_tmpl_fc_is_held(clause: FluentClauseModel) -> Optional[VariableStrTemplate]:
-    if URI_BDD_TYPE_IS_HELD not in clause.types:
+def get_tmpl_fc_is_held(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(model, FluentClauseModel):
         return None
 
-    assert URI_BDD_PRED_REF_OBJ in clause.variable_by_role, (
-        f"IsHeldBy fluent '{clause.id}' does not have 'ref-obj' property"
+    if URI_BDD_TYPE_IS_HELD not in model.types:
+        return None
+
+    assert URI_BDD_PRED_REF_OBJ in model.variable_by_role, (
+        f"IsHeldBy fluent '{model.id}' does not have 'ref-obj' property"
     )
-    obj_id = clause.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
+    obj_id = model.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
     assert isinstance(obj_id, URIRef), (
-        f"IsHeldBy fluent '{clause.id}' does not have URI 'ref-obj' property"
+        f"IsHeldBy fluent '{model.id}' does not have URI 'ref-obj' property"
     )
 
-    assert URI_BDD_PRED_REF_AGN in clause.variable_by_role, (
-        f"IsHeldBy fluent '{clause.id}' does not have 'ref-agn' property"
+    assert URI_BDD_PRED_REF_AGN in model.variable_by_role, (
+        f"IsHeldBy fluent '{model.id}' does not have 'ref-agn' property"
     )
-    agn_id = clause.variable_by_role[URI_BDD_PRED_REF_AGN][0]
+    agn_id = model.variable_by_role[URI_BDD_PRED_REF_AGN][0]
     assert isinstance(agn_id, URIRef), (
-        f"IsHeldBy fluent '{clause.id}' does not have URI 'ref-agn' property"
+        f"IsHeldBy fluent '{model.id}' does not have URI 'ref-agn' property"
     )
 
     return VariableStrTemplate(
         tmpl_str='"{target_obj}" is held by "{agn}"', var_map={obj_id: "target_obj", agn_id: "agn"}
-    )
-
-
-def get_str_tc_before_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
-    return get_model_rep(
-        model=tc,
-        tmpl_str='before event "{evt_uri}"',
-        attr_mappings={URI_TIME_PRED_BEFORE_EVT: "evt_uri"},
-        ns_manager=ns_manager,
-    )
-
-
-def get_str_tc_after_event(tc: ModelBase, ns_manager: NamespaceManager) -> str:
-    return get_model_rep(
-        model=tc,
-        tmpl_str='after event "{evt_uri}"',
-        attr_mappings={URI_TIME_PRED_AFTER_EVT: "evt_uri"},
-        ns_manager=ns_manager,
-    )
-
-
-def get_str_tc_during_events(tc: ModelBase, ns_manager: NamespaceManager) -> str:
-    return get_model_rep(
-        model=tc,
-        tmpl_str='from "{start_evt_uri}" until "{end_evt_uri}"',
-        attr_mappings={
-            URI_TIME_PRED_AFTER_EVT: "start_evt_uri",
-            URI_TIME_PRED_BEFORE_EVT: "end_evt_uri",
-        },
-        ns_manager=ns_manager,
     )
