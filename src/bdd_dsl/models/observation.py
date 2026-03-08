@@ -183,10 +183,14 @@ class FluentTimeline(object):
 
 
 class ObservationManager(object):
+    scr_rep: str
     scr_start_event: URIRef
     scr_end_event: URIRef
     scr_start_time: Optional[float]
     scr_end_time: Optional[float]
+
+    bhv_result: Optional[TrinaryStamped]
+    bhv_rep: str
 
     fluent_timelines: dict[URIRef, FluentTimeline]
     event_timelines: dict[URIRef, list[float]]
@@ -195,16 +199,22 @@ class ObservationManager(object):
 
     def __init__(
         self,
+        scr_rep: str,
         scr_start_event: URIRef,
         scr_end_event: URIRef,
+        bhv_rep: str,
         ns_manager: Optional[NamespaceManager] = None,
     ) -> None:
         self._ns_manager = ns_manager
 
+        self.scr_rep = scr_rep
         self.scr_start_event = scr_start_event
         self.scr_end_event = scr_end_event
         self.scr_start_time = None
         self.scr_end_time = None
+
+        self.bhv_rep = bhv_rep
+        self.bhv_result = None
 
         self.fluent_timelines = {}
         self.event_timelines = {}
@@ -241,6 +251,9 @@ class ObservationManager(object):
 
         for obs_ldr in obs_loaders:
             obs_ldr(graph=graph, model=fc)
+
+    def update_bhv_result(self, trin_st: TrinaryStamped):
+        self.bhv_result = trin_st
 
     def update_fpolicy_assertion(self, fc_uri: URIRef, trin_st: TrinaryStamped):
         assert fc_uri in self.fluent_timelines, f"No Timeline created for '{fc_uri}'"
@@ -285,9 +298,17 @@ class ObservationManager(object):
             f"ScenarioVariant '{scr_var.id.n3(ns_manager)}' has same start/end events: {scr_start_event}"
         )
 
+        bhv_rep = clause_rep_builder.render_when_bhv_clause(
+            clause=scr_var.when_bhv_model,
+            val_dict=val_dict,
+            ns_manager=ns_manager,
+        )
+
         obs_manager = ObservationManager(
+            scr_rep=scr_var.id.n3(ns_manager),
             scr_start_event=scr_start_event,
             scr_end_event=scr_end_event,
+            bhv_rep=bhv_rep,
             ns_manager=ns_manager,
         )
 
