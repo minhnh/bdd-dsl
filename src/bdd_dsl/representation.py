@@ -198,7 +198,7 @@ class ClauseRepBuilder:
 
     def render_when_bhv_clause(
         self,
-        clause: FluentClauseModel,
+        clause: WhenBehaviourModel,
         val_dict: dict[URIRef, Any],
         ns_manager: Optional[NamespaceManager],
     ) -> str:
@@ -246,29 +246,29 @@ class ClauseRepBuilder:
         return tc_rep
 
 
-def get_tmpl_bhv_pickplace(when_bhv: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
-    if not isinstance(when_bhv, WhenBehaviourModel):
+def get_tmpl_bhv_pickplace(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(model, WhenBehaviourModel):
         return None
 
-    is_pick = URI_BHV_TYPE_PICK in when_bhv.behaviour.types
-    is_place = URI_BHV_TYPE_PLACE in when_bhv.behaviour.types
+    is_pick = URI_BHV_TYPE_PICK in model.behaviour.types
+    is_place = URI_BHV_TYPE_PLACE in model.behaviour.types
 
     if not is_pick and not is_place:
         return None
 
-    agn_var_uri = when_bhv.get_attr(key=URI_BHV_PRED_TARGET_AGN)
+    agn_var_uri = model.get_attr(key=URI_BHV_PRED_TARGET_AGN)
     assert isinstance(agn_var_uri, URIRef), (
-        f"'{when_bhv.id}' doesn't have a URI for agn attr: {agn_var_uri}"
+        f"'{model.id}' doesn't have a URI for agn attr: {agn_var_uri}"
     )
-    obj_var_uri = when_bhv.get_attr(key=URI_BHV_PRED_TARGET_OBJ)
+    obj_var_uri = model.get_attr(key=URI_BHV_PRED_TARGET_OBJ)
     assert isinstance(obj_var_uri, URIRef), (
-        f"'{when_bhv.id}' doesn't have a URI for obj attr: {obj_var_uri}"
+        f"'{model.id}' doesn't have a URI for obj attr: {obj_var_uri}"
     )
-    ws_var_uri = when_bhv.get_attr(key=URI_BHV_PRED_TARGET_WS)
+    ws_var_uri = model.get_attr(key=URI_BHV_PRED_TARGET_WS)
 
     if is_place:
         assert isinstance(ws_var_uri, URIRef), (
-            f"'{when_bhv.id}' doesn't have a URI for ws attr: {ws_var_uri}"
+            f"'{model.id}' doesn't have a URI for ws attr: {ws_var_uri}"
         )
         if is_pick:
             # pick and place
