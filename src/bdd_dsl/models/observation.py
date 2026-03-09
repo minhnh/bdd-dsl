@@ -110,7 +110,7 @@ class FluentTimeline(object):
                 break
             self.trinary_timeline.pop(0)
 
-    def add_trinary(self, trin_st: TrinaryStamped):
+    def add_trinary(self, trin_st: TrinaryStamped) -> tuple[bool, str]:
         if self.duration_type == URI_TIME_TYPE_BEFORE_EVT:
             # If end time is available then clause timeline should have finished
             if self.end_time is not None:
@@ -118,38 +118,41 @@ class FluentTimeline(object):
                 assert self.start_time is not None
                 if trin_st.stamp > self.start_time and trin_st.stamp < self.end_time:
                     self._insert_trin_stamped_in_order(trin_st)
-                return
+                    return True, ""
+                return False, "(before) finished and out of horizon"
 
             self._insert_trin_stamped_in_order(trin_st)
 
             self._discard_out_of_horizon_trin()
-            return
+            return True, ""
 
         if self.duration_type == URI_TIME_TYPE_AFTER_EVT:
             # Not started
             if self.start_time is None:
-                return
+                return False, "(after) not started"
 
             assert self.end_time is not None
 
             # Out of horizon
             if trin_st.stamp > self.end_time:
-                return
+                return False, f"(after) out of horizon - {trin_st.stamp} > {self.end_time}"
 
             self._insert_trin_stamped_in_order(trin_st)
-            return
+            return True, ""
 
         if self.duration_type == URI_TIME_TYPE_DURING:
             # Not started
             if self.start_time is None:
-                return
+                return False, "(during) not started"
 
             # Out of horizon
             if self.end_time is not None and trin_st.stamp > self.end_time:
-                return
+                return False, f"(during) out of horizon - {trin_st.stamp} > {self.end_time}"
 
             self._insert_trin_stamped_in_order(trin_st)
-            return
+            return True, ""
+
+        return False, "no matching type"
 
     def on_event(self, evt_uri: URIRef, evt_stamp: float):
         if evt_uri == self.start_event:
@@ -257,9 +260,9 @@ class ObservationManager(object):
     def update_bhv_result(self, trin_st: TrinaryStamped):
         self.bhv_result = trin_st
 
-    def update_fpolicy_assertion(self, fc_uri: URIRef, trin_st: TrinaryStamped):
+    def update_fpolicy_assertion(self, fc_uri: URIRef, trin_st: TrinaryStamped) -> tuple[bool, str]:
         assert fc_uri in self.fluent_timelines, f"No Timeline created for '{fc_uri}'"
-        self.fluent_timelines[fc_uri].add_trinary(trin_st)
+        return self.fluent_timelines[fc_uri].add_trinary(trin_st)
 
     def on_event(self, evt_uri: URIRef, evt_t: float):
         if evt_uri not in self.event_timelines:
