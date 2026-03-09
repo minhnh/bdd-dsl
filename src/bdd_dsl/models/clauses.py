@@ -1,13 +1,17 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Optional, Protocol
-from rdflib import URIRef, Graph
+from rdflib import Literal, URIRef, Graph
 from rdf_utils.models.common import ModelBase
 from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_CFG_NAME,
+    URI_BDD_PRED_CFG_TARGET,
+    URI_BDD_PRED_CFG_VAR,
     URI_BDD_PRED_CLAUSE_OF,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
+    URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_MOVE_SAFE,
@@ -28,9 +32,9 @@ class IClause(object):
 
     def __init__(self, node_id: URIRef, graph: Graph) -> None:
         clause_of_id = graph.value(subject=node_id, predicate=URI_BDD_PRED_CLAUSE_OF)
-        assert isinstance(
-            clause_of_id, URIRef
-        ), f"Node '{node_id}': 'clause-of' does not link to URIRef: {clause_of_id}"
+        assert isinstance(clause_of_id, URIRef), (
+            f"Node '{node_id}': 'clause-of' does not link to URIRef: {clause_of_id}"
+        )
         self.clause_of = clause_of_id
 
 
@@ -45,9 +49,9 @@ class FluentClauseModel(ModelBase, IClause):
         self.variable_by_role = {}
         self.role_by_variable = {}
 
-        assert (
-            URI_TIME_TYPE_TC in self.types
-        ), f"FluentClause '{self.id}': is missing type {URI_TIME_TYPE_TC}"
+        assert URI_TIME_TYPE_TC in self.types, (
+            f"FluentClause '{self.id}': is missing type {URI_TIME_TYPE_TC}"
+        )
         process_time_constraint_model(constraint=self, graph=graph)
 
     def add_variables_by_role(self, graph: Graph, role_pred: URIRef):
@@ -55,9 +59,9 @@ class FluentClauseModel(ModelBase, IClause):
             self.variable_by_role[role_pred] = []
 
         for var_id in graph.objects(subject=self.id, predicate=role_pred):
-            assert isinstance(
-                var_id, URIRef
-            ), f"FluentClause '{self.id}': variable not a URIRef: {var_id}"
+            assert isinstance(var_id, URIRef), (
+                f"FluentClause '{self.id}': variable not a URIRef: {var_id}"
+            )
 
             self.variable_by_role[role_pred].append(var_id)
 
@@ -65,9 +69,9 @@ class FluentClauseModel(ModelBase, IClause):
                 self.role_by_variable[var_id] = []
             self.role_by_variable[var_id].append(var_id)
 
-        assert (
-            len(self.variable_by_role[role_pred]) > 0
-        ), f"clause '{self.id}' does link to a variable via '{role_pred}'"
+        assert len(self.variable_by_role[role_pred]) > 0, (
+            f"clause '{self.id}' does link to a variable via '{role_pred}'"
+        )
 
 
 class FluentClauseLoaderProtocol(Protocol):
@@ -106,11 +110,39 @@ def load_sorted_info(graph: Graph, clause: FluentClauseModel) -> None:
     return
 
 
+def load_has_config_info(graph: Graph, clause: FluentClauseModel) -> None:
+    clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_CFG_VAR)
+
+    cfg_target_uri = graph.value(subject=clause.id, predicate=URI_BDD_PRED_CFG_TARGET, any=False)
+    assert isinstance(cfg_target_uri, URIRef), (
+        f"HasConfig Pred '{clause.id}' missing 'config-target' pred to URI: {cfg_target_uri}"
+    )
+    clause.set_attr(key=URI_BDD_PRED_CFG_TARGET, val=cfg_target_uri)
+
+    cfg_name = graph.value(subject=clause.id, predicate=URI_BDD_PRED_CFG_NAME, any=False)
+    assert isinstance(cfg_name, Literal), (
+        f"HasConfig Pred '{clause.id}' missing 'config-name' pred to Literal: {cfg_name}"
+    )
+    clause.set_attr(key=URI_BDD_PRED_CFG_NAME, val=cfg_name.toPython())
+    return
+
+
+def get_clause_config(clause: FluentClauseModel) -> tuple[URIRef, str, URIRef]:
+    cfg_target = clause.get_attr(URI_BDD_PRED_CFG_TARGET)
+    assert isinstance(cfg_target, URIRef)
+    cfg_var = clause.variable_by_role[URI_BDD_PRED_CFG_VAR][0]
+    cfg_name = clause.get_attr(URI_BDD_PRED_CFG_NAME)
+    assert isinstance(cfg_name, str)
+
+    return (cfg_target, cfg_name, cfg_var)
+
+
 DEFAULT_FLUENT_LOADERS = {
     URI_BDD_TYPE_LOCATED_AT: load_located_at_info,
     URI_BDD_TYPE_IS_HELD: load_held_by_info,
     URI_BDD_TYPE_MOVE_SAFE: load_move_safe_info,
     URI_BDD_TYPE_SORTED: load_sorted_info,
+    URI_BDD_TYPE_CONFIG: load_has_config_info,
 }
 
 
@@ -130,9 +162,9 @@ class FluentClauseLoader(object):
             self._loaders[clause_type](graph=graph, clause=clause)
             break
 
-        assert (
-            processed_type is not None
-        ), f"unhandled types for fluent of clause '{clause.id}': {clause.types}"
+        assert processed_type is not None, (
+            f"unhandled types for fluent of clause '{clause.id}': {clause.types}"
+        )
 
 
 class WhenBehaviourModel(ModelBase, IClause):
@@ -143,9 +175,9 @@ class WhenBehaviourModel(ModelBase, IClause):
         IClause.__init__(self, node_id=clause_id, graph=graph)
 
         bhv_id = graph.value(subject=self.id, predicate=URI_BHV_PRED_OF_BHV)
-        assert isinstance(
-            bhv_id, URIRef
-        ), f"WhenBehaviour '{self.id}' does not ref a behaviour URI: {bhv_id}"
+        assert isinstance(bhv_id, URIRef), (
+            f"WhenBehaviour '{self.id}' does not ref a behaviour URI: {bhv_id}"
+        )
         self.behaviour = ModelBase(node_id=bhv_id, graph=graph)
 
         process_time_constraint_model(constraint=self, graph=graph)
@@ -161,25 +193,27 @@ def load_bhv_pickplace(graph: Graph, when_bhv: WhenBehaviourModel) -> None:
     assert (
         URI_BHV_TYPE_PICK in when_bhv.behaviour.types
         or URI_BHV_TYPE_PLACE in when_bhv.behaviour.types
-    ), f"load_bhv_pickplace: '{when_bhv.behaviour.id}' not a pick or place bhv, types: {when_bhv.behaviour.types}"
+    ), (
+        f"load_bhv_pickplace: '{when_bhv.behaviour.id}' not a pick or place bhv, types: {when_bhv.behaviour.types}"
+    )
 
     target_obj_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_OBJ)
-    assert isinstance(
-        target_obj_id, URIRef
-    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target object's URI: {target_obj_id}"
+    assert isinstance(target_obj_id, URIRef), (
+        f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target object's URI: {target_obj_id}"
+    )
     when_bhv.set_attr(key=URI_BHV_PRED_TARGET_OBJ, val=target_obj_id)
 
     target_agn_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_AGN)
-    assert isinstance(
-        target_agn_id, URIRef
-    ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target agent's URI: {target_agn_id}"
+    assert isinstance(target_agn_id, URIRef), (
+        f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target agent's URI: {target_agn_id}"
+    )
     when_bhv.set_attr(key=URI_BHV_PRED_TARGET_AGN, val=target_agn_id)
 
     if URI_BHV_TYPE_PLACE in when_bhv.behaviour.types:
         target_ws_id = graph.value(subject=when_bhv.id, predicate=URI_BHV_PRED_TARGET_WS)
-        assert isinstance(
-            target_ws_id, URIRef
-        ), f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target workspace's URI: {target_ws_id}"
+        assert isinstance(target_ws_id, URIRef), (
+            f"WhenBehaviour '{when_bhv.id}' (behaviour types: {when_bhv.behaviour.types}) does not ref target workspace's URI: {target_ws_id}"
+        )
         when_bhv.set_attr(key=URI_BHV_PRED_TARGET_WS, val=target_ws_id)
 
 

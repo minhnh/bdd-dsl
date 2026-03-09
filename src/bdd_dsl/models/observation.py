@@ -36,12 +36,15 @@ class FluentTimeline(object):
     end_time: Optional[float]
 
     fluent_id: URIRef
+    fluent_types: set[URIRef]
     duration_type: URIRef
     start_event: Optional[URIRef]
     end_event: Optional[URIRef]
     horizon: Optional[float]
 
     def __init__(self, fc: FluentClauseModel, rep: str) -> None:
+        self.fluent_id = fc.id
+        self.fluent_types = fc.types
         self.representation = rep
 
         self.trinary_timeline = []
@@ -49,7 +52,6 @@ class FluentTimeline(object):
         self.start_time = None
         self.end_time = None
 
-        self.fluent_id = fc.id
         dur_spec = get_duration(constraint=fc)
 
         if URI_TIME_TYPE_DURING in fc.types:

@@ -7,9 +7,13 @@ from rdflib.namespace import NamespaceManager
 
 from bdd_dsl.models.clauses import FluentClauseModel, IClause, WhenBehaviourModel
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_CFG_NAME,
+    URI_BDD_PRED_CFG_TARGET,
+    URI_BDD_PRED_CFG_VAR,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
+    URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BHV_PRED_TARGET_AGN,
@@ -355,4 +359,31 @@ def get_tmpl_fc_is_held(model: ModelBase, **kwargs) -> Optional[VariableStrTempl
 
     return VariableStrTemplate(
         tmpl_str='"{target_obj}" is held by "{agn}"', var_map={obj_id: "target_obj", agn_id: "agn"}
+    )
+
+
+def get_tmpl_fc_config(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(model, FluentClauseModel):
+        return None
+
+    if URI_BDD_TYPE_CONFIG not in model.types:
+        return None
+
+    ns_manager = kwargs.get("ns_manager", None)
+
+    assert URI_BDD_PRED_CFG_VAR in model.variable_by_role, (
+        f"HasConfig fluent '{model.id}' does not have 'config-var' property"
+    )
+    cfg_var_id = model.variable_by_role[URI_BDD_PRED_CFG_VAR][0]
+    assert isinstance(cfg_var_id, URIRef), (
+        f"HasConfig fluent '{model.id}' does not have URI 'config-var' property"
+    )
+
+    cfg_name = model.get_attr(URI_BDD_PRED_CFG_NAME)
+    target_uri = model.get_attr(URI_BDD_PRED_CFG_TARGET)
+    assert isinstance(target_uri, URIRef)
+
+    return VariableStrTemplate(
+        tmpl_str=f'"{target_uri.n3(ns_manager)}" has config "{cfg_name}" = "{{cfg_val}}"',
+        var_map={cfg_var_id: "cfg_val"},
     )
