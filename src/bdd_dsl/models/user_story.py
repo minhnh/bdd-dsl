@@ -26,6 +26,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_VARIATION,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_WHEN,
+    URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENE_AGN,
     URI_BDD_TYPE_SCENE_OBJ,
@@ -77,33 +78,33 @@ class ScenarioModel(ModelBase):
         super().__init__(node_id=scenario_id, types={URI_BDD_TYPE_SCENARIO})
 
         node_val = graph.value(subject=self.id, predicate=URI_BDD_PRED_GIVEN)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"Scenario '{self.id}' does not refer to a Given"
+        assert node_val is not None and isinstance(node_val, URIRef), (
+            f"Scenario '{self.id}' does not refer to a Given"
+        )
         self.given = node_val
 
         node_val = graph.value(subject=self.id, predicate=URI_BDD_PRED_WHEN)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"Scenario '{self.id}' does not refer to a When"
+        assert node_val is not None and isinstance(node_val, URIRef), (
+            f"Scenario '{self.id}' does not refer to a When"
+        )
         self.when = node_val
 
         node_val = graph.value(subject=self.id, predicate=URI_BDD_PRED_THEN)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"Scenario '{self.id}' does not refer to a Then"
+        assert node_val is not None and isinstance(node_val, URIRef), (
+            f"Scenario '{self.id}' does not refer to a Then"
+        )
         self.then = node_val
 
         node_val = graph.value(subject=self.id, predicate=URI_BHV_PRED_OF_BHV)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"Scenario '{self.id}' does not refer to a Behaviour"
+        assert node_val is not None and isinstance(node_val, URIRef), (
+            f"Scenario '{self.id}' does not refer to a Behaviour"
+        )
         self.bhv_id = node_val
 
         node_val = graph.value(subject=self.id, predicate=URI_TASK_PRED_OF_TASK)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"Scenario '{self.id}' does not refer to a Task"
+        assert node_val is not None and isinstance(node_val, URIRef), (
+            f"Scenario '{self.id}' does not refer to a Task"
+        )
         self.task_id = node_val
 
 
@@ -130,9 +131,9 @@ class SceneModel(ModelBase):
 
             if URI_BDD_TYPE_SCENE_OBJ in comp_types:
                 for obj_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_OBJ):
-                    assert isinstance(
-                        obj_id, URIRef
-                    ), f"SceneModel {self.id}: '{obj_id}' not URIRef"
+                    assert isinstance(obj_id, URIRef), (
+                        f"SceneModel {self.id}: '{obj_id}' not URIRef"
+                    )
                     self.objects.add(obj_id)
 
             if URI_BDD_TYPE_SCENE_WS in comp_types:
@@ -204,20 +205,20 @@ class IHasClause(ModelBase):
         self._path_to_clauses = {}
 
     def _process_iclause(self, clause: IClause):
-        assert isinstance(
-            clause, ModelBase
-        ), f"{self.id}: got IClause which is not also a ModelBase: {clause}"
-        assert (
-            clause.clause_of in self.clauses_by_role
-        ), f"{self.id}: IClause '{clause.id}' does not ref Given, When, Then of parent scenario '{self.scenario.id}'"
+        assert isinstance(clause, ModelBase), (
+            f"{self.id}: got IClause which is not also a ModelBase: {clause}"
+        )
+        assert clause.clause_of in self.clauses_by_role, (
+            f"{self.id}: IClause '{clause.id}' does not ref Given, When, Then of parent scenario '{self.scenario.id}'"
+        )
 
         assert clause.id not in self.clauses, f"{self.id}: duplicate clause: {clause.id}"
         self.clauses[clause.id] = clause
         self.clauses_by_role[clause.clause_of].append(clause.id)
 
-        assert (
-            clause.id not in self._path_to_clauses
-        ), f"{self.id}: multiple '{clause.id}' in clause hierarchy"
+        assert clause.id not in self._path_to_clauses, (
+            f"{self.id}: multiple '{clause.id}' in clause hierarchy"
+        )
         self._path_to_clauses[clause.id] = None
 
     def _load_clauses_re(self, node_id: URIRef, graph: Graph, has_clause_set: set[URIRef]) -> None:
@@ -229,14 +230,14 @@ class IHasClause(ModelBase):
         if has_clause_obj is None:
             # no has-clause
             return
-        assert isinstance(
-            has_clause_obj, BNode
-        ), f"'{node_id}': 'has-clause' does not refer to BNode: {has_clause_obj}"
+        assert isinstance(has_clause_obj, BNode), (
+            f"'{node_id}': 'has-clause' does not refer to BNode: {has_clause_obj}"
+        )
 
         for clause_id in graph.items(list=has_clause_obj):
-            assert isinstance(
-                clause_id, URIRef
-            ), f"'{node_id}': item in 'has-clause' collection not a URIRef: {clause_id}"
+            assert isinstance(clause_id, URIRef), (
+                f"'{node_id}': item in 'has-clause' collection not a URIRef: {clause_id}"
+            )
             assert clause_id not in self.clauses, f"'{node_id}': duplicate clause '{clause_id}'"
 
             clause_types = get_node_types(graph=graph, node_id=clause_id)
@@ -249,12 +250,12 @@ class IHasClause(ModelBase):
                 continue
 
             if URI_BDD_TYPE_FORALL in clause_types:
-                assert (
-                    self._when_bhv_id is None
-                ), f"'{self.id}' has ForAll '{clause_id}' but also a WhenBehaviour '{self._when_bhv_id}'"
-                assert (
-                    self._bhv_loader is not None
-                ), f"'{self.id}' has ForAll '{clause_id}' but no behaviour loader"
+                assert self._when_bhv_id is None, (
+                    f"'{self.id}' has ForAll '{clause_id}' but also a WhenBehaviour '{self._when_bhv_id}'"
+                )
+                assert self._bhv_loader is not None, (
+                    f"'{self.id}' has ForAll '{clause_id}' but no behaviour loader"
+                )
                 self._forall_id = clause_id
                 forall_model = ForAllModel(
                     forall_id=clause_id,
@@ -269,9 +270,9 @@ class IHasClause(ModelBase):
                     node_id=forall_model.id, graph=graph, has_clause_set=has_clause_set
                 )
                 for clause_id in forall_model._path_to_clauses:
-                    assert (
-                        clause_id not in self._path_to_clauses
-                    ), f"{self.id}: multiple {clause_id} of {forall_model.id} in clause hierarchy"
+                    assert clause_id not in self._path_to_clauses, (
+                        f"{self.id}: multiple {clause_id} of {forall_model.id} in clause hierarchy"
+                    )
                     assert clause_id in forall_model._path_to_clauses
                     self._path_to_clauses[clause_id] = forall_model.id
                 continue
@@ -290,20 +291,20 @@ class IHasClause(ModelBase):
                     node_id=exists_model.id, graph=graph, has_clause_set=has_clause_set
                 )
                 for clause_id in exists_model._path_to_clauses:
-                    assert (
-                        clause_id not in self._path_to_clauses
-                    ), f"{self.id}: multiple {clause_id} of {exists_model.id} in clause hierarchy"
+                    assert clause_id not in self._path_to_clauses, (
+                        f"{self.id}: multiple {clause_id} of {exists_model.id} in clause hierarchy"
+                    )
                     assert clause_id in exists_model._path_to_clauses
                     self._path_to_clauses[clause_id] = exists_model.id
                 continue
 
             if URI_BDD_TYPE_WHEN_BHV in clause_types:
-                assert (
-                    self._forall_id is None
-                ), f"'{self.id}' has WhenBehaviour '{clause_id}' but also a ForAll '{self._forall_id}'"
-                assert (
-                    self._bhv_loader is not None
-                ), f"'{self.id}' has WhenBehaviour '{clause_id}' but no WhenBhvLoader"
+                assert self._forall_id is None, (
+                    f"'{self.id}' has WhenBehaviour '{clause_id}' but also a ForAll '{self._forall_id}'"
+                )
+                assert self._bhv_loader is not None, (
+                    f"'{self.id}' has WhenBehaviour '{clause_id}' but no WhenBhvLoader"
+                )
                 self._when_bhv_id = clause_id
                 when_bhv_model = WhenBehaviourModel(clause_id=clause_id, graph=graph)
                 self._bhv_loader.load_bhv_info(when_bhv=when_bhv_model, graph=graph)
@@ -321,9 +322,9 @@ class IHasClause(ModelBase):
             assert clause_id in self.clauses, f"'{clause_id}' not added to clause collection"
             return self.clauses[clause_id]
 
-        assert (
-            p_to_clause_id in self.clauses
-        ), f"path to '{clause_id}', {p_to_clause_id}, not in clause collection"
+        assert p_to_clause_id in self.clauses, (
+            f"path to '{clause_id}', {p_to_clause_id}, not in clause collection"
+        )
         p_to_clause_model = self.clauses[p_to_clause_id]
         assert isinstance(p_to_clause_model, IHasClause)
         return p_to_clause_model.get_clause_model(clause_id)
@@ -338,6 +339,12 @@ class IHasClause(ModelBase):
                 yield from fc.fluent_clauses()
             else:
                 raise ValueError(f"Unexpected clause type ({type(fc)}): {fc}")
+
+    def config_clauses(self) -> Generator[FluentClauseModel, None, None]:
+        for fc in self.fluent_clauses():
+            if URI_BDD_TYPE_CONFIG not in fc.types:
+                continue
+            yield fc
 
 
 class ForAllModel(IHasClause, IClause):
@@ -365,32 +372,32 @@ class ForAllModel(IHasClause, IClause):
         IClause.__init__(self, node_id=forall_id, graph=graph)
 
         var_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_REF_VAR)
-        assert isinstance(
-            var_node, URIRef
-        ), f"ForAll {self.id}: 'ref-variable' not a URI: {var_node}"
+        assert isinstance(var_node, URIRef), (
+            f"ForAll {self.id}: 'ref-variable' not a URI: {var_node}"
+        )
         self.quantified_var = var_node
 
         in_set_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_IN_SET)
-        assert isinstance(
-            in_set_node, URIRef
-        ), f"ForAll {self.id}: 'in-set' is not a URI: {in_set_node}"
+        assert isinstance(in_set_node, URIRef), (
+            f"ForAll {self.id}: 'in-set' is not a URI: {in_set_node}"
+        )
         self.in_set = in_set_node
 
     @property
     def when_bhv_id(self) -> URIRef:
         if self._forall_id is None:
-            assert (
-                self._when_bhv_id is not None
-            ), f"ForAllModel '{self.id}': no inner forall or WhenBehaviour clause"
+            assert self._when_bhv_id is not None, (
+                f"ForAllModel '{self.id}': no inner forall or WhenBehaviour clause"
+            )
             return self._when_bhv_id
 
-        assert (
-            self._forall_id in self.clauses
-        ), f"ForAllModel '{self.id}': inner forall '{self._forall_id}' not added to clause collection"
+        assert self._forall_id in self.clauses, (
+            f"ForAllModel '{self.id}': inner forall '{self._forall_id}' not added to clause collection"
+        )
         inner_forall = self.clauses[self._forall_id]
-        assert isinstance(
-            inner_forall, ForAllModel
-        ), f"ForAllModel '{self.id}': inner forall '{self._forall_id}' not added as ForAllModel"
+        assert isinstance(inner_forall, ForAllModel), (
+            f"ForAllModel '{self.id}': inner forall '{self._forall_id}' not added as ForAllModel"
+        )
         return inner_forall.when_bhv_id
 
 
@@ -417,15 +424,15 @@ class ThereExistsModel(IHasClause, IClause):
         IClause.__init__(self, node_id=exists_id, graph=graph)
 
         var_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_REF_VAR)
-        assert isinstance(
-            var_node, URIRef
-        ), f"ForAll {self.id}: ref-variable not an URI: {var_node}"
+        assert isinstance(var_node, URIRef), (
+            f"ForAll {self.id}: ref-variable not an URI: {var_node}"
+        )
         self.quantified_var = var_node
 
         in_set_node = graph.value(subject=self.id, predicate=URI_BDD_PRED_IN_SET)
-        assert isinstance(
-            in_set_node, URIRef
-        ), f"ForAll {self.id}: 'in-set' is not a URI: {in_set_node}"
+        assert isinstance(in_set_node, URIRef), (
+            f"ForAll {self.id}: 'in-set' is not a URI: {in_set_node}"
+        )
         self.in_set = in_set_node
 
 
@@ -446,9 +453,9 @@ class ScenarioVariantModel(IHasClause):
         bhv_loaders: list[WhenBhvLoaderProtocol] = [load_bhv_pickplace],
     ) -> None:
         node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"ScenarioVariant '{var_id}' does not refer to a Scenario"
+        assert node_val is not None and isinstance(node_val, URIRef), (
+            f"ScenarioVariant '{var_id}' does not refer to a Scenario"
+        )
         scenario_id = node_val
 
         scenario = ScenarioModel(scenario_id=scenario_id, graph=us_graph)
@@ -463,22 +470,22 @@ class ScenarioVariantModel(IHasClause):
         )
 
         node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_TMPL)
-        assert node_val is not None and isinstance(
-            node_val, URIRef
-        ), f"ScenarioVariant '{var_id}' does not refer to a ScenarioTemplate"
+        assert node_val is not None and isinstance(node_val, URIRef), (
+            f"ScenarioVariant '{var_id}' does not refer to a ScenarioTemplate"
+        )
         self.tmpl = ModelBase(node_id=node_val, graph=full_graph)
         process_time_constraint_model(constraint=self.tmpl, graph=full_graph)
 
         scene_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_HAS_SCENE)
-        assert scene_id is not None and isinstance(
-            scene_id, URIRef
-        ), f"ScenarioVariant '{var_id}' does not refer to a Scene"
+        assert scene_id is not None and isinstance(scene_id, URIRef), (
+            f"ScenarioVariant '{var_id}' does not refer to a Scene"
+        )
         self.scene = SceneModel(us_graph=us_graph, full_graph=full_graph, scene_id=scene_id)
 
         us_ids = list(us_graph.subjects(object=var_id, predicate=URI_BDD_PRED_HAS_AC))
-        assert len(us_ids) == 1 and isinstance(
-            us_ids[0], URIRef
-        ), f"ScenarioVariant 'var_id' is not referred from exactly 1 UserStory, found: {us_ids}"
+        assert len(us_ids) == 1 and isinstance(us_ids[0], URIRef), (
+            f"ScenarioVariant 'var_id' is not referred from exactly 1 UserStory, found: {us_ids}"
+        )
         self.us_id = us_ids[0]
 
         self._tmpl_clauses = set()
@@ -489,9 +496,9 @@ class ScenarioVariantModel(IHasClause):
         self._load_clauses_re(node_id=self.id, graph=full_graph, has_clause_set=clause_set)
 
         task_var_id = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_HAS_VARIATION)
-        assert task_var_id is not None and isinstance(
-            task_var_id, URIRef
-        ), f"ScenarioVariant '{var_id}' does not refer to a TaskVariation"
+        assert task_var_id is not None and isinstance(task_var_id, URIRef), (
+            f"ScenarioVariant '{var_id}' does not refer to a TaskVariation"
+        )
         self.task_variation = TaskVariationModel(
             us_graph=us_graph, full_graph=full_graph, task_var_id=task_var_id
         )
@@ -499,26 +506,26 @@ class ScenarioVariantModel(IHasClause):
     @property
     def when_bhv_id(self) -> URIRef:
         if self._forall_id is None:
-            assert (
-                self._when_bhv_id is not None
-            ), f"ScenarioVariant '{self.id}': no inner forall or WhenBehaviour clause"
+            assert self._when_bhv_id is not None, (
+                f"ScenarioVariant '{self.id}': no inner forall or WhenBehaviour clause"
+            )
             return self._when_bhv_id
 
-        assert (
-            self._forall_id in self.clauses
-        ), f"ScenarioVariant '{self.id}': forall '{self._forall_id}' not added to clause collection"
+        assert self._forall_id in self.clauses, (
+            f"ScenarioVariant '{self.id}': forall '{self._forall_id}' not added to clause collection"
+        )
         forall = self.clauses[self._forall_id]
-        assert isinstance(
-            forall, ForAllModel
-        ), f"ScenarioVariant '{self.id}': forall '{self._forall_id}' not added as ForAllModel"
+        assert isinstance(forall, ForAllModel), (
+            f"ScenarioVariant '{self.id}': forall '{self._forall_id}' not added as ForAllModel"
+        )
         return forall.when_bhv_id
 
     @property
     def when_bhv_model(self) -> WhenBehaviourModel:
         whn_bhv = self.get_clause_model(clause_id=self.when_bhv_id)
-        assert isinstance(
-            whn_bhv, WhenBehaviourModel
-        ), f"Model for '{self.when_bhv_id}' not a WhenBehaviourModel: {type(whn_bhv)}"
+        assert isinstance(whn_bhv, WhenBehaviourModel), (
+            f"Model for '{self.when_bhv_id}' not a WhenBehaviourModel: {type(whn_bhv)}"
+        )
         return whn_bhv
 
 
@@ -555,9 +562,9 @@ class UserStoryLoader(object):
         """
         q_result = self._us_graph.query(Q_US_VAR)
         assert q_result is not None, "querying scenario variant returns None query"
-        assert q_result.type == "SELECT" and isinstance(
-            q_result, Iterable
-        ), f"unexpected query result: type={q_result.type}"
+        assert q_result.type == "SELECT" and isinstance(q_result, Iterable), (
+            f"unexpected query result: type={q_result.type}"
+        )
 
         us_var_dict = {}
         for row in q_result:
@@ -566,13 +573,13 @@ class UserStoryLoader(object):
             assert hasattr(row, "var"), "query result row has no attribute 'var'"
 
             us_id = row.us
-            assert isinstance(
-                us_id, URIRef
-            ), f"query result for UserStory is not a URIRef: {type(us_id)}"
+            assert isinstance(us_id, URIRef), (
+                f"query result for UserStory is not a URIRef: {type(us_id)}"
+            )
             var_id = row.var
-            assert isinstance(
-                var_id, URIRef
-            ), f"query result for ScenarioVariant is not a URIRef: {type(var_id)}"
+            assert isinstance(var_id, URIRef), (
+                f"query result for ScenarioVariant is not a URIRef: {type(var_id)}"
+            )
 
             if us_id not in us_var_dict:
                 us_var_dict[us_id] = set()
