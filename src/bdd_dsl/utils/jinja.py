@@ -172,7 +172,7 @@ class WhenBhvToStringProtocol(Protocol):
 def get_bhv_str_pickplace(
     when_bhv: WhenBehaviourModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    tmpl = get_tmpl_bhv_pickplace(when_bhv=when_bhv)
+    tmpl = get_tmpl_bhv_pickplace(model=when_bhv)
     assert tmpl is not None, (
         f"WhenBehaviour '{when_bhv.id.n3(ns_manager)}' has wrong types: {when_bhv.types}"
     )
