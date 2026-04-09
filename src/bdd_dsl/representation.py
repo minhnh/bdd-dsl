@@ -27,7 +27,7 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
-from bdd_dsl.models.user_story import IHasClause, ScenarioModel
+from bdd_dsl.models.user_story import ScenarioModel
 
 
 def get_clause_role_rep(scenario: ScenarioModel, clause: IClause) -> str:
@@ -37,7 +37,7 @@ def get_clause_role_rep(scenario: ScenarioModel, clause: IClause) -> str:
         return "When"
     if clause.clause_of == scenario.then:
         return "Then"
-    raise ValueError(f"Role '{clause.clause_of}' is not Given/When/Then of '{IHasClause.id}'")
+    raise ValueError(f"Role '{clause.clause_of}' is not Given/When/Then of '{scenario.id}'")
 
 
 def var_val_to_str(var_val: Any, ns_manager: Optional[NamespaceManager] = None) -> str:

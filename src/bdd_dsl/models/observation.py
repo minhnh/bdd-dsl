@@ -73,7 +73,9 @@ class FluentTimeline(object):
             self.horizon = dur_spec[URI_TIME_PRED_HRZN_SEC]
 
         else:
-            raise ValueError("Unhandled duration types:\n" + "\n  ".join(fc.types))
+            raise ValueError(
+                "Unhandled duration types:\n" + "\n  ".join([uri.n3() for uri in fc.types])
+            )
 
     def _insert_trin_stamped_in_order(self, trin_st: TrinaryStamped):
         # Find insertion point (from end)
