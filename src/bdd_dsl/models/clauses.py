@@ -67,7 +67,7 @@ class FluentClauseModel(ModelBase, IClause):
 
             if var_id not in self.role_by_variable:
                 self.role_by_variable[var_id] = []
-            self.role_by_variable[var_id].append(var_id)
+            self.role_by_variable[var_id].append(role_pred)
 
         assert len(self.variable_by_role[role_pred]) > 0, (
             f"clause '{self.id}' does link to a variable via '{role_pred}'"

@@ -41,7 +41,7 @@ class BDDSpecTest(unittest.TestCase):
                 scr_var = us_loader.load_scenario_variant(full_graph=graph, variant_id=scr_var_id)
                 self.assertTrue(
                     scr_var.when_bhv_model.behaviour.id == scr_var.scenario.bhv_id,
-                    "behaviour id in WhenBehaviour clause doesn't match that for ScenarioVariant '{scr_var.id}'",
+                    f"behaviour id in WhenBehaviour clause doesn't match that for ScenarioVariant '{scr_var.id}'",
                 )
 
     def test_pickplace_jinja(self):
