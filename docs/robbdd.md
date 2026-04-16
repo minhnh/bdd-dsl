@@ -10,104 +10,167 @@ the `examples/models` folder in the RobBDD repository.
 
 <!-- mtoc-start -->
 
-* [Specifying a scenario template](#specifying-a-scenario-template)
-  * [Identifiers](#identifiers)
-  * [Template elements](#template-elements)
-* [Specifying a scene](#specifying-a-scene)
-* [Specifying user stories and scenario variants](#specifying-user-stories-and-scenario-variants)
-  * [Table variation](#table-variation)
-  * [Cartesian product variation](#cartesian-product-variation)
-* [From pick and place to sorting](#from-pick-and-place-to-sorting)
-* [Code generation](#code-generation)
-* [References](#references)
+1. [Specifying a scenario template](#specifying-a-scenario-template)
+    1. [Identifiers](#identifiers)
+    1. [Minimal Scenario Template](#minimal-scenario-template)
+    1. [Adding fluent clauses](#adding-fluent-clauses)
+1. [Specifying a scene](#specifying-a-scene)
+1. [Specifying user stories and scenario variants](#specifying-user-stories-and-scenario-variants)
+    1. [Table variation](#table-variation)
+    1. [Cartesian product variation](#cartesian-product-variation)
+1. [From pick and place to sorting](#from-pick-and-place-to-sorting)
+1. [Code generation](#code-generation)
+1. [References](#references)
 
 <!-- mtoc-end -->
 
 ## Specifying a scenario template
 
-We begins with specifying a simple pick & place scenario, which in Gherkin may look like
-the following:
+[Behaviour-Driven Development (BDD)](https://en.wikipedia.org/wiki/Behavior-driven_development)
+in an acceptance testing approach which defines each acceptance, i.e., "good-enough", criterion,
+as a scenario using the _Given_ pre-condition, _When_ action/event occurs, _Then_ expect some outcome
+formulation. A popular BDD implmentation is [Gherkin](https://cucumber.io/docs/gherkin/reference).
+When applied to a simple pick & place task, a Gherkin scenario may look like the following:
 
 ```gherkin
 Scenario Outline: pickplace scenario
   Given <object> is located at <pick_ws>
-  When the robot picks <object> and places it at <place_ws>
+  When the <robot> picks <object> and places it at <place_ws>
   Then the object is located at <place_ws>
+
+  Examples:
+    | robot  | object | pick_ws | place_ws |
+    | kinova | ball   | table   | shelf    |
+    ...
 ```
 
-With RobBDD, we first specify this as a scenario template:
+Here, in addition to the pick-and-place behaviour, we declare 2 expectations: the target object to
+be in the picking area before the behaviour, and at the placing area afterwards.
+`<robot>`, `<object>`,... in the excerpt are parameters that can take different values in the
+`Examples` table underneath.
+We now walk through how we can specify this using RobBDD.
+We begin with the following minimal example:
 
-```txt
+```gherkin
 // pickplace.bdd
-ns bdd_tmpl='https://secorolab.github.io/models/acceptance-criteria/bdd/templates/'
+ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
 
-Task (ns=bdd_tmpl) tsk_pickplace
-Event (ns=bdd_tmpl) evt_pick_start
-Event (ns=bdd_tmpl) evt_place_end
+Task (ns=tutorial) tutorial-tsk
 
-Scenario Template (ns=bdd_tmpl) tmpl_pickplace {
-  task: <tsk_pickplace>
+Event (ns=tutorial) evt-scr-start
+Event (ns=tutorial) evt-pick-start
+Event (ns=tutorial) evt-place-end
+Event (ns=tutorial) evt-scr-end
 
-  var target_object
-  var robot
-  var pick_ws
-  var place_ws
+Scenario Template (ns=tutorial) pickplace-tmpl {
+    duration: from <evt-scr-start> until <evt-scr-end>
+    task: <tutorial-tsk>
+    var robot
+    var target-obj
+    var place-ws
 
-  Given:
-    holds(<target_object> is located at <pick_ws>, before <evt_pick_start>)
-  When:
-    Behaviour (ns=bdd_tmpl) pickplace: <robot> picks <target_object> and places at <place_ws>
-  Then:
-    holds(<target_object> is located at <place_ws>, after <evt_pick_start>)
+    When:
+        Behaviour (ns=tutorial) pickplace-bhv {
+            duration: from <evt-pick-start> until <evt-place-end>
+            <robot> picks <target-obj> and places at <place-ws>
+        }
 }
 ```
+
+This minimal scenario template can be used to generate to an RDF graph, e.g., in the turtle (TTL) format,
+using the following `textx generate` command, which will print the TTL serialization to the terminal:
+
+```sh
+textx generate pickplace.bdd --target console --format ttl
+```
+
+We now walk through the key elements in this example, before introducing additional specifications.
 
 ### Identifiers
 
 RDF graphs use [Internationalized Resource Identifiers (IRIs)](https://datatracker.ietf.org/doc/html/rfc3987)
-to identify nodes. To accomodate this during graph generation, we include the namespace declaration
-syntax `ns bdd_tmpl='http://...'`, which different models can point to, e.g. with `(ns=bdd_tmpl)`,
-to form complete IRIs. The `bdd_tmpl` string is also used as prefix to form [compact IRIs](https://www.w3.org/TR/json-ld11/#dfn-compact-iri).
-For example, `(ns=bdd_tmpl) tmpl_pickplace` will be transformed into a node with IRI
-`https://secorolab.github.io/models/acceptance-criteria/bdd/templates/tmpl_pickplace`,
-which has the short form `bdd_tmpl:tmpl_pickplace`.
+to identify nodes. To accommodate this during graph generation, we include the namespace declaration
+syntax `ns tutorial='http://...'`, which different models can point to, e.g. with `(ns=tutorial)`,
+to form complete IRIs. The `tutorial` string is also used as prefix to form [compact IRIs](https://www.w3.org/TR/json-ld11/#dfn-compact-iri).
+For example, `(ns=tutorial) pickplace-tmpl` will be transformed into a node with IRI
+`https://secorolab.github.io/robbdd/tutorials/pickplace-tmpl`,
+which has the short form `tutorial:pickplace-tmpl`.
 IRIs allow extending a model in the generated graph with any additional information as needed,
 as long as they refer the model's IRI.
+In RobBDD, the element IDs, e.g., `evt-scr-start`, are combined with a namespace declaration,
+e.g., `ns tutorial`, to generate the full IRI in the graph.
+The namespace reference can either be explicit like with task or event declarations, or inherited from
+the parent like with variable declarations.
 
-### Template elements
+### Minimal Scenario Template
 
-A scenario template consists of the following essential elements:
+A scenario template, defined with the `Scenario Template (ns=...) ... { ... }` block, outlines the
+basic BDD Given-When-Then structure described above.
+For a valid generation, a template require the following elements:
 
-* A template reference a `Task`. For now, this is not exploited but can be extended with more
+* A reference to a `Task`. For now, this is not exploited but can be extended with more
   specific task models in the future.
-* Declared variables, e.g. `var target_object`, can be referred to by clauses & behaviour.
-  The [section about scenario variations](#specifying-user-stories-and-scenario-variants) describes how
-  variations can be introduced via these variables.
-  - RobBDD syntax also includes set variables with syntax `set var var_name` for sets that can
-    vary across scenario variants. Usage of this syntax will be explained in [a later section](#from-pick-and-place-to-sorting).
-* A declared behaviour, e.g. `Behaviour (ns=bdd_tmpl) pickplace`, where the following part
+* A duration specification referring to the boundary events of the scenario.
+* A behaviour declaration, e.g. `Behaviour (ns=tutorial) pickplace`, where the following part
   link to variable parameter of the behaviour. For now, only pick & place behaviours are
   supported, via the following syntax:
   - `<agn> picks <obj>`
   - `<agn> places <obj> at <ws>`
   - `<agn> picks <obj> and places at <ws>`
-* A fluent clause, e.g. `holds(...)`, can be added to the `Given` & `Then` parts of the scenario,
-  and composes a predicate, e.g. `is located at`, a time constraint, e.g. `before ...`, with
-  corresponding variables, e.g. `<target_object>`. More details on this composition is described
-  on [the "concepts" page](./bdd-concepts). A general language for predicates is not available
-  at the moment. Available syntax:
-  - supported predicates (all can generate RDF graphs, but some won't generate Gherkin for now):
-    + `<obj> is located at <ws>`: fully supported
-    + `<obj> is held by <agn>`: fully supported
-    + `<obj> are sorted into <ws_set>`: fully supported
-    + `<subject> has config <config>`: Gherkin gen. N/A
-    + `<agn> can reach <obj>`: Gherkin gen. N/A
-    + `<agn> does not drop <obj>`: Gherkin gen. N/A
-    + `<agn> does not collide <target>`: Gherkin gen. N/A
-  - supported time constraints (all works with all generators):
-    + `before <event>`
-    + `after <event>`
-    + `from <start_event> until <end_event>`
+* A variable declaration, e.g. `var target-obj`, can be referred to by clauses & behaviour.
+  The [section about scenario variations](#specifying-user-stories-and-scenario-variants) describes how
+  variations can be introduced via these variables.
+  - RobBDD syntax also includes set variables with syntax `set var var_name` for sets that can
+    vary across scenario variants. Usage of this syntax will be explained in [a later section](#from-pick-and-place-to-sorting).
+
+### Adding fluent clauses
+
+Fluent clauses specify expectations about the behaviour under test. A fluent clause, e.g. `holds(...)`,
+can be added to the `Given` & `Then` parts of the scenario, and composes a predicate, e.g. `is located at`,
+a time constraint, e.g. `before ...`, with  corresponding variables, e.g. `<target-obj>`.
+More details on this composition is described on [the "concepts" page](./bdd-concepts).
+A general language for predicates is not available at the moment. Available syntax:
+
+* supported predicates (all can generate RDF graphs, but some won't generate Gherkin for now):
+  - `<obj> is located at <ws>`: fully supported
+  - `<obj> is held by <agn>`: fully supported
+  - `<obj> are sorted into <ws_set>`: fully supported
+  - `<subject> has config <config>`: Gherkin gen. N/A
+  - `<agn> can reach <obj>`: Gherkin gen. N/A
+  - `<agn> does not drop <obj>`: Gherkin gen. N/A
+  - `<agn> does not collide <target>`: Gherkin gen. N/A
+* supported time constraints (all works with all generators):
+  - `before <event>`
+  - `after <event>`
+  - `from <start_event> until <end_event>`
+
+The two "located at" clauses in the above Gherkin example can be reproduced in RobBDD with the
+following additions:
+
+```diff
+@@ -12,11 +12,18 @@
+     task: <tutorial-tsk>
+     var robot
+     var target-obj
++    var pick-ws
+     var place-ws
+
++    Given:
++        fc-located-before: holds(<target-obj> is located at <pick-ws>, before <evt-pick-start>)
++
+     When:
+         Behaviour (ns=tutorial) pickplace-bhv {
+             duration: from <evt-pick-start> until <evt-place-end>
+             <robot> picks <target-obj> and places at <place-ws>
+         }
++
++    Then:
++        fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
+ }
+```
+
+You can now run the `textx generate` command above again to see how the graph changes. Note that
+we cannot generate to Gherkin at this point since no scenario variant is specified.
 
 ## Specifying a scene
 
@@ -258,7 +321,7 @@ Here, value sets can be specified in several ways:
   const set (ns=bdd_var) ws_set {
     <lab_workspaces.table_ws>, <lab_workspaces.shelf_ws>
   }
-  Scenario Template (ns=bdd_tmpl) tmpl_pickplace {
+  Scenario Template (ns=tutorial) tmpl_pickplace {
   ...
   ```
 
@@ -275,7 +338,7 @@ multiple objects and workspaces. This section describes how this extensions can 
 with RobBDD. Following is a template for such a sorting scenario:
 
 ```txt
-Scenario Template (ns=bdd_tmpl) tmpl_sort {
+Scenario Template (ns=tutorial) tmpl_sort {
   task: <tsk_sorting>
 
   set var target_objects
@@ -289,7 +352,7 @@ Scenario Template (ns=bdd_tmpl) tmpl_sort {
       holds(<x> is located at <pick_ws>, before <evt_pick_start>)
     )
     When:
-      Behaviour (ns=bdd_tmpl) pickplace: <robot> picks <x> and places at <place_workspaces>
+      Behaviour (ns=tutorial) pickplace: <robot> picks <x> and places at <place_workspaces>
     Then:
       ( var y exists in <place_workspaces> ) such that {
           holds(<x> is located at <y>, after <evt_place_end>)
