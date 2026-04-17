@@ -1,0 +1,43 @@
+// lab.scene
+ns lab-env='https://secorolab.github.io/models/environments/secorolab/'
+
+obj set (ns=lab-env) pickplace_objects {
+  object red-cube,
+  object blue-cube,
+  object green-ball,
+  object bottle
+}
+agn set (ns=lab-env) lab_agents {
+  agent panda,
+  agent ur10,
+  agent kinova
+}
+
+obj set (ns=lab-env) ws_objects {
+  object container_1,
+  object container_2,
+  object dining_table
+}
+ws set (ns=lab-env) lab_workspaces {
+  workspace table_ws,
+  workspace container_1_ws,
+  workspace container_2_ws
+}
+
+comp (ns=lab-env) comp_container1 of ws <lab_workspaces.container_1_ws> {
+  obj <ws_objects.container_1>
+}
+comp (ns=lab-env) comp_container2 of ws <lab_workspaces.container_2_ws> {
+  obj <ws_objects.container_2>
+}
+comp (ns=lab-env) comp_table_pickplace of ws <lab_workspaces.table_ws> {
+  obj <ws_objects.dining_table>
+  ws comp <comp_container1>
+  ws comp <comp_container2>
+}
+
+scene (ns=lab-env) pickplace_scene {
+  obj set <pickplace_objects>
+  ws comp <comp_table_pickplace>
+  agn set <lab_agents>
+}

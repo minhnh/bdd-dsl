@@ -15,6 +15,8 @@ the `examples/models` folder in the RobBDD repository.
     1. [Minimal Scenario Template](#minimal-scenario-template)
     1. [Adding fluent clauses](#adding-fluent-clauses)
 1. [Specifying a scene](#specifying-a-scene)
+    1. [Adding objects and agents](#adding-objects-and-agents)
+    1. [Composing workspaces](#composing-workspaces)
 1. [Specifying user stories and scenario variants](#specifying-user-stories-and-scenario-variants)
     1. [Table variation](#table-variation)
     1. [Cartesian product variation](#cartesian-product-variation)
@@ -175,81 +177,122 @@ we cannot generate to Gherkin at this point since no scenario variant is specifi
 ## Specifying a scene
 
 To vary the above template, we must first specify the possible objects, workspaces, and agents
-that can appear in the scene. To this end, RobBDD includes a scene specification DSL:
+that can appear in the scene. We will now walk through how a compose a scene for the above
+pick & place task using RobBDD syntax.
+
+### Adding objects and agents
+
+At the minimum, a scene model requires a scene declaration, e.g., `pickplace_scene` in the
+example below. Here, we start with a set of objects that can be picked and placed by the robot:
 
 ```txt
-// pickplace.scene
-ns lab_env='https://secorolab.github.io/models/environments/secorolab/'
-ns isaac_agn='https://secorolab.github.io/models/agents/isaac-sim/'
+// lab.scene
+ns lab-env='https://secorolab.github.io/models/environments/secorolab/'
 
-obj set (ns=lab_env) pickplace_objects {
-  object box1,
-  object box2,
-  object ball,
+obj set (ns=lab-env) pickplace_objects {
+  object red-cube,
+  object blue-cube,
+  object green-ball,
   object bottle
 }
-obj set (ns=lab_env) ws_objects {
-  object container_1,
-  object container_2,
-  object dining_table,
-  object shelf
-}
-ws set (ns=lab_env) lab_workspaces {
-  workspace container_1_ws,
-  workspace container_2_ws,
-  workspace table_ws,
-  workspace shelf_ws
-}
-agn set (ns=isaac_agn) isaac_agents {
-  agent panda,
-  agent ur10,
-  agent kinova
-}
-comp (ns=lab_env) comp_table_pickplace of ws <lab_workspaces.table_ws> {
-  obj <ws_objects.dining_table>
-}
-comp (ns=lab_env) comp_shelf_pickplace of ws <lab_workspaces.shelf_ws> {
-  obj <ws_objects.shelf>
-}
-```
 
-As shown in the exceprt, sets of scene elements can be declared, e.g. with
-`obj set (ns=lab_env) pickplace_objects`, where the set elements inherit the set's namespace.
-RobBDD also includes mechanism to specify compositions of workspaces, e.g.
-`comp (ns=lab_env comp_table_pickplace)`. A workspace composition can contain objects, workspaces,
-and other compositions. A scene model can then be specified by linking to element sets &
-workspace compositions, e.g. in the excerpt below.
-
-```txt
-// pickplace.scene
-scene (ns=scene_lab) pickplace_scene {
+scene (ns=lab-env) pickplace_scene {
   obj set <pickplace_objects>
-  ws comp <comp_table_pickplace>
-  ws comp <comp_shelf_pickplace>
-  agn set <isaac_agents>
 }
 ```
 
-For a sorting scenario where the robot place objects, in 2 containers, the scene composition
-can be specified as follows:
+Generation to RDF graph, e.g., printing to the terminal in the turtle format, can be tested with:
 
-```txt
-comp (ns=lab_env) comp_container1 of ws <lab_workspaces.container_1_ws> { obj <ws_objects.container_1> }
-comp (ns=lab_env) comp_container2 of ws <lab_workspaces.container_2_ws> { obj <ws_objects.container_2> }
-comp (ns=lab_env) comp_table_sort of ws <lab_workspaces.table_ws> {
-  obj <ws_objects.dining_table>
-  ws comp <comp_container1>
-  ws comp <comp_container2>
-}
-scene (ns=scene_lab) sorting_scene {
-  obj set <pickplace_objects>
-  ws comp <comp_table_sort>
-  agn set <isaac_agents>
-}
+```sh
+textx generate lab.scene --target console --format ttl
 ```
 
-The scenario variant can link to specific scene model, as described further in
-[the next section](#specifying-user-stories-and-scenario-variants).
+Then we add a set of robots to test the pick & place behaviour with:
+
+```diff
++++ lab.scene
+@@ -7,7 +7,13 @@
+   object green-ball,
+   object bottle
+ }
++agn set (ns=lab-env) lab_agents {
++  agent panda,
++  agent ur10,
++  agent kinova
++}
+
+ scene (ns=lab-env) pickplace_scene {
+   obj set <pickplace_objects>
++  agn set <lab_agents>
+ }
+```
+
+### Composing workspaces
+
+We now specify the workspaces where the pick & place behaviour take place. For example, we want to
+describe the robot picking up objects from a table and put them into one of two containers, which
+are also on the table. RobBDD scene specification differentiates between physical objects that
+an agent can interact with and the abstract workspace where a behaviour may take place.
+One example of the distinction is, when we command the robot to the table _workspace_, we don't
+mean on top of the table _object_, but any space surrounding it.
+
+To this end, we first declare the objects and workspaces as follows:
+
+```diff
++++ lab.scene
+@@ -13,6 +13,17 @@
+   agent kinova
+ }
+
++obj set (ns=lab-env) ws_objects {
++  object container_1,
++  object container_2,
++  object dining_table
++}
++ws set (ns=lab-env) lab_workspaces {
++  workspace table_ws,
++  workspace container_1_ws,
++  workspace container_2_ws
++}
++
+ scene (ns=lab-env) pickplace_scene {
+   obj set <pickplace_objects>
+   agn set <lab_agents>
+```
+
+Then we declare the compositions: table, containers workspaces linking to corresponding objects,
+table workspace linking to the container workspaces, and the scene linking to the composition:
+
+```diff
++++ lab.scene
+@@ -24,7 +24,20 @@
+   workspace container_2_ws
+ }
+
++comp (ns=lab-env) comp_container1 of ws <lab_workspaces.container_1_ws> {
++  obj <ws_objects.container_1>
++}
++comp (ns=lab-env) comp_container2 of ws <lab_workspaces.container_2_ws> {
++  obj <ws_objects.container_2>
++}
++comp (ns=lab-env) comp_table_pickplace of ws <lab_workspaces.table_ws> {
++  obj <ws_objects.dining_table>
++  ws comp <comp_container1>
++  ws comp <comp_container2>
++}
++
+ scene (ns=lab-env) pickplace_scene {
+   obj set <pickplace_objects>
++  ws comp <comp_table_pickplace>
+   agn set <lab_agents>
+ }
+```
+
+The above TextX generation command should work after each of the above changes.
+For reference, you can also download/view the
+[complete `lab.scene` model](./assets/models/lab.scene).
+A scenario variant can now link to `pickplace_scene`, as described further in
+the next section.
 
 ## Specifying user stories and scenario variants
 
