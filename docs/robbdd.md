@@ -150,6 +150,7 @@ The two "located at" clauses in the above Gherkin example can be reproduced in R
 following additions:
 
 ```diff
++++ pickplace.bdd
 @@ -12,11 +12,18 @@
      task: <tutorial-tsk>
      var robot
@@ -298,7 +299,7 @@ the next section.
 
 With the scene composition available, we can now specify variants of the above scenario template.
 Here, a user story needs to be declared, e.g. `(ns=bdd_var) us_pickplace` below, as a collection
-of scenario variants, e.g. `table_pick` below. a scenario variant links to a template,
+of scenario variants, e.g. `table_pick` below. A scenario variant links to a template,
 a scene model, and declares variation of the scenario's variables.
 Two types of variation are currently supported by RobBDD: table form like with
 [Gherkin's `Examples` table in a `ScenarioOutline`](https://cucumber.io/docs/gherkin/reference/#scenario-outline),
@@ -312,66 +313,96 @@ clauses, similar to Gherkin's `Examples` table. Cell values can be links to scen
 e.g. `<pickplace_objects.box1>`, links to set of elements, e.g. `obj set <pickplace_objects>`,
 or literal values like strings or numbers.
 
-```txt
-User Story (ns=bdd_var) us_pickplace {
-  As A "Function Developer"
-  I Want "Pick and place behaviour"
-  So That "I can transport objects"
+```diff
++++ pickplace.bdd
+@@ -1,3 +1,5 @@
++import "lab.scene"
++
+ ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
 
-  Scenarios:
-    Scenario table_pick {
-      template: <tmpl_pickplace>
-      scene: <pickplace_scene>
+ Task (ns=tutorial) tutorial-tsk
+@@ -27,3 +29,22 @@
+     Then:
+         fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
+ }
++
++User Story (ns=tutorial) pickplace-us {
++  As A "Function Developer"
++  I Want "Pick and place behaviour"
++  So That "I can transport objects"
++
++  Scenarios:
++    Scenario pickplace-table {
++        template: <pickplace-tmpl>
++        scene: <pickplace_scene>
++
++        variation:
++        | <pickplace-tmpl.target-obj> | <pickplace-tmpl.pick-ws> | <pickplace-tmpl.place-ws> | <pickplace-tmpl.robot> |
++        |---|
++        | <pickplace_objects.red-cube> | <lab_workspaces.table_ws> | <lab_workspaces.container_1_ws> |  <lab_agents.panda> |
++        | <pickplace_objects.green-ball> | <lab_workspaces.container_2_ws> | <lab_workspaces.table_ws> |  <lab_agents.ur10> |
++        | <pickplace_objects.bottle> | <lab_workspaces.table_ws> | <lab_workspaces.container_2_ws> | <lab_agents.kinova> |
++    }
++}
+```
 
-      variation:
-      | <tmpl_pickplace.target_object> | <tmpl_pickplace.pick_ws> | <tmpl_pickplace.place_ws> | <tmpl_pickplace.robot> |
-      |---|
-      | <pickplace_objects.box1> | <lab_workspaces.table_ws> | <lab_workspaces.shelf_ws> |  <isaac_agents.panda> |
-      | <pickplace_objects.ball> | <lab_workspaces.shelf_ws> | <lab_workspaces.table_ws> |  <isaac_agents.ur10> |
-      | <pickplace_objects.bottle> | <lab_workspaces.table_ws> | <lab_workspaces.shelf_ws> | <isaac_agents.kinova> |
-    }
-}
+At this point you should be able to generate a Gherkin feature file using the following command:
+
+```sh
+textx generate pickplace.bdd --target gherkin
 ```
 
 ### Cartesian product variation
 
-In addition to the table syntax, a scenario variation can also be speficied as the
+In addition to the table syntax, a scenario variation can also be specified as the
 Cartesian product of sets of possible values:
 
-```txt
-Scenario simple_pick {
-  template: <tmpl_pickplace>
-  scene: <pickplace_scene>
+```diff
++++ pickplace.bdd
+@@ -9,6 +9,10 @@
+ Event (ns=tutorial) evt-place-end
+ Event (ns=tutorial) evt-scr-end
 
-  variation:
-    var <tmpl_pickplace.target_object>: obj set <pickplace_objects>
-    var <tmpl_pickplace.pick_ws>: set <ws_set>
-    var <tmpl_pickplace.place_ws>: set <ws_set>
-    var <tmpl_pickplace.robot>: {
-      <isaac_agents.panda>, <isaac_agents.ur10>
-    }
-}
++const set (ns=tutorial) ws_set {
++    <lab_workspaces.table_ws>, <lab_workspaces.container_1_ws>
++}
++
+ Scenario Template (ns=tutorial) pickplace-tmpl {
+     duration: from <evt-scr-start> until <evt-scr-end>
+     task: <tutorial-tsk>
+@@ -47,4 +51,17 @@
+         | <pickplace_objects.green-ball> | <lab_workspaces.container_2_ws> | <lab_workspaces.table_ws> |  <lab_agents.ur10> |
+         | <pickplace_objects.bottle> | <lab_workspaces.table_ws> | <lab_workspaces.container_2_ws> | <lab_agents.kinova> |
+     }
++
++    Scenario pickplace-cart {
++        template: <pickplace-tmpl>
++        scene: <pickplace_scene>
++
++        variation:
++            var <pickplace-tmpl.target-obj>: obj set <pickplace_objects>
++            var <pickplace-tmpl.pick-ws>: set <ws_set>
++            var <pickplace-tmpl.place-ws>: set <ws_set>
++            var <pickplace-tmpl.robot>: {
++                <lab_agents.panda>, <lab_agents.ur10>
++            }
++    }
+ }
 ```
 
 Here, value sets can be specified in several ways:
 
 * as a link to scene element sets, e.g. `obj set <pickplace_objects>`
 * as inline explicit set, e.g. with `<tmpl_pickplace.robot>`, via the syntax `{ elem1, elem2, ... }`
-* link to an explicit set declared before scenario templates, e.g. `ws_set`:
+* link to an explicit set declared before scenario templates, e.g. `ws_set`.
 
-  ```txt
-  ...
-  const set (ns=bdd_var) ws_set {
-    <lab_workspaces.table_ws>, <lab_workspaces.shelf_ws>
-  }
-  Scenario Template (ns=tutorial) tmpl_pickplace {
-  ...
-  ```
+For reference, you can view/download the
+[complete `pickplace.bdd` model](./assets/models/pickplace.bdd).
 
-> [!IMPORTANT]  
+> [!IMPORTANT]
 > The above syntax is only for non-set variable. Separate syntax is required for a set variable,
 > as the collection of its possible values must be a set of sets. We describe this in more details
-> in the [following section](#from-pick-and-place-to-sorting).
+> in the following section.
 
 ## From pick and place to sorting
 
