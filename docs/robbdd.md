@@ -6,6 +6,10 @@ Domain-Specific-Language (DSL) to model robotics acceptance criteria and generat
 execution of pick & place scenarios. The following model examples can also be found under
 the `examples/models` folder in the RobBDD repository.
 
+> [!TIP]
+> A [plugin](https://github.com/minhnh/robbdd-nvim/) is available for
+> [Neovim](https://neovim.io/) users with syntax highlighting and model checking.
+
 ## Table of contents
 
 <!-- mtoc-start -->
@@ -21,7 +25,6 @@ the `examples/models` folder in the RobBDD repository.
     1. [Table variation](#table-variation)
     1. [Cartesian product variation](#cartesian-product-variation)
 1. [From pick and place to sorting](#from-pick-and-place-to-sorting)
-1. [Code generation](#code-generation)
 1. [References](#references)
 
 <!-- mtoc-end -->
@@ -57,7 +60,7 @@ We begin with the following minimal example:
 // pickplace.bdd
 ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
 
-Task (ns=tutorial) tutorial-tsk
+Task (ns=tutorial) tsk-pickplace
 
 Event (ns=tutorial) evt-scr-start
 Event (ns=tutorial) evt-pick-start
@@ -66,7 +69,7 @@ Event (ns=tutorial) evt-scr-end
 
 Scenario Template (ns=tutorial) pickplace-tmpl {
     duration: from <evt-scr-start> until <evt-scr-end>
-    task: <tutorial-tsk>
+    task: <tsk-pickplace>
     var robot
     var target-obj
     var place-ws
@@ -152,7 +155,7 @@ following additions:
 ```diff
 +++ pickplace.bdd
 @@ -12,11 +12,18 @@
-     task: <tutorial-tsk>
+     task: <tsk-pickplace>
      var robot
      var target-obj
 +    var pick-ws
@@ -310,7 +313,7 @@ and as the Cartesian products of sets of variable values.
 The table-style variation links to scenario variables in the header row, separated from the
 corresponding value rows by `|---|`. Each value rows will replace the variables in the scenario
 clauses, similar to Gherkin's `Examples` table. Cell values can be links to scene elements,
-e.g. `<pickplace_objects.box1>`, links to set of elements, e.g. `obj set <pickplace_objects>`,
+e.g. `<pickplace_objects.red-cube>`, links to set of elements, e.g. `obj set <pickplace_objects>`,
 or literal values like strings or numbers.
 
 ```diff
@@ -320,7 +323,7 @@ or literal values like strings or numbers.
 +
  ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
 
- Task (ns=tutorial) tutorial-tsk
+ Task (ns=tutorial) tsk-pickplace
 @@ -27,3 +29,22 @@
      Then:
          fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
@@ -369,7 +372,7 @@ Cartesian product of sets of possible values:
 +
  Scenario Template (ns=tutorial) pickplace-tmpl {
      duration: from <evt-scr-start> until <evt-scr-end>
-     task: <tutorial-tsk>
+     task: <tsk-pickplace>
 @@ -47,4 +51,17 @@
          | <pickplace_objects.green-ball> | <lab_workspaces.container_2_ws> | <lab_workspaces.table_ws> |  <lab_agents.ur10> |
          | <pickplace_objects.bottle> | <lab_workspaces.table_ws> | <lab_workspaces.container_2_ws> | <lab_agents.kinova> |
@@ -412,28 +415,32 @@ multiple objects and workspaces. This section describes how this extensions can 
 with RobBDD. Following is a template for such a sorting scenario:
 
 ```txt
-Scenario Template (ns=tutorial) tmpl_sort {
-  task: <tsk_sorting>
+// sorting.bdd
+...
+Scenario Template (ns=tutorial) pickplace-tmpl {
+    duration: from <evt-scr-start> until <evt-scr-end>
+    task: <tsk-sorting>
+    var robot
+    set var target-objects
+    var pick-ws
+    set var place-workspaces
 
-  set var target_objects
-  set var place_workspaces
-  var robot
-  var pick_ws
+    for all ( var x in <target-objects> ) {
+        Given:
+            fc-located-before: holds(<x> is located at <pick-ws>, before <evt-pick-start>)
 
-  for all ( var x in <target_objects> ) {
-    Given:
-    (
-      holds(<x> is located at <pick_ws>, before <evt_pick_start>)
-    )
-    When:
-      Behaviour (ns=tutorial) pickplace: <robot> picks <x> and places at <place_workspaces>
+        When:
+            Behaviour (ns=tutorial) pickplace-bhv {
+                duration: from <evt-pick-start> until <evt-place-end>
+                <robot> picks <x> and places at <place-workspaces>
+            }
+
+        Then:
+            fc-located-after: holds(<x> is located at <place-workspaces>, after <evt-place-end>)
+    }
+
     Then:
-      ( var y exists in <place_workspaces> ) such that {
-          holds(<x> is located at <y>, after <evt_place_end>)
-      }
-  }
-  Then:
-      holds(<target_objects> are sorted into <place_workspaces>, after <evt_place_end>)
+        fc-sorted: holds(<target-objects> are sorted into <place-workspaces>, after <evt-place-end>)
 }
 ```
 
@@ -455,21 +462,20 @@ Here, we introduce set quantifiers and set variables to represent the sorting sc
     any of the set elements.
 
 ```txt
-Scenario simple_pick {
-  template: <tmpl_sort>
-  scene: <sorting_scene>
+Scenario isaac_sorting {
+    template: <sorting-tmpl>
+    scene: <pickplace_scene>
 
-  variation:
-    set var <tmpl_sort.target_objects>: select 3 combinations from <pickplace_objects>
-    var <tmpl_sort.pick_ws>: {
-      <lab_workspaces.table_ws>, <lab_workspaces.shelf_ws>
-    }
-    set var <tmpl_sort.place_workspaces>: select 2 combinations from <sort_ws_set>
-    set var <tmpl_sort.place_workspaces>: {
-      { <lab_workspaces.container_1_ws>, <lab_workspaces.container_2_ws> },
-      { <lab_workspaces.container_2_ws>, <lab_workspaces.container_1_ws> }
-    }
-    var <tmpl_sort.robot>: agn set <isaac_agents>
+    variation:
+        set var <sorting-tmpl.target-objects>: select 3 combinations from <pickplace_objects>
+        var <sorting-tmpl.pick-ws>: {
+            <lab_workspaces.table_ws>
+        }
+        set var <sorting-tmpl.place-workspaces>: {
+            { <lab_workspaces.container_1_ws>, <lab_workspaces.container_2_ws> },
+            { <lab_workspaces.container_2_ws>, <lab_workspaces.container_1_ws> }
+        }
+        var <sorting-tmpl.robot>: agn set <lab_agents>
 }
 ```
 
@@ -483,15 +489,8 @@ can be specified in 2 main ways:
   - linked set can be explicitly declared sets or scene sets, e.g. `pickplace_objects`
 * explicitly listing set of sets elements, like with `place_workspaces` in the excerpt.
 
-## Code generation
-
-Details on the supported generators and addititonal arguments are documented on the
-[RobBDD repository](https://github.com/minhnh/robbdd). Generating the Gherkin feature file
-from a RobBDD model can be done with:
-
-```console
-foo@bar:~$ textx generate path/to/model.bdd --target gherkin -o path/to/generated/dir
-```
+For reference, you can view/download the
+[complete `sorting.bdd` model](./assets/models/sorting.bdd).
 
 ## References
 

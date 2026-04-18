@@ -2,7 +2,7 @@ import "lab.scene"
 
 ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
 
-Task (ns=tutorial) tutorial-tsk
+Task (ns=tutorial) tsk-pickplace
 
 Event (ns=tutorial) evt-scr-start
 Event (ns=tutorial) evt-pick-start
@@ -15,7 +15,7 @@ const set (ns=tutorial) ws_set {
 
 Scenario Template (ns=tutorial) pickplace-tmpl {
     duration: from <evt-scr-start> until <evt-scr-end>
-    task: <tutorial-tsk>
+    task: <tsk-pickplace>
     var robot
     var target-obj
     var pick-ws
