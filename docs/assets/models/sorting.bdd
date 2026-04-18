@@ -1,0 +1,60 @@
+// sorting.bdd
+import "lab.scene"
+
+ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
+
+Task (ns=tutorial) tsk-sorting
+
+Event (ns=tutorial) evt-scr-start
+Event (ns=tutorial) evt-pick-start
+Event (ns=tutorial) evt-place-end
+Event (ns=tutorial) evt-scr-end
+
+Scenario Template (ns=tutorial) sorting-tmpl {
+    duration: from <evt-scr-start> until <evt-scr-end>
+    task: <tsk-sorting>
+    var robot
+    set var target-objects
+    var pick-ws
+    set var place-workspaces
+
+    for all ( var x in <target-objects> ) {
+        Given:
+            fc-located-before: holds(<x> is located at <pick-ws>, before <evt-pick-start>)
+
+        When:
+            Behaviour (ns=tutorial) pickplace-bhv {
+                duration: from <evt-pick-start> until <evt-place-end>
+                <robot> picks <x> and places at <place-workspaces>
+            }
+
+        Then:
+            fc-located-after: holds(<x> is located at <place-workspaces>, after <evt-place-end>)
+    }
+
+    Then:
+        fc-sorted: holds(<target-objects> are sorted into <place-workspaces>, after <evt-place-end>)
+}
+
+User Story (ns=tutorial) us-sorting {
+    As A "Function Developer"
+    I Want "Pick and place behaviour"
+    So That "I can transport objects"
+
+    Scenarios:
+        Scenario isaac_sorting {
+            template: <sorting-tmpl>
+            scene: <pickplace_scene>
+
+            variation:
+                set var <sorting-tmpl.target-objects>: select 3 combinations from <pickplace_objects>
+                var <sorting-tmpl.pick-ws>: {
+                    <lab_workspaces.table_ws>
+                }
+                set var <sorting-tmpl.place-workspaces>: {
+                    { <lab_workspaces.container_1_ws>, <lab_workspaces.container_2_ws> },
+                    { <lab_workspaces.container_2_ws>, <lab_workspaces.container_1_ws> }
+                }
+                var <sorting-tmpl.robot>: agn set <lab_agents>
+        }
+}
