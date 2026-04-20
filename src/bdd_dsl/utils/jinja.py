@@ -25,6 +25,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_REF_WS,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
+    URI_BDD_TYPE_STR_TMPL,
     URI_TIME_TYPE_AFTER_EVT,
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
@@ -45,6 +46,7 @@ from bdd_dsl.representation import (
     get_tmpl_bhv_pickplace,
     get_tmpl_fc_is_held,
     get_tmpl_fc_located_at,
+    get_tmpl_fc_str_tmpl,
     var_val_to_str,
 )
 
@@ -150,11 +152,20 @@ def get_fc_str_sorted(
     return f'"{obj_value_str}" are sorted into "{ws_value_str}"'
 
 
+def get_fc_str_tmpl(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    tmpl = get_tmpl_fc_str_tmpl(model=clause)
+    assert tmpl is not None, f"StringTemplate clause {clause.id.n3(ns_manager)} has wrong types"
+    return tmpl.render(var_values=var_values, ns_manager=ns_manager)
+
+
 DEFAULT_FLUENT_CLAUSE_STR_GENS = {
     URI_BDD_TYPE_LOCATED_AT: get_fc_str_located_at,
     URI_BDD_TYPE_IS_HELD: get_fc_str_is_held,
     URI_BDD_TYPE_MOVE_SAFE: get_fc_str_move_safe,
     URI_BDD_TYPE_SORTED: get_fc_str_sorted,
+    URI_BDD_TYPE_STR_TMPL: get_fc_str_tmpl,
 }
 
 
