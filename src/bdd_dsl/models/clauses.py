@@ -139,7 +139,7 @@ def get_clause_config(clause: FluentClauseModel) -> tuple[URIRef, str, URIRef]:
     return (cfg_target, cfg_name, cfg_var)
 
 
-def load_str_tmpl_clause(graph: Graph, clause: FluentClauseModel):
+def load_str_tmpl_clause(graph: Graph, clause: FluentClauseModel) -> None:
     tmpl_str_node = graph.value(subject=clause.id, predicate=URI_BDD_PRED_TMPL_STR, any=False)
     assert isinstance(tmpl_str_node, Literal), (
         f"StringTemplatePredicate '{clause.id}' missing Literal 'template-string' attr: {tmpl_str_node}"
