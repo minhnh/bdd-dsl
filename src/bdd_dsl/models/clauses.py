@@ -1,9 +1,12 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Optional, Protocol
-from rdflib import Literal, URIRef, Graph
+from rdflib import BNode, Literal, URIRef, Graph
 from rdf_utils.models.common import ModelBase
+from rdf_utils.collection import load_list_re
 from bdd_dsl.exception import BDDConstraintViolation
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_ARG_NAMES,
+    URI_BDD_PRED_ARG_VARS,
     URI_BDD_PRED_CFG_NAME,
     URI_BDD_PRED_CFG_TARGET,
     URI_BDD_PRED_CFG_VAR,
@@ -11,11 +14,13 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
+    URI_BDD_PRED_TMPL_STR,
     URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
     URI_BDD_TYPE_MOVE_SAFE,
     URI_BDD_TYPE_SORTED,
+    URI_BDD_TYPE_STR_TMPL,
     URI_BHV_PRED_OF_BHV,
     URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
@@ -40,14 +45,14 @@ class IClause(object):
 
 class FluentClauseModel(ModelBase, IClause):
     variable_by_role: dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
-    role_by_variable: dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
+    variables: set[URIRef]
 
     def __init__(self, graph: Graph, clause_id: URIRef, types: Optional[set[URIRef]]) -> None:
         ModelBase.__init__(self, graph=graph, node_id=clause_id, types=types)
         IClause.__init__(self, node_id=clause_id, graph=graph)
 
         self.variable_by_role = {}
-        self.role_by_variable = {}
+        self.variables = set()
 
         assert URI_TIME_TYPE_TC in self.types, (
             f"FluentClause '{self.id}': is missing type {URI_TIME_TYPE_TC}"
@@ -64,10 +69,7 @@ class FluentClauseModel(ModelBase, IClause):
             )
 
             self.variable_by_role[role_pred].append(var_id)
-
-            if var_id not in self.role_by_variable:
-                self.role_by_variable[var_id] = []
-            self.role_by_variable[var_id].append(role_pred)
+            self.variables.add(var_id)
 
         assert len(self.variable_by_role[role_pred]) > 0, (
             f"clause '{self.id}' does link to a variable via '{role_pred}'"
@@ -137,12 +139,40 @@ def get_clause_config(clause: FluentClauseModel) -> tuple[URIRef, str, URIRef]:
     return (cfg_target, cfg_name, cfg_var)
 
 
+def load_str_tmpl_clause(graph: Graph, clause: FluentClauseModel) -> None:
+    tmpl_str_node = graph.value(subject=clause.id, predicate=URI_BDD_PRED_TMPL_STR, any=False)
+    assert isinstance(tmpl_str_node, Literal), (
+        f"StringTemplatePredicate '{clause.id}' missing Literal 'template-string' attr: {tmpl_str_node}"
+    )
+    clause.set_attr(key=URI_BDD_PRED_TMPL_STR, val=tmpl_str_node.toPython())
+
+    arg_names_node = graph.value(subject=clause.id, predicate=URI_BDD_PRED_ARG_NAMES, any=False)
+    assert isinstance(arg_names_node, BNode), (
+        f"StringTemplatePredicate '{clause.id}' missing BNode 'argument-names' attr: {arg_names_node}"
+    )
+    arg_names = load_list_re(graph=graph, first_node=arg_names_node, parse_uri=False, quiet=False)
+    clause.set_attr(key=URI_BDD_PRED_ARG_NAMES, val=arg_names)
+
+    arg_vars_node = graph.value(subject=clause.id, predicate=URI_BDD_PRED_ARG_VARS, any=False)
+    assert isinstance(arg_vars_node, BNode), (
+        f"StringTemplatePredicate '{clause.id}' missing BNode 'argument-variables' attr: {arg_vars_node}"
+    )
+    arg_vars = load_list_re(graph=graph, first_node=arg_vars_node, parse_uri=True, quiet=False)
+    for var_id in arg_vars:
+        assert isinstance(var_id, URIRef), (
+            f"StringTemplatePredicate '{clause.id}': not a variable IRI: {var_id}"
+        )
+        clause.variables.add(var_id)
+    clause.set_attr(key=URI_BDD_PRED_ARG_VARS, val=arg_vars)
+
+
 DEFAULT_FLUENT_LOADERS = {
     URI_BDD_TYPE_LOCATED_AT: load_located_at_info,
     URI_BDD_TYPE_IS_HELD: load_held_by_info,
     URI_BDD_TYPE_MOVE_SAFE: load_move_safe_info,
     URI_BDD_TYPE_SORTED: load_sorted_info,
     URI_BDD_TYPE_CONFIG: load_has_config_info,
+    URI_BDD_TYPE_STR_TMPL: load_str_tmpl_clause,
 }
 
 

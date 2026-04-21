@@ -7,15 +7,19 @@ from rdflib.namespace import NamespaceManager
 
 from bdd_dsl.models.clauses import FluentClauseModel, IClause, WhenBehaviourModel
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_ARG_NAMES,
+    URI_BDD_PRED_ARG_VARS,
     URI_BDD_PRED_CFG_NAME,
     URI_BDD_PRED_CFG_TARGET,
     URI_BDD_PRED_CFG_VAR,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
+    URI_BDD_PRED_TMPL_STR,
     URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
+    URI_BDD_TYPE_STR_TMPL,
     URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
     URI_BHV_PRED_TARGET_WS,
@@ -387,3 +391,45 @@ def get_tmpl_fc_config(model: ModelBase, **kwargs) -> Optional[VariableStrTempla
         tmpl_str=f'"{target_uri.n3(ns_manager)}" has config "{cfg_name}" = "{{cfg_val}}"',
         var_map={cfg_var_id: "cfg_val"},
     )
+
+
+def get_tmpl_fc_str_tmpl(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(model, FluentClauseModel):
+        return None
+
+    if URI_BDD_TYPE_STR_TMPL not in model.types:
+        return None
+
+    tmpl_str = model.get_attr(key=URI_BDD_PRED_TMPL_STR)
+    assert isinstance(tmpl_str, str), (
+        f"StringTemplate clause {model.id} does not have valid 'template-string' attr: {tmpl_str}"
+    )
+
+    arg_names = model.get_attr(key=URI_BDD_PRED_ARG_NAMES)
+    assert isinstance(arg_names, list), (
+        f"StringTemplate clause {model.id} does not have valid 'argument-names' attr: {arg_names}"
+    )
+
+    arg_vars = model.get_attr(key=URI_BDD_PRED_ARG_VARS)
+    assert isinstance(arg_vars, list), (
+        f"StringTemplate clause {model.id} does not have valid 'argument-variables' attr: {arg_vars}"
+    )
+
+    assert len(arg_names) == len(arg_vars), (
+        f"StringTemplate clause {model.id} does not have matching number of arg names & vars"
+    )
+    var_map = {}
+    for i, arg_name in enumerate(arg_names):
+        arg_var = arg_vars[i]
+        assert isinstance(arg_name, str), (
+            f"StringTemplate clause {model.id}: arg name not a str: {arg_name}"
+        )
+        assert isinstance(arg_var, URIRef), (
+            f"StringTemplate clause {model.id}: not a variable URIRef: {arg_var}"
+        )
+        assert arg_var not in var_map, (
+            f"StringTemplate clause {model.id}: duplicate variable: {arg_var}"
+        )
+        var_map[arg_var] = arg_name
+
+    return VariableStrTemplate(tmpl_str=tmpl_str, var_map=var_map)
