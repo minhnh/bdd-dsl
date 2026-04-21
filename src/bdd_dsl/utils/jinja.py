@@ -18,6 +18,7 @@ from bdd_dsl.models.frames import (
     FR_WS,
 )
 from bdd_dsl.models.urirefs import (
+    URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_MOVE_SAFE,
     URI_BDD_TYPE_SORTED,
     URI_BDD_PRED_REF_AGN,
@@ -44,6 +45,7 @@ from bdd_dsl.representation import (
     get_str_tc_before_event,
     get_str_tc_during_events,
     get_tmpl_bhv_pickplace,
+    get_tmpl_fc_config,
     get_tmpl_fc_is_held,
     get_tmpl_fc_located_at,
     get_tmpl_fc_str_tmpl,
@@ -155,8 +157,16 @@ def get_fc_str_sorted(
 def get_fc_str_tmpl(
     clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
 ) -> str:
-    tmpl = get_tmpl_fc_str_tmpl(model=clause)
+    tmpl = get_tmpl_fc_str_tmpl(model=clause, ns_manager=ns_manager)
     assert tmpl is not None, f"StringTemplate clause {clause.id.n3(ns_manager)} has wrong types"
+    return tmpl.render(var_values=var_values, ns_manager=ns_manager)
+
+
+def get_fc_str_config(
+    clause: FluentClauseModel, var_values: dict[URIRef, Any], ns_manager: NamespaceManager
+) -> str:
+    tmpl = get_tmpl_fc_config(model=clause, ns_manager=ns_manager)
+    assert tmpl is not None, f"HasConfig clause {clause.id.n3(ns_manager)} has wrong types"
     return tmpl.render(var_values=var_values, ns_manager=ns_manager)
 
 
@@ -166,6 +176,7 @@ DEFAULT_FLUENT_CLAUSE_STR_GENS = {
     URI_BDD_TYPE_MOVE_SAFE: get_fc_str_move_safe,
     URI_BDD_TYPE_SORTED: get_fc_str_sorted,
     URI_BDD_TYPE_STR_TMPL: get_fc_str_tmpl,
+    URI_BDD_TYPE_CONFIG: get_fc_str_config,
 }
 
 
