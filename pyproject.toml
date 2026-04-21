@@ -27,6 +27,7 @@ dependencies = [
   "jinja2",
   "platformdirs",
   "behave",
+  "trinary",
 ]
 
 [project.urls]

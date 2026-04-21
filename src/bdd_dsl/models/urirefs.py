@@ -7,6 +7,7 @@ from rdf_utils.namespace import (
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
+    NS_MM_OBS,
     NS_MM_SIM,
     NS_MM_TASK,
 )
@@ -49,6 +50,7 @@ URI_TIME_TYPE_AFTER_EVT = NS_MM_TIME["AfterEventConstraint"]
 URI_TIME_TYPE_DURING = NS_MM_TIME["DuringEventsConstraint"]
 URI_TIME_PRED_BEFORE_EVT = NS_MM_TIME["before-event"]
 URI_TIME_PRED_AFTER_EVT = NS_MM_TIME["after-event"]
+URI_TIME_PRED_HRZN_SEC = NS_MM_TIME["horizon-seconds"]
 
 # Task
 URI_TASK_TYPE_TASK = NS_MM_TASK["Task"]
@@ -59,6 +61,10 @@ URI_SIM_TYPE_SYS_RES = NS_MM_SIM["SystemResource"]
 URI_SIM_TYPE_RES_PATH = NS_MM_SIM["ResourceWithPath"]
 URI_SIM_PRED_HAS_CONFIG = NS_MM_SIM["has-config"]
 URI_SIM_PRED_PATH = NS_MM_SIM["path"]
+
+# Observation
+URI_OBS_TYPE_POLICY = NS_MM_OBS["ObservationPolicy"]
+URI_OBS_TYPE_PROVIDER = NS_MM_OBS["ObservationProvider"]
 
 # BDD
 URI_BDD_TYPE_US = NS_MM_BDD["UserStory"]
@@ -86,6 +92,8 @@ URI_BDD_TYPE_LOCATED_AT = NS_MM_BDD["LocatedAtPredicate"]
 URI_BDD_TYPE_IS_HELD = NS_MM_BDD["IsHeldPredicate"]
 URI_BDD_TYPE_MOVE_SAFE = NS_MM_BDD["MoveSafelyPredicate"]
 URI_BDD_TYPE_SORTED = NS_MM_BDD["SortedIntoPredicate"]
+URI_BDD_TYPE_CONFIG = NS_MM_BDD["HasConfigPredicate"]
+URI_BDD_TYPE_STR_TMPL = NS_MM_BDD["StringTemplatePredicate"]
 URI_BDD_TYPE_SCENARIO_EXEC = NS_MM_BDD["ScenarioExecution"]
 URI_BDD_TYPE_BHV_IMPL = NS_MM_BDD["BehaviourImplementation"]
 URI_BDD_PRED_GIVEN = NS_MM_BDD["given"]
@@ -101,6 +109,12 @@ URI_BDD_PRED_CLAUSE_OF = NS_MM_BDD["clause-of"]
 URI_BDD_PRED_REF_OBJ = NS_MM_BDD["ref-object"]
 URI_BDD_PRED_REF_WS = NS_MM_BDD["ref-workspace"]
 URI_BDD_PRED_REF_AGN = NS_MM_BDD["ref-agent"]
+URI_BDD_PRED_CFG_TARGET = NS_MM_BDD["config-target"]
+URI_BDD_PRED_CFG_NAME = NS_MM_BDD["config-name"]
+URI_BDD_PRED_CFG_VAR = NS_MM_BDD["config-variable"]
+URI_BDD_PRED_TMPL_STR = NS_MM_BDD["template-string"]
+URI_BDD_PRED_ARG_NAMES = NS_MM_BDD["argument-names"]
+URI_BDD_PRED_ARG_VARS = NS_MM_BDD["argument-variables"]
 URI_BDD_PRED_ELEMS = NS_MM_BDD["elements"]
 URI_BDD_PRED_HAS_VARIATION = NS_MM_BDD["has-variation"]
 URI_BDD_PRED_VAR_LIST = NS_MM_BDD["variable-list"]

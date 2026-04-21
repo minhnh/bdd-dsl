@@ -1,0 +1,67 @@
+import "lab.scene"
+
+ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
+
+Task (ns=tutorial) tsk-pickplace
+
+Event (ns=tutorial) evt-scr-start
+Event (ns=tutorial) evt-pick-start
+Event (ns=tutorial) evt-place-end
+Event (ns=tutorial) evt-scr-end
+
+const set (ns=tutorial) ws_set {
+    <lab_workspaces.table_ws>, <lab_workspaces.container_1_ws>
+}
+
+Scenario Template (ns=tutorial) pickplace-tmpl {
+    duration: from <evt-scr-start> until <evt-scr-end>
+    task: <tsk-pickplace>
+    var robot
+    var target-obj
+    var pick-ws
+    var place-ws
+
+    Given:
+        fc-located-before: holds(<target-obj> is located at <pick-ws>, before <evt-pick-start>)
+
+    When:
+        Behaviour (ns=tutorial) pickplace-bhv {
+            duration: from <evt-pick-start> until <evt-place-end>
+            <robot> picks <target-obj> and places at <place-ws>
+        }
+
+    Then:
+        fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
+}
+
+User Story (ns=tutorial) pickplace-us {
+  As A "Function Developer"
+  I Want "Pick and place behaviour"
+  So That "I can transport objects"
+
+  Scenarios:
+    Scenario pickplace-table {
+        template: <pickplace-tmpl>
+        scene: <pickplace_scene>
+
+        variation:
+        | <pickplace-tmpl.target-obj> | <pickplace-tmpl.pick-ws> | <pickplace-tmpl.place-ws> | <pickplace-tmpl.robot> |
+        |---|
+        | <pickplace_objects.red-cube> | <lab_workspaces.table_ws> | <lab_workspaces.container_1_ws> |  <lab_agents.panda> |
+        | <pickplace_objects.green-ball> | <lab_workspaces.container_2_ws> | <lab_workspaces.table_ws> |  <lab_agents.ur10> |
+        | <pickplace_objects.bottle> | <lab_workspaces.table_ws> | <lab_workspaces.container_2_ws> | <lab_agents.kinova> |
+    }
+
+    Scenario pickplace-cart {
+        template: <pickplace-tmpl>
+        scene: <pickplace_scene>
+
+        variation:
+            var <pickplace-tmpl.target-obj>: obj set <pickplace_objects>
+            var <pickplace-tmpl.pick-ws>: set <ws_set>
+            var <pickplace-tmpl.place-ws>: set <ws_set>
+            var <pickplace-tmpl.robot>: {
+                <lab_agents.panda>, <lab_agents.ur10>
+            }
+    }
+}
