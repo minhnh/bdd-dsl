@@ -245,7 +245,7 @@ class IHasClause(ModelBase):
                 clause = FluentClauseModel(graph=graph, clause_id=clause_id, types=clause_types)
                 self._fluent_loader.load_clause_info(clause=clause, graph=graph)
                 self._process_iclause(clause=clause)
-                for var_id in clause.role_by_variable.keys():
+                for var_id in clause.variables:
                     self.variables.add(var_id)
                 continue
 

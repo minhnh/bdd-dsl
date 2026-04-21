@@ -45,14 +45,14 @@ class IClause(object):
 
 class FluentClauseModel(ModelBase, IClause):
     variable_by_role: dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
-    role_by_variable: dict[URIRef, list[URIRef]]  # map ScenarioVariable URI -> role URIs
+    variables: set[URIRef]
 
     def __init__(self, graph: Graph, clause_id: URIRef, types: Optional[set[URIRef]]) -> None:
         ModelBase.__init__(self, graph=graph, node_id=clause_id, types=types)
         IClause.__init__(self, node_id=clause_id, graph=graph)
 
         self.variable_by_role = {}
-        self.role_by_variable = {}
+        self.variables = set()
 
         assert URI_TIME_TYPE_TC in self.types, (
             f"FluentClause '{self.id}': is missing type {URI_TIME_TYPE_TC}"
@@ -69,10 +69,7 @@ class FluentClauseModel(ModelBase, IClause):
             )
 
             self.variable_by_role[role_pred].append(var_id)
-
-            if var_id not in self.role_by_variable:
-                self.role_by_variable[var_id] = []
-            self.role_by_variable[var_id].append(role_pred)
+            self.variables.add(var_id)
 
         assert len(self.variable_by_role[role_pred]) > 0, (
             f"clause '{self.id}' does link to a variable via '{role_pred}'"
@@ -161,6 +158,11 @@ def load_str_tmpl_clause(graph: Graph, clause: FluentClauseModel):
         f"StringTemplatePredicate '{clause.id}' missing BNode 'argument-variables' attr: {arg_vars_node}"
     )
     arg_vars = load_list_re(graph=graph, first_node=arg_vars_node, parse_uri=True, quiet=False)
+    for var_id in arg_vars:
+        assert isinstance(var_id, URIRef), (
+            f"StringTemplatePredicate '{clause.id}': not a variable IRI: {var_id}"
+        )
+        clause.variables.add(var_id)
     clause.set_attr(key=URI_BDD_PRED_ARG_VARS, val=arg_vars)
 
 
