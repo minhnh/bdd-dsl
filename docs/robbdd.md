@@ -18,6 +18,7 @@ the `examples/models` folder in the RobBDD repository.
     1. [Identifiers](#identifiers)
     1. [Minimal Scenario Template](#minimal-scenario-template)
     1. [Adding fluent clauses](#adding-fluent-clauses)
+    1. [Adding custom fluents](#adding-custom-fluents)
 1. [Specifying a scene](#specifying-a-scene)
     1. [Adding objects and agents](#adding-objects-and-agents)
     1. [Composing workspaces](#composing-workspaces)
@@ -56,7 +57,7 @@ be in the picking area before the behaviour, and at the placing area afterwards.
 We now walk through how we can specify this using RobBDD.
 We begin with the following minimal example:
 
-```gherkin
+```txt
 // pickplace.bdd
 ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
 
@@ -140,10 +141,11 @@ A general language for predicates is not available at the moment. Available synt
   - `<obj> is located at <ws>`: fully supported
   - `<obj> is held by <agn>`: fully supported
   - `<obj> are sorted into <ws_set>`: fully supported
-  - `<subject> has config <config>`: Gherkin gen. N/A
+  - `<subject> has config name = <config>`: fully supported
   - `<agn> can reach <obj>`: Gherkin gen. N/A
   - `<agn> does not drop <obj>`: Gherkin gen. N/A
   - `<agn> does not collide <target>`: Gherkin gen. N/A
+  - Custom fluent: see below
 * supported time constraints (all works with all generators):
   - `before <event>`
   - `after <event>`
@@ -172,6 +174,29 @@ following additions:
 +
 +    Then:
 +        fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
+ }
+```
+
+### Adding custom fluents
+
+In addition to the built-in fluents above, you can also add custom clauses using the
+`pred("string template with {arg_name}", arg_name=<variable>)` syntax:
+
+```diff
++++ pickplace.bdd
+@@ -25,5 +25,12 @@
+         }
+
+     Then:
+-        fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
++        (
++            fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
++            and
++            fc-no-collide: holds(
++                pred("\"{robot}\" does not collide with \"{place_ws}\"", robot=<robot>, place_ws=<place-ws>),
++                from <evt-pick-start> until <evt-place-end>
++            )
++        )
  }
 ```
 
@@ -323,10 +348,10 @@ or literal values like strings or numbers.
 +
  ns tutorial = "https://secorolab.github.io/robbdd/tutorials/"
 
- Task (ns=tutorial) tsk-pickplace
-@@ -27,3 +29,22 @@
-     Then:
-         fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
+ Task (ns=tutorial) tutorial-tsk
+@@ -34,3 +36,22 @@
+             )
+         )
  }
 +
 +User Story (ns=tutorial) pickplace-us {
@@ -372,8 +397,8 @@ Cartesian product of sets of possible values:
 +
  Scenario Template (ns=tutorial) pickplace-tmpl {
      duration: from <evt-scr-start> until <evt-scr-end>
-     task: <tsk-pickplace>
-@@ -47,4 +51,17 @@
+     task: <tutorial-tsk>
+@@ -54,4 +58,17 @@
          | <pickplace_objects.green-ball> | <lab_workspaces.container_2_ws> | <lab_workspaces.table_ws> |  <lab_agents.ur10> |
          | <pickplace_objects.bottle> | <lab_workspaces.table_ws> | <lab_workspaces.container_2_ws> | <lab_agents.kinova> |
      }

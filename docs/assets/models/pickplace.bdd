@@ -31,7 +31,14 @@ Scenario Template (ns=tutorial) pickplace-tmpl {
         }
 
     Then:
-        fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
+        (
+            fc-located-after: holds(<target-obj> is located at <place-ws>, after <evt-place-end>)
+            and
+            fc-no-collide: holds(
+                pred("\"{robot}\" does not collide with \"{place_ws}\"", robot=<robot>, place_ws=<place-ws>),
+                from <evt-pick-start> until <evt-place-end>
+            )
+        )
 }
 
 User Story (ns=tutorial) pickplace-us {
