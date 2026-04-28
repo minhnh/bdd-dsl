@@ -53,26 +53,26 @@ from bdd_dsl.representation import (
 )
 
 
-def load_template_from_file(file_path: str) -> Template:
+def load_template_from_file(file_path: str, autoescape=True, **kwargs) -> Template:
     """Create template instance from text content of a file.
 
     Not using Jinja's environment loading mechanism may break more advanced features like
     template inheritance and filters.
     """
-    return Template(read_file_and_cache(file_path), autoescape=True)
+    return Template(read_file_and_cache(file_path), autoescape=autoescape, **kwargs)
 
 
-def load_template_from_url(url: str) -> Template:
+def load_template_from_url(url: str, autoescape=True, **kwargs) -> Template:
     """Create template instance by downloading a remote template URL.
 
     Not using Jinja's environment loading mechanism may break more advanced features like
     template inheritance and filters.
     """
-    return Template(read_url_and_cache(url), autoescape=True)
+    return Template(read_url_and_cache(url), autoescape=autoescape, **kwargs)
 
 
-def load_template(template_name: str, dir_name: str) -> Template:
-    env = Environment(loader=FileSystemLoader(dir_name), autoescape=True)
+def load_template(template_name: str, dir_name: str, autoescape=True, **kwargs) -> Template:
+    env = Environment(loader=FileSystemLoader(dir_name), autoescape=autoescape, **kwargs)
     return env.get_template(template_name)
 
 
