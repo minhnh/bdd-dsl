@@ -19,6 +19,8 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
+    URI_BDD_TYPE_MOVE_SAFE,
+    URI_BDD_TYPE_SORTED,
     URI_BDD_TYPE_STR_TMPL,
     URI_BHV_PRED_TARGET_AGN,
     URI_BHV_PRED_TARGET_OBJ,
@@ -362,7 +364,58 @@ def get_tmpl_fc_is_held(model: ModelBase, **kwargs) -> Optional[VariableStrTempl
     )
 
     return VariableStrTemplate(
-        tmpl_str='"{target_obj}" is held by "{agn}"', var_map={obj_id: "target_obj", agn_id: "agn"}
+        tmpl_str='"{target_obj}" is held by "{target_agn}"',
+        var_map={obj_id: "target_obj", agn_id: "target_agn"},
+    )
+
+
+def get_tmpl_fc_move_safe(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(model, FluentClauseModel):
+        return None
+
+    if URI_BDD_TYPE_MOVE_SAFE not in model.types:
+        return None
+
+    assert URI_BDD_PRED_REF_AGN in model.variable_by_role, (
+        f"MoveSafe fluent '{model.id}' does not have 'ref-agn' property"
+    )
+    agn_id = model.variable_by_role[URI_BDD_PRED_REF_AGN][0]
+    assert isinstance(agn_id, URIRef), (
+        f"MoveSafe fluent '{model.id}' does not have URI 'ref-agn' property"
+    )
+
+    return VariableStrTemplate(
+        tmpl_str='"{target_agn}" moves safely',
+        var_map={agn_id: "target_agn"},
+    )
+
+
+def get_tmpl_fc_sorted(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+    if not isinstance(model, FluentClauseModel):
+        return None
+
+    if URI_BDD_TYPE_SORTED not in model.types:
+        return None
+
+    assert URI_BDD_PRED_REF_OBJ in model.variable_by_role, (
+        f"SortedInto fluent '{model.id}' does not have 'ref-obj' property"
+    )
+    obj_id = model.variable_by_role[URI_BDD_PRED_REF_OBJ][0]
+    assert isinstance(obj_id, URIRef), (
+        f"SortedInto fluent '{model.id}' does not have URI 'ref-obj' property"
+    )
+
+    assert URI_BDD_PRED_REF_WS in model.variable_by_role, (
+        f"SortedInto fluent '{model.id}' does not have 'ref-ws' property"
+    )
+    ws_id = model.variable_by_role[URI_BDD_PRED_REF_WS][0]
+    assert isinstance(ws_id, URIRef), (
+        f"SortedInto fluent '{model.id}' does not have URI 'ref-ws' property"
+    )
+
+    return VariableStrTemplate(
+        tmpl_str='"{target_obj}" are sorted into "{target_ws}"',
+        var_map={obj_id: "target_obj", ws_id: "target_ws"},
     )
 
 

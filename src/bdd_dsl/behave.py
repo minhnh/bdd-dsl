@@ -2,14 +2,17 @@
 from enum import Enum
 from typing import Any, Generator, Union
 from ast import literal_eval
+import re
 from behave.model import Table
 from rdflib import Graph
 from rdflib.term import Node as RDFNode
 from rdflib.namespace import NamespaceManager
 from rdf_utils.uri import try_parse_n3_iterable, try_parse_n3_string
+from rdf_utils.naming import get_valid_var_name
 from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel, WorkspaceModel
 from bdd_dsl.models.user_story import SceneModel
+from bdd_dsl.representation import VariableStrTemplate
 
 
 PARAM_OBJ = "obj_str"
@@ -99,9 +102,9 @@ def parse_str_param(
         except SyntaxError as e:
             raise RuntimeError(f"unable to parse '{list_str}': {e}")
 
-        assert isinstance(
-            n3_str_list, list
-        ), f"can't parse as a list (type={type(n3_str_list)}): {list_str}"
+        assert isinstance(n3_str_list, list), (
+            f"can't parse as a list (type={type(n3_str_list)}): {list_str}"
+        )
 
         n3_term_list = try_parse_n3_iterable(
             n3_str_iterable=n3_str_list, ns_manager=ns_manager, quiet=False
@@ -116,9 +119,9 @@ def parse_str_param(
         except SyntaxError as e:
             raise RuntimeError(f"unable to parse '{param_str}': {e}")
 
-        assert isinstance(
-            n3_str_list, list
-        ), f"can't parse as a list (type={type(n3_str_list)}): {param_str}"
+        assert isinstance(n3_str_list, list), (
+            f"can't parse as a list (type={type(n3_str_list)}): {param_str}"
+        )
 
         n3_term_list = try_parse_n3_iterable(
             n3_str_iterable=n3_str_list, ns_manager=ns_manager, quiet=False
@@ -140,3 +143,34 @@ def load_str_params(param_names: list[str], **kwargs: Any) -> dict[str, str]:
         params[param_name] = param_str
 
     return params
+
+
+def get_behave_annotation(template: VariableStrTemplate) -> tuple[str, list[str]]:
+    arg_names = []
+    used_names = set()
+
+    def repl(match: re.Match[str]) -> str:
+        field_name = match.group(1)
+        arg_name = _sanitize_behave_arg_name(field_name=field_name, used_names=used_names)
+        used_names.add(arg_name)
+        arg_names.append(arg_name)
+        return "{" + arg_name + "}"
+
+    annotation = re.sub(r"\{([^{}]+)\}", repl, template.tmpl_str)
+    return annotation, arg_names
+
+
+def _sanitize_behave_arg_name(field_name: str, used_names: set[str]) -> str:
+    sanitized = get_valid_var_name(field_name).strip("_").lower()
+    if sanitized == "":
+        sanitized = "arg"
+    if sanitized[0].isdigit():
+        sanitized = f"arg_{sanitized}"
+
+    if sanitized not in used_names:
+        return sanitized
+
+    suffix = 2
+    while f"{sanitized}_{suffix}" in used_names:
+        suffix += 1
+    return f"{sanitized}_{suffix}"
