@@ -103,8 +103,6 @@ For example, `(ns=tutorial) pickplace-tmpl` will be transformed into a node with
 which has the short form `tutorial:pickplace-tmpl`.
 IRIs allow extending a model in the generated graph with any additional information as needed,
 as long as they refer the model's IRI.
-In RobBDD, the element IDs, e.g., `evt-scr-start`, are combined with a namespace declaration,
-e.g., `ns tutorial`, to generate the full IRI in the graph.
 The namespace reference can either be explicit like with task or event declarations, or inherited from
 the parent like with variable declarations.
 

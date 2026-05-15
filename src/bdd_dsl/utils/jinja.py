@@ -278,9 +278,15 @@ def get_gherkin_clauses_re(
                 f"ThereExists '{exists_model.id}': no value set for URI 'in-set', available vars: {list(var_values.keys())}"
             )
             exists_set = var_values[exists_model.in_set]
-            assert isinstance(exists_set, Iterable), (
-                f"ThereExists '{exists_model.id}': value 'in-set' not an Iterable: {exists_set}"
-            )
+            if isinstance(exists_set, str):
+                # will also raise for URIRef
+                raise ValueError(
+                    f"ThereExists '{exists_model.id}': expected a set of value, got ({type(exists_set)}): {exists_set}"
+                )
+            elif not isinstance(exists_set, Iterable):
+                raise ValueError(
+                    f"ThereExists '{exists_model.id}': value 'in-set' not an Iterable: {exists_set}"
+                )
         else:
             raise RuntimeError(
                 f"ThereExists '{exists_model.id}': unhandled type for 'in-set': {exists_model.in_set}"
