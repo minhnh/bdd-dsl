@@ -31,7 +31,7 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
-from bdd_dsl.models.user_story import ScenarioModel
+from bdd_dsl.models.user_story import ScenarioModel, ScenarioVariantModel
 
 
 def get_clause_role_rep(scenario: ScenarioModel, clause: IClause) -> str:
@@ -252,6 +252,45 @@ class ClauseRepBuilder:
             tc_rep = f"(no TimeConstraint rep for '{clause.id.n3(ns_manager)}')"
 
         return tc_rep
+
+
+class ScenarioVariantRep:
+    variant_rep: str
+    bhv_rep: str
+    _clause_reps: dict[URIRef, str]
+
+    def __init__(
+        self,
+        scr_var: ScenarioVariantModel,
+        clause_rep_builder: ClauseRepBuilder,
+        val_dict: dict[URIRef, Any],
+        ns_manager: Optional[NamespaceManager] = None,
+    ) -> None:
+        self.variant_rep = scr_var.id.n3(ns_manager)
+        self.bhv_rep = clause_rep_builder.render_when_bhv_clause(
+            clause=scr_var.when_bhv_model,
+            val_dict=val_dict,
+            ns_manager=ns_manager,
+        )
+        self._clause_reps = {}
+        for fc in scr_var.fluent_clauses():
+            fc_role = get_clause_role_rep(scenario=scr_var.scenario, clause=fc)
+            fc_rep = clause_rep_builder.render_fluent_clause(
+                role=fc_role, clause=fc, val_dict=val_dict, ns_manager=ns_manager
+            )
+            if fc.id in self._clause_reps:
+                raise ValueError(
+                    f"Representation for ScenarioVariant '{self.variant_rep}': multiple clause with same URI '{fc.id}'"
+                )
+            self._clause_reps[fc.id] = fc_rep
+
+    def clause_rep(self, clause_id: URIRef) -> str:
+        if clause_id not in self._clause_reps:
+            raise ValueError(
+                f"Representation for ScenarioVariant '{self.variant_rep}': unknown URI '{clause_id}'"
+            )
+
+        return self._clause_reps[clause_id]
 
 
 def get_tmpl_bhv_pickplace(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:

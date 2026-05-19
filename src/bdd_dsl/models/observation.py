@@ -19,7 +19,6 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
-from bdd_dsl.representation import ClauseRepBuilder, get_clause_role_rep
 
 
 @dataclass
@@ -29,7 +28,6 @@ class TrinaryStamped:
 
 
 class FluentTimeline(object):
-    representation: str
     trinary_timeline: list[TrinaryStamped]
 
     start_time: Optional[float]
@@ -42,10 +40,9 @@ class FluentTimeline(object):
     end_event: Optional[URIRef]
     horizon: Optional[float]
 
-    def __init__(self, fc: FluentClauseModel, rep: str) -> None:
+    def __init__(self, fc: FluentClauseModel) -> None:
         self.fluent_id = fc.id
         self.fluent_types = fc.types
-        self.representation = rep
 
         self.trinary_timeline = []
 
@@ -190,14 +187,12 @@ class FluentTimeline(object):
 
 
 class ObservationManager(object):
-    scr_rep: str
     scr_start_event: URIRef
     scr_end_event: URIRef
     scr_start_time: Optional[float]
     scr_end_time: Optional[float]
 
     bhv_result: Optional[TrinaryStamped]
-    bhv_rep: str
 
     fluent_timelines: dict[URIRef, FluentTimeline]
     event_timelines: dict[URIRef, list[float]]
@@ -206,21 +201,17 @@ class ObservationManager(object):
 
     def __init__(
         self,
-        scr_rep: str,
         scr_start_event: URIRef,
         scr_end_event: URIRef,
-        bhv_rep: str,
         ns_manager: Optional[NamespaceManager] = None,
     ) -> None:
         self._ns_manager = ns_manager
 
-        self.scr_rep = scr_rep
         self.scr_start_event = scr_start_event
         self.scr_end_event = scr_end_event
         self.scr_start_time = None
         self.scr_end_time = None
 
-        self.bhv_rep = bhv_rep
         self.bhv_result = None
 
         self.fluent_timelines = {}
@@ -248,10 +239,10 @@ class ObservationManager(object):
         self._fluent_event_registry[evt_uri].add(fc_id)
 
     def register_fluent_obs(
-        self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol], rep: str
+        self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol]
     ):
         if fc.id not in self.fluent_timelines:
-            f_tl = FluentTimeline(fc=fc, rep=rep)
+            f_tl = FluentTimeline(fc=fc)
             self.fluent_timelines[fc.id] = f_tl
             self._register_fluent_event(evt_uri=f_tl.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=f_tl.end_event, fc_id=fc.id)
@@ -290,8 +281,6 @@ class ObservationManager(object):
         graph: Graph,
         scr_var: ScenarioVariantModel,
         obs_loaders: list[AttrLoaderProtocol],
-        clause_rep_builder: ClauseRepBuilder,
-        val_dict: dict[URIRef, Any],
     ) -> ObservationManager:
         dur = get_duration(scr_var.tmpl)
         ns_manager = graph.namespace_manager
@@ -305,26 +294,14 @@ class ObservationManager(object):
             f"ScenarioVariant '{scr_var.id.n3(ns_manager)}' has same start/end events: {scr_start_event}"
         )
 
-        bhv_rep = clause_rep_builder.render_when_bhv_clause(
-            clause=scr_var.when_bhv_model,
-            val_dict=val_dict,
-            ns_manager=ns_manager,
-        )
-
         obs_manager = ObservationManager(
-            scr_rep=scr_var.id.n3(ns_manager),
             scr_start_event=scr_start_event,
             scr_end_event=scr_end_event,
-            bhv_rep=bhv_rep,
             ns_manager=ns_manager,
         )
 
         for fc in scr_var.fluent_clauses():
-            fc_role = get_clause_role_rep(scenario=scr_var.scenario, clause=fc)
-            fc_rep = clause_rep_builder.render_fluent_clause(
-                role=fc_role, clause=fc, val_dict=val_dict, ns_manager=ns_manager
-            )
-            obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders, rep=fc_rep)
+            obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders)
         return obs_manager
 
 
