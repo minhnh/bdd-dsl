@@ -91,24 +91,24 @@ class ScenarioExecutionModel(ModelBase):
 
         super().__init__(graph=graph, node_id=scr_exec_ids[0])
         if URI_BDD_TYPE_SCENARIO_EXEC not in self.types:
-            raise ValueError(
-                f"ScenarioExecution '{self.id}' does't link to exactly 1 execution model URI: {scr_exec_ids}"
-            )
+            raise ValueError(f"'{self.id}' missing expected ScenarioExecution type: {self.types}")
 
         # Boundary events
         dur = get_duration(scr_var.tmpl)
-        self.start_event = dur[URI_TIME_PRED_AFTER_EVT]
-        self.end_event = dur[URI_TIME_PRED_BEFORE_EVT]
-        if self.start_event is None or self.end_event is None:
+        start_evt = dur.get(URI_TIME_PRED_AFTER_EVT)
+        end_evt = dur.get(URI_TIME_PRED_BEFORE_EVT)
+        if start_evt is None or end_evt is None:
             raise ValueError(
                 f"ScenarioVariant '{scr_var.id.n3(graph.namespace_manager)}'"
                 f" has invalid start/end events: start={self.start_event}, end={self.end_event}"
             )
-        if self.start_event == self.end_event:
+        if start_evt == end_evt:
             raise ValueError(
                 f"ScenarioVariant '{scr_var.id.n3(graph.namespace_manager)}'"
-                f" has same start/end events: {self.start_event}"
+                f" has same start/end events: {start_evt}"
             )
+        self.start_event = start_evt
+        self.end_event = end_evt
 
         # Behaviour Implementation model
         bhv_impl_id = graph.value(subject=self.id, predicate=URI_BDD_PRED_HAS_BHV_IMPL, any=False)

@@ -70,7 +70,9 @@ class ObsPolicyModel(ModelBase):
     ) -> None:
         super().__init__(node_id=node_id, graph=graph)
         if URI_OBS_TYPE_POLICY not in self.types:
-            raise ValueError(f"FluentImpl {self.id} does not have correct types: {self.types}")
+            raise ValueError(
+                f"ObservationPolicy '{self.id}' does not have correct types: {self.types}"
+            )
         self.fluent_id = fluent_id
         self.fluent_types = fluent_types
         self.duration_type = duration_type
@@ -232,7 +234,9 @@ class ObsPolicyModel(ModelBase):
 
         for obs_pol_id in graph.subjects(predicate=URI_BDD_PRED_OF_CLAUSE, object=fc.id):
             if not isinstance(obs_pol_id, URIRef):
-                raise ValueError(f"Fluent '{fc.id}' does not link to an impl URIRef: {obs_pol_id}")
+                raise ValueError(
+                    f"Fluent '{fc.id}' is not linked via 'of-clause' to a ObservationPolicy URI: {obs_pol_id}"
+                )
 
             yield ObsPolicyModel(
                 node_id=obs_pol_id,
@@ -253,7 +257,7 @@ class ObservationManager(object):
 
     bhv_result: Optional[TrinaryStamped]
 
-    obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> FluentImplModel
+    obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> ObsPolicyModel
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
 
     event_timelines: dict[URIRef, list[float]]
