@@ -1,17 +1,17 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol
-
-from rdflib import Graph, URIRef
-from rdflib.namespace import NamespaceManager
+from typing import Any, Generator, Optional, Protocol
 from trinary import Trinary, Unknown
-
-from rdf_utils.models.common import AttrLoaderProtocol
-from bdd_dsl.models.clauses import FluentClauseModel
-from bdd_dsl.models.user_story import ScenarioVariantModel
+from rdflib import Graph, URIRef
+from rdf_utils.models.common import AttrLoaderProtocol, ModelBase
+from bdd_dsl.execution.common import ScenarioExecutionModel
 from bdd_dsl.models.time_constraint import get_duration
+from bdd_dsl.models.user_story import ScenarioVariantModel
+from bdd_dsl.models.clauses import FluentClauseModel
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_OF_CLAUSE,
+    URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
     URI_TIME_PRED_HRZN_SEC,
@@ -27,7 +27,24 @@ class TrinaryStamped:
     trinary: Trinary | bool
 
 
-class FluentTimeline(object):
+class TrinariesPolicyProtocol(Protocol):
+    """Protocol for functions that load model attributes."""
+
+    def __call__(self, trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary: ...
+
+
+def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary:
+    if len(trinaries) == 0:
+        return Unknown
+
+    result = True
+    for trin_st in trinaries:
+        result &= trin_st.trinary
+
+    return result
+
+
+class ObsPolicyModel(ModelBase):
     trinary_timeline: list[TrinaryStamped]
 
     start_time: Optional[float]
@@ -40,39 +57,31 @@ class FluentTimeline(object):
     end_event: Optional[URIRef]
     horizon: Optional[float]
 
-    def __init__(self, fc: FluentClauseModel) -> None:
-        self.fluent_id = fc.id
-        self.fluent_types = fc.types
+    def __init__(
+        self,
+        node_id: URIRef,
+        graph: Graph,
+        fluent_id: URIRef,
+        fluent_types: set[URIRef],
+        duration_type: URIRef,
+        start_event: Optional[URIRef],
+        end_event: Optional[URIRef],
+        horizon: Optional[float],
+    ) -> None:
+        super().__init__(node_id=node_id, graph=graph)
+        if URI_OBS_TYPE_POLICY not in self.types:
+            raise ValueError(f"FluentImpl {self.id} does not have correct types: {self.types}")
+        self.fluent_id = fluent_id
+        self.fluent_types = fluent_types
+        self.duration_type = duration_type
+        self.start_event = start_event
+        self.end_event = end_event
+        self.horizon = horizon
 
         self.trinary_timeline = []
 
         self.start_time = None
         self.end_time = None
-
-        dur_spec = get_duration(constraint=fc)
-
-        if URI_TIME_TYPE_DURING in fc.types:
-            self.duration_type = URI_TIME_TYPE_DURING
-            self.start_event = dur_spec[URI_TIME_PRED_AFTER_EVT]
-            self.end_event = dur_spec[URI_TIME_PRED_BEFORE_EVT]
-            self.horizon = None
-
-        elif URI_TIME_TYPE_AFTER_EVT in fc.types:
-            self.duration_type = URI_TIME_TYPE_AFTER_EVT
-            self.start_event = dur_spec[URI_TIME_PRED_AFTER_EVT]
-            self.end_event = None
-            self.horizon = dur_spec[URI_TIME_PRED_HRZN_SEC]
-
-        elif URI_TIME_TYPE_BEFORE_EVT in fc.types:
-            self.duration_type = URI_TIME_TYPE_BEFORE_EVT
-            self.start_event = None
-            self.end_event = dur_spec[URI_TIME_PRED_BEFORE_EVT]
-            self.horizon = dur_spec[URI_TIME_PRED_HRZN_SEC]
-
-        else:
-            raise ValueError(
-                "Unhandled duration types:\n" + "\n  ".join([uri.n3() for uri in fc.types])
-            )
 
     def _insert_trin_stamped_in_order(self, trin_st: TrinaryStamped):
         # Find insertion point (from end)
@@ -185,36 +194,87 @@ class FluentTimeline(object):
                 f"fluent {self.fluent_id}: matching end event '{self.end_event}' for wrong duration type: {self.duration_type}"
             )
 
+    @classmethod
+    def policies_for_fluent_clause(
+        cls,
+        graph: Graph,
+        fc: FluentClauseModel,
+        obs_loaders: list[AttrLoaderProtocol],
+    ) -> Generator[ObsPolicyModel, None, None]:
+
+        dur_spec = get_duration(constraint=fc)
+        dur_type = None
+        start_evt = None
+        end_evt = None
+        hrzn = None
+
+        if URI_TIME_TYPE_DURING in fc.types:
+            dur_type = URI_TIME_TYPE_DURING
+            start_evt = dur_spec[URI_TIME_PRED_AFTER_EVT]
+            end_evt = dur_spec[URI_TIME_PRED_BEFORE_EVT]
+            hrzn = None
+
+        elif URI_TIME_TYPE_AFTER_EVT in fc.types:
+            dur_type = URI_TIME_TYPE_AFTER_EVT
+            start_evt = dur_spec[URI_TIME_PRED_AFTER_EVT]
+            end_evt = None
+            hrzn = dur_spec[URI_TIME_PRED_HRZN_SEC]
+
+        elif URI_TIME_TYPE_BEFORE_EVT in fc.types:
+            dur_type = URI_TIME_TYPE_BEFORE_EVT
+            start_evt = None
+            end_evt = dur_spec[URI_TIME_PRED_BEFORE_EVT]
+            hrzn = dur_spec[URI_TIME_PRED_HRZN_SEC]
+
+        else:
+            raise ValueError(
+                "Unhandled duration types:\n" + "\n  ".join([uri.n3() for uri in fc.types])
+            )
+
+        for obs_pol_id in graph.subjects(predicate=URI_BDD_PRED_OF_CLAUSE, object=fc.id):
+            if not isinstance(obs_pol_id, URIRef):
+                raise ValueError(f"Fluent '{fc.id}' does not link to an impl URIRef: {obs_pol_id}")
+
+            obs_pol = ObsPolicyModel(
+                node_id=obs_pol_id,
+                graph=graph,
+                fluent_id=fc.id,
+                fluent_types=fc.types,
+                duration_type=dur_type,
+                start_event=start_evt,
+                end_event=end_evt,
+                horizon=hrzn,
+            )
+
+            for loader in obs_loaders:
+                loader(graph=graph, model=obs_pol)
+
+            yield obs_pol
+
 
 class ObservationManager(object):
-    scr_start_event: URIRef
-    scr_end_event: URIRef
+    scenario_exec: ScenarioExecutionModel
     scr_start_time: Optional[float]
     scr_end_time: Optional[float]
 
     bhv_result: Optional[TrinaryStamped]
 
-    fluent_timelines: dict[URIRef, FluentTimeline]
+    obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> FluentImplModel
+    _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
+
     event_timelines: dict[URIRef, list[float]]
-    _fluent_event_registry: dict[URIRef, set[URIRef]]
-    _ns_manager: Optional[NamespaceManager]
+    _fluent_event_registry: dict[URIRef, set[URIRef]]  # fluent ID -> event IDs
 
-    def __init__(
-        self,
-        scr_start_event: URIRef,
-        scr_end_event: URIRef,
-        ns_manager: Optional[NamespaceManager] = None,
-    ) -> None:
-        self._ns_manager = ns_manager
-
-        self.scr_start_event = scr_start_event
-        self.scr_end_event = scr_end_event
+    def __init__(self, scr_exec: ScenarioExecutionModel) -> None:
+        self.scenario_exec = scr_exec
         self.scr_start_time = None
         self.scr_end_time = None
 
         self.bhv_result = None
 
-        self.fluent_timelines = {}
+        self.obs_policies = {}
+        self._fluent_policy_registry = {}
+
         self.event_timelines = {}
         self._fluent_event_registry = {}
 
@@ -240,22 +300,38 @@ class ObservationManager(object):
 
     def register_fluent_obs(
         self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol]
-    ):
-        if fc.id not in self.fluent_timelines:
-            f_tl = FluentTimeline(fc=fc)
-            self.fluent_timelines[fc.id] = f_tl
-            self._register_fluent_event(evt_uri=f_tl.start_event, fc_id=fc.id)
-            self._register_fluent_event(evt_uri=f_tl.end_event, fc_id=fc.id)
+    ) -> None:
+        if fc.id in self._fluent_policy_registry:
+            # Already registered
+            return
 
-        for obs_ldr in obs_loaders:
-            obs_ldr(graph=graph, model=fc)
+        self._fluent_policy_registry[fc.id] = set()
+
+        for obs_pol in ObsPolicyModel.policies_for_fluent_clause(
+            graph=graph, fc=fc, obs_loaders=obs_loaders
+        ):
+            if obs_pol.id in self.obs_policies:
+                # policy already added.
+                continue
+            if obs_pol.id not in self.scenario_exec.obs_policy_uris:
+                raise ValueError(
+                    f"FluentImpl '{obs_pol.id}' not included in ScenarioExecution '{self.scenario_exec.id}'"
+                )
+            self._fluent_policy_registry[fc.id].add(obs_pol.id)
+            self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
+            self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
+            self.obs_policies[obs_pol.id] = obs_pol
 
     def update_bhv_result(self, trin_st: TrinaryStamped):
         self.bhv_result = trin_st
 
-    def update_fpolicy_assertion(self, fc_uri: URIRef, trin_st: TrinaryStamped) -> tuple[bool, str]:
-        assert fc_uri in self.fluent_timelines, f"No Timeline created for '{fc_uri}'"
-        return self.fluent_timelines[fc_uri].add_trinary(trin_st)
+    def update_fpolicy_assertion(
+        self, policy_uri: URIRef, trin_st: TrinaryStamped
+    ) -> tuple[bool, str]:
+        if policy_uri not in self.obs_policies:
+            raise ValueError(f"ObservationPolicy not registered: '{policy_uri}'")
+
+        return self.obs_policies[policy_uri].add_trinary(trin_st)
 
     def on_event(self, evt_uri: URIRef, evt_t: float):
         if evt_uri not in self.event_timelines:
@@ -263,60 +339,38 @@ class ObservationManager(object):
         else:
             self._insert_evt_stamp_in_order(evt_uri=evt_uri, evt_t=evt_t)
 
-        if evt_uri == self.scr_start_event:
+        if evt_uri == self.scenario_exec.start_event:
             self.scr_start_time = evt_t
-        elif evt_uri == self.scr_end_event:
+        elif evt_uri == self.scenario_exec.end_event:
             self.scr_end_time = evt_t
 
         if evt_uri not in self._fluent_event_registry:
             return
 
         for fc_uri in self._fluent_event_registry[evt_uri]:
-            assert fc_uri in self.fluent_timelines
-            self.fluent_timelines[fc_uri].on_event(evt_uri=evt_uri, evt_stamp=evt_t)
+            if fc_uri not in self._fluent_policy_registry:
+                raise ValueError(f"On event {evt_uri}: No policy for fluent {fc_uri}")
+            for obs_pol_id in self._fluent_policy_registry[fc_uri]:
+                self.obs_policies[obs_pol_id].on_event(evt_uri=evt_uri, evt_stamp=evt_t)
 
     @classmethod
     def from_scenario_variant(
         cls,
         graph: Graph,
         scr_var: ScenarioVariantModel,
+        bhv_loaders: list[AttrLoaderProtocol],
         obs_loaders: list[AttrLoaderProtocol],
     ) -> ObservationManager:
-        dur = get_duration(scr_var.tmpl)
-        ns_manager = graph.namespace_manager
-        assert URI_TIME_PRED_AFTER_EVT in dur and URI_TIME_PRED_BEFORE_EVT in dur, (
-            f"ScenarioVariant '{scr_var.id.n3(ns_manager)}' does not have before/after event attributes"
+        scr_exec = ScenarioExecutionModel(
+            graph=graph,
+            scr_var=scr_var,
+            bhv_loaders=bhv_loaders,
         )
-
-        scr_start_event = dur[URI_TIME_PRED_AFTER_EVT]
-        scr_end_event = dur[URI_TIME_PRED_BEFORE_EVT]
-        assert scr_start_event != scr_end_event, (
-            f"ScenarioVariant '{scr_var.id.n3(ns_manager)}' has same start/end events: {scr_start_event}"
-        )
-
-        obs_manager = ObservationManager(
-            scr_start_event=scr_start_event,
-            scr_end_event=scr_end_event,
-            ns_manager=ns_manager,
-        )
-
+        obs_manager = ObservationManager(scr_exec=scr_exec)
         for fc in scr_var.fluent_clauses():
-            obs_manager.register_fluent_obs(graph=graph, fc=fc, obs_loaders=obs_loaders)
+            obs_manager.register_fluent_obs(
+                graph=graph,
+                fc=fc,
+                obs_loaders=obs_loaders,
+            )
         return obs_manager
-
-
-class TrinariesPolicyProtocol(Protocol):
-    """Protocol for functions that load model attributes."""
-
-    def __call__(self, trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary: ...
-
-
-def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary:
-    if len(trinaries) == 0:
-        return Unknown
-
-    result = True
-    for trin_st in trinaries:
-        result &= trin_st.trinary
-
-    return result
