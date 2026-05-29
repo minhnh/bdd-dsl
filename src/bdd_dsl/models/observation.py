@@ -199,7 +199,6 @@ class ObsPolicyModel(ModelBase):
         cls,
         graph: Graph,
         fc: FluentClauseModel,
-        obs_loaders: list[AttrLoaderProtocol],
     ) -> Generator[ObsPolicyModel, None, None]:
 
         dur_spec = get_duration(constraint=fc)
@@ -235,7 +234,7 @@ class ObsPolicyModel(ModelBase):
             if not isinstance(obs_pol_id, URIRef):
                 raise ValueError(f"Fluent '{fc.id}' does not link to an impl URIRef: {obs_pol_id}")
 
-            obs_pol = ObsPolicyModel(
+            yield ObsPolicyModel(
                 node_id=obs_pol_id,
                 graph=graph,
                 fluent_id=fc.id,
@@ -245,11 +244,6 @@ class ObsPolicyModel(ModelBase):
                 end_event=end_evt,
                 horizon=hrzn,
             )
-
-            for loader in obs_loaders:
-                loader(graph=graph, model=obs_pol)
-
-            yield obs_pol
 
 
 class ObservationManager(object):
@@ -308,15 +302,19 @@ class ObservationManager(object):
         self._fluent_policy_registry[fc.id] = set()
 
         for obs_pol in ObsPolicyModel.policies_for_fluent_clause(
-            graph=graph, fc=fc, obs_loaders=obs_loaders
+            graph=graph,
+            fc=fc,
         ):
             if obs_pol.id in self.obs_policies:
                 # policy already added.
                 continue
             if obs_pol.id not in self.scenario_exec.obs_policy_uris:
-                raise ValueError(
-                    f"FluentImpl '{obs_pol.id}' not included in ScenarioExecution '{self.scenario_exec.id}'"
-                )
+                # policy not explicitly included in execution model
+                continue
+
+            for loader in obs_loaders:
+                loader(graph=graph, model=obs_pol)
+
             self._fluent_policy_registry[fc.id].add(obs_pol.id)
             self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
