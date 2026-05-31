@@ -6,6 +6,7 @@ from bdd_dsl.models.uri import (
     URI_MM_SIM,
     URI_MM_OBS,
     URI_MM_TASK,
+    URI_MM_ROS,
 )
 
 # Namespaces
@@ -14,6 +15,7 @@ NS_MM_BHV = Namespace(URI_MM_BHV)
 NS_MM_TASK = Namespace(URI_MM_TASK)
 NS_MM_SIM = Namespace(URI_MM_SIM)
 NS_MM_OBS = Namespace(URI_MM_OBS)
+NS_MM_ROS = Namespace(URI_MM_ROS)
 
 # Prefixes
 PREFIX_GEOM = "geom"
