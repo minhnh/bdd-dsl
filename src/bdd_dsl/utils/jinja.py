@@ -11,7 +11,6 @@ from bdd_dsl.models.clauses import (
 from bdd_dsl.models.frames import (
     FR_AGENTS,
     FR_OBJECTS,
-    FR_SCENE,
     FR_NAME,
     FR_CRITERIA,
     FR_VARIATIONS,
@@ -464,11 +463,6 @@ def prepare_jinja2_template_data(
         us_id_str = us_id.n3(namespace_manager=ns_manager)
         us_data = {FR_NAME: us_id_str, FR_CRITERIA: []}
 
-        # TODO(minhnh): handles a UserStory having multiple scenes, since scenes are linked to
-        # a ScenarioTemplate, multiple of which can appear in a UserStory. This can perhaps be
-        # a constraint on USs, but for now just raise an error
-        scene_data = {}
-
         for scr_var_id in scr_var_set:
             scr_var = us_loader.load_scenario_variant(full_graph=full_graph, variant_id=scr_var_id)
 
@@ -482,8 +476,6 @@ def prepare_jinja2_template_data(
             )
 
             us_data[FR_CRITERIA].append(scr_var_data)
-
-        us_data[FR_SCENE] = scene_data
 
         jinja_data.append(us_data)
 
