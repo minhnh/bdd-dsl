@@ -388,6 +388,28 @@ def prepare_scenario_variant_data(
     scr_var_name = scr_var_model.id.n3(namespace_manager=ns_manager)
     scr_var_data = {FR_NAME: scr_var_name, FR_VARIATIONS: []}
 
+    # Scene data
+    scene_data = {}
+    scene_data[FR_NAME] = scr_var_model.scene.id.n3(namespace_manager=ns_manager)
+
+    obj_list = []
+    for obj_id in scr_var_model.scene.objects:
+        obj_list.append(obj_id.n3(namespace_manager=ns_manager))
+    if len(obj_list) > 0:
+        scene_data[FR_OBJECTS] = obj_list
+
+    ws_list = []
+    for ws_id in scr_var_model.scene.workspaces:
+        ws_list.append(ws_id.n3(namespace_manager=ns_manager))
+    if len(ws_list) > 0:
+        scene_data[FR_WS] = ws_list
+
+    agn_list = []
+    for agn_id in scr_var_model.scene.agents:
+        agn_list.append(agn_id.n3(namespace_manager=ns_manager))
+    if len(agn_list) > 0:
+        scene_data[FR_AGENTS] = agn_list
+
     var_uri_list, var_vals_list = get_task_variations(scr_var_model.task_variation)
     var_count = 1
     string_gen = GherkinClauseStrGen(
@@ -398,6 +420,16 @@ def prepare_scenario_variant_data(
     for var_value_set in var_vals_list:
         var_values = dict(zip(var_uri_list, var_value_set))
 
+        # Variable scene elements
+        var_scene_elems = set()
+        var_scene_data = scene_data.copy()
+        for var_val in var_values.values():
+            scr_var_model.scene.get_variable_elems_re(var_val=var_val, var_elems=var_scene_elems)
+        if len(var_scene_elems) > 0:
+            var_scene_data["elements"] = [
+                elem_id.n3(namespace_manager=ns_manager) for elem_id in var_scene_elems
+            ]
+
         clauses = []
         get_gherkin_clauses_re(
             has_clause_model=scr_var_model,
@@ -407,7 +439,7 @@ def prepare_scenario_variant_data(
             clause_list=clauses,
         )
         scr_var_data[FR_VARIATIONS].append(
-            {FR_NAME: f"{scr_var_name} -- {var_count}", "clauses": clauses}
+            {FR_NAME: f"{scr_var_name} -- {var_count}", "clauses": clauses, "scene": var_scene_data}
         )
         var_count += 1
 
@@ -439,34 +471,6 @@ def prepare_jinja2_template_data(
 
         for scr_var_id in scr_var_set:
             scr_var = us_loader.load_scenario_variant(full_graph=full_graph, variant_id=scr_var_id)
-
-            # Scene data
-            scene_id_str = scr_var.scene.id.n3(namespace_manager=ns_manager)
-            if FR_NAME not in scene_data:
-                scene_data[FR_NAME] = scene_id_str
-
-                obj_list = []
-                for obj_id in scr_var.scene.objects:
-                    obj_list.append(obj_id.n3(namespace_manager=ns_manager))
-                if len(obj_list) > 0:
-                    scene_data[FR_OBJECTS] = obj_list
-
-                ws_list = []
-                for ws_id in scr_var.scene.workspaces:
-                    ws_list.append(ws_id.n3(namespace_manager=ns_manager))
-                if len(ws_list) > 0:
-                    scene_data[FR_WS] = ws_list
-
-                agn_list = []
-                for agn_id in scr_var.scene.agents:
-                    agn_list.append(agn_id.n3(namespace_manager=ns_manager))
-                if len(agn_list) > 0:
-                    scene_data[FR_AGENTS] = agn_list
-            else:
-                if scene_id_str != scene_data[FR_NAME]:
-                    raise ValueError(
-                        f"can't handle multiple scenes for US '{us_id_str}': {scene_data[FR_NAME]}, {scene_id_str}"
-                    )
 
             # ScenarioVariant data
             scr_var_data = prepare_scenario_variant_data(

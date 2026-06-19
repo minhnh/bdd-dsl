@@ -132,18 +132,22 @@ class SceneModel(ModelBase):
             if URI_BDD_TYPE_SCENE_OBJ in comp_types:
                 for obj_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_OBJ):
                     assert isinstance(obj_id, URIRef), (
-                        f"SceneModel {self.id}: '{obj_id}' not URIRef"
+                        f"SceneModel {self.id}: obj '{obj_id}' not URIRef"
                     )
                     self.objects.add(obj_id)
 
             if URI_BDD_TYPE_SCENE_WS in comp_types:
                 for ws_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_WS):
-                    assert isinstance(ws_id, URIRef), f"SceneModel {self.id}: '{ws_id}' not URIRef"
+                    assert isinstance(ws_id, URIRef), (
+                        f"SceneModel {self.id}: ws '{ws_id}' not URIRef"
+                    )
                     self.workspaces.add(ws_id)
 
             if URI_BDD_TYPE_SCENE_AGN in comp_types:
                 for agn_id in full_graph.objects(subject=comp_id, predicate=URI_AGN_PRED_HAS_AGN):
-                    assert isinstance(agn_id, URIRef)
+                    assert isinstance(agn_id, URIRef), (
+                        f"SceneModel {self.id}: agn '{agn_id}' not URIRef"
+                    )
                     self.agents.add(agn_id)
 
     def load_obj_model(
@@ -169,6 +173,24 @@ class SceneModel(ModelBase):
         return self.agn_model_loader.load_agent_model(
             graph=graph, agent_id=agent_id, override=override, **kwargs
         )
+
+    def has_invariant_elem(self, elem_id: URIRef) -> bool:
+        return elem_id in self.objects or elem_id in self.workspaces or elem_id in self.agents
+
+    def get_variable_elems_re(self, var_val: Any, var_elems: Optional[set[URIRef]] = None) -> None:
+        if var_elems is None:
+            var_elems = set()
+
+        if isinstance(var_val, URIRef):
+            if self.has_invariant_elem(elem_id=var_val):
+                return
+            var_elems.add(var_val)
+            return
+
+        if isinstance(var_val, list):
+            for v in var_val:
+                self.get_variable_elems_re(var_val=v, var_elems=var_elems)
+            return
 
 
 class IHasClause(ModelBase):
