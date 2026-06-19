@@ -187,7 +187,7 @@ class SceneModel(ModelBase):
             var_elems.add(var_val)
             return
 
-        if isinstance(var_val, list):
+        if isinstance(var_val, (list, tuple)):
             for v in var_val:
                 self.get_variable_elems_re(var_val=v, var_elems=var_elems)
             return

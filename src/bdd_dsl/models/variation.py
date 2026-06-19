@@ -278,6 +278,6 @@ def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], lis
 
 
 def get_task_var_dicts(task_var: TaskVariationModel) -> list[dict[URIRef, Any]]:
-    """Return list of varations as dictionaries mapping variables to their corresponding values"""
+    """Return list of variations as dictionaries mapping variables to their corresponding values"""
     var_uri_list, var_value_sets = get_task_variations(task_var=task_var)
     return [dict(zip(var_uri_list, val_set)) for val_set in var_value_sets]
