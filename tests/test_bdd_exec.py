@@ -11,16 +11,16 @@ from rdf_utils.models.python import (
 )
 from rdf_utils.resolver import install_resolver
 from rdf_utils.constraints import check_shacl_constraints
-from bdd_dsl.models.agent import AgentModel
-from bdd_dsl.models.environment import ObjectModel
-from bdd_dsl.models.urirefs import URI_SIM_TYPE_SYS_RES
-from bdd_dsl.models.user_story import UserStoryLoader
-from bdd_dsl.simulation.common import (
-    URL_MM_SIM_SHACL,
+from bdd_dsl.execution.common import (
+    URL_MM_EXEC_SHACL,
     get_path_of_node,
     load_attr_has_config,
     load_attr_path,
 )
+from bdd_dsl.models.agent import AgentModel
+from bdd_dsl.models.environment import ObjectModel
+from bdd_dsl.models.urirefs import URI_EXEC_TYPE_SYS_RES
+from bdd_dsl.models.user_story import UserStoryLoader
 
 
 SPEC_MODEL_URLS = {
@@ -36,7 +36,7 @@ EXEC_MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/execution/pickplace-secorolab-isaac.exec.json": "json-ld",
 }
 SHACL_URLS = {
-    URL_MM_SIM_SHACL: "turtle",
+    URL_MM_EXEC_SHACL: "turtle",
     URL_MM_PYTHON_SHACL: "turtle",
 }
 
@@ -64,12 +64,12 @@ class BDDExecTest(unittest.TestCase):
         check_shacl_constraints(graph=self.graph, shacl_dict=SHACL_URLS)
 
     def _test_obj_model(self, obj_model: ObjectModel):
-        if URI_SIM_TYPE_SYS_RES in obj_model.model_types:
+        if URI_EXEC_TYPE_SYS_RES in obj_model.model_types:
             self.assertTrue(
-                len(obj_model.model_type_to_id[URI_SIM_TYPE_SYS_RES]) > 0,
-                f"Object '{obj_model.id}' has type '{URI_SIM_TYPE_SYS_RES}' but no corresponding model",
+                len(obj_model.model_type_to_id[URI_EXEC_TYPE_SYS_RES]) > 0,
+                f"Object '{obj_model.id}' has type '{URI_EXEC_TYPE_SYS_RES}' but no corresponding model",
             )
-            for model_id in obj_model.model_type_to_id[URI_SIM_TYPE_SYS_RES]:
+            for model_id in obj_model.model_type_to_id[URI_EXEC_TYPE_SYS_RES]:
                 # assertion already in function
                 _ = get_path_of_node(graph=self.graph, node_id=model_id)
 

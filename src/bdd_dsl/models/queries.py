@@ -29,7 +29,7 @@ from bdd_dsl.models.urirefs import (
     URI_ENV_PRED_HAS_OBJ_MODEL,
     URI_ENV_TYPE_OBJ_MODEL,
     URI_ENV_TYPE_MOD_OBJ,
-    URI_SIM_PRED_HAS_CONFIG,
+    URI_EXEC_PRED_HAS_CONFIG,
     URI_TASK_TYPE_TASK,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENARIO_TMPL,
@@ -234,7 +234,7 @@ Q_MODELLED_OBJECT = f"""
 CONSTRUCT {{
     ?obj a ?objType ;
         {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
-        {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+        {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
     ?objModel a ?objModelType .
 }}
 WHERE {{
@@ -242,7 +242,7 @@ WHERE {{
         {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
         {URI_ENV_PRED_OF_OBJ.n3()} ?obj .
     OPTIONAL {{
-        ?modelledObj {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+        ?modelledObj {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
     }}
     ?obj a {URI_ENV_TYPE_OBJ.n3()} ;
         a ?objType .
@@ -256,7 +256,7 @@ Q_MODELLED_AGENT = f"""
 CONSTRUCT {{
     ?agn a ?agnType ;
         {URI_AGN_PRED_HAS_AGN_MODEL.n3()} ?agnModel ;
-        {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+        {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
     ?agnModel a ?agnModelType .
 }}
 WHERE {{
@@ -264,7 +264,7 @@ WHERE {{
         {URI_AGN_PRED_HAS_AGN_MODEL.n3()} ?agnModel ;
         {URI_AGN_PRED_OF_AGN.n3()} ?agn .
     OPTIONAL {{
-        ?modelledAgn {URI_SIM_PRED_HAS_CONFIG.n3()} ?configs .
+        ?modelledAgn {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
     }}
     ?agn a {URI_AGN_TYPE_AGN.n3()} ;
         a ?agnType .
