@@ -25,7 +25,9 @@ from bdd_dsl.behave import (
     load_ws_models_from_table,
     parse_str_param,
 )
-from bdd_dsl.execution.common import Behaviour, ExecutionModel, load_attr_has_config, load_attr_path
+from bdd_dsl.execution.common import load_attr_has_config, load_attr_path
+from bdd_dsl.execution.behaviour import Behaviour
+from bdd_dsl.execution.scenario import ExecutionModel
 from bdd_dsl.models.urirefs import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_RES_PATH
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
@@ -34,7 +36,7 @@ def before_all_mockup(context: Context):
     g = getattr(context, "model_graph", None)
     assert g is not None, "'model_graph' attribute not found in context"
 
-    exec_model = ExecutionModel(graph=g)
+    exec_model = ExecutionModel(graph=g, bhv_loaders=[load_py_module_attr])
     context.execution_model = exec_model
     context.us_loader = UserStoryLoader(graph=g)
 

@@ -7,7 +7,6 @@ from rdf_utils.caching import read_url_and_cache
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     import_attr_from_model,
-    load_py_module_attr,
 )
 from bdd_dsl.execution.behaviour import Behaviour, BehaviourImplModel
 from bdd_dsl.execution.common import URL_Q_SCENARIO_EXEC
@@ -58,7 +57,7 @@ class ScenarioExecutionModel(ModelBase):
         if start_evt is None or end_evt is None:
             raise ValueError(
                 f"ScenarioVariant '{scr_var.id.n3(graph.namespace_manager)}'"
-                f" has invalid start/end events: start={self.start_event}, end={self.end_event}"
+                f" has invalid start/end events: start={start_evt}, end={end_evt}"
             )
         if start_evt == end_evt:
             raise ValueError(
@@ -94,9 +93,7 @@ class ExecutionModel(object):
     _scr_exec_graph: Graph
     bhv_model_loader: ModelLoader
 
-    def __init__(
-        self, graph: Graph, bhv_loaders: list[AttrLoaderProtocol] = [load_py_module_attr]
-    ) -> None:
+    def __init__(self, graph: Graph, bhv_loaders: list[AttrLoaderProtocol]) -> None:
         g_query_str = read_url_and_cache(URL_Q_SCENARIO_EXEC)
         q_result = graph.query(g_query_str)
         assert q_result.type == "CONSTRUCT" and q_result.graph is not None, (
@@ -121,7 +118,7 @@ class ExecutionModel(object):
             "'current_scenario' not added to behave context"
         )
         assert isinstance(context.current_scenario, ScenarioVariantModel), (
-            "load_bhv_impl: 'model_graph' not a rdflib.Graph"
+            "load_bhv_impl: 'context.current_scenario' not a ScenarioVariantModel"
         )
 
         scr_var_id = context.current_scenario.id
