@@ -7,9 +7,9 @@ from rdf_utils.namespace import (
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
+    NS_MM_EXEC,
     NS_MM_OBS,
     NS_MM_ROS,
-    NS_MM_SIM,
     NS_MM_TASK,
 )
 
@@ -57,11 +57,11 @@ URI_TIME_PRED_HRZN_SEC = NS_MM_TIME["horizon-seconds"]
 URI_TASK_TYPE_TASK = NS_MM_TASK["Task"]
 URI_TASK_PRED_OF_TASK = NS_MM_TASK["of-task"]
 
-# Simulation
-URI_SIM_TYPE_SYS_RES = NS_MM_SIM["SystemResource"]
-URI_SIM_TYPE_RES_PATH = NS_MM_SIM["ResourceWithPath"]
-URI_SIM_PRED_HAS_CONFIG = NS_MM_SIM["has-config"]
-URI_SIM_PRED_PATH = NS_MM_SIM["path"]
+# Execution Context
+URI_EXEC_TYPE_SYS_RES = NS_MM_EXEC["SystemResource"]
+URI_EXEC_TYPE_RES_PATH = NS_MM_EXEC["ResourceWithPath"]
+URI_EXEC_PRED_HAS_CONFIG = NS_MM_EXEC["has-config"]
+URI_EXEC_PRED_PATH = NS_MM_EXEC["path"]
 
 # Observation
 URI_OBS_TYPE_POLICY = NS_MM_OBS["ObservationPolicy"]

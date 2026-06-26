@@ -56,7 +56,7 @@ BDD_SHACL_URLS = {
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/time.shacl.ttl": "turtle",
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/environment.shacl.ttl": "turtle",
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/agent.shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/simulation.shacl.ttl": "turtle",
+    f"{URL_SECORO_MM}/acceptance-criteria/bdd/execution-context.shacl.ttl": "turtle",
     URL_MM_PYTHON_SHACL: "turtle",
 }
 Q_US_VAR = f"""

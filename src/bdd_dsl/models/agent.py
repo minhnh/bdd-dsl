@@ -2,7 +2,7 @@
 from typing import Any, Dict, Optional
 from rdflib import Graph, URIRef
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
-from bdd_dsl.simulation.common import load_attr_has_config
+from bdd_dsl.execution.common import load_attr_has_config
 from bdd_dsl.models.queries import Q_MODELLED_AGENT
 from bdd_dsl.models.urirefs import URI_AGN_PRED_HAS_AGN_MODEL
 
@@ -24,9 +24,9 @@ class AgentModel(ModelBase):
             assert isinstance(model_id, URIRef)
 
             agn_model = ModelBase(graph=graph, node_id=model_id)
-            assert (
-                agn_model.id not in self.models
-            ), f"Agent '{self.id}' has duplicate models '{agn_model.id}'"
+            assert agn_model.id not in self.models, (
+                f"Agent '{self.id}' has duplicate models '{agn_model.id}'"
+            )
             self.models[agn_model.id] = agn_model
 
             for model_type in agn_model.types:
@@ -59,9 +59,9 @@ class AgnModelLoader(object):
 
     def _query_agent_models(self, graph: Graph) -> Graph:
         q_result = graph.query(Q_MODELLED_AGENT)
-        assert (
-            q_result.type == "CONSTRUCT" and q_result.graph is not None
-        ), "querying for ModelledAgent's failed"
+        assert q_result.type == "CONSTRUCT" and q_result.graph is not None, (
+            "querying for ModelledAgent's failed"
+        )
         assert len(q_result.graph) > 0, "querying for ModelledAgent's returned an empty graph"
 
         return q_result.graph
