@@ -5,7 +5,7 @@ from typing import Any, Generator, Optional, Protocol
 from trinary import Trinary, Unknown
 from rdflib import Graph, URIRef
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase
-from bdd_dsl.execution.common import ScenarioExecutionModel
+from bdd_dsl.execution.scenario import ScenarioExecutionModel
 from bdd_dsl.models.time_constraint import get_duration
 from bdd_dsl.models.user_story import ScenarioVariantModel
 from bdd_dsl.models.clauses import FluentClauseModel
