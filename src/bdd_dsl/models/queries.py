@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.uri import URL_SECORO_M
+from rdf_utils.namespace import URL_SECORO_M
 from bdd_dsl.models.namespace import PREFIX_TRANS
 from bdd_dsl.models.uri import (
     URI_TRANS,

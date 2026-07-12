@@ -1,5 +1,5 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.uri import URL_SECORO, URL_SECORO_MM
+from rdf_utils.namespace import URL_SECORO, URL_SECORO_MM
 
 URL_SESAME = "https://hbrs-sesame.github.io"
 

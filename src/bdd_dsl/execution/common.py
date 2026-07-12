@@ -4,7 +4,7 @@ import json
 from typing import Any
 from rdf_utils.models.common import ModelBase
 from rdflib import Graph, URIRef
-from rdf_utils.uri import URL_SECORO_M, URL_SECORO_MM
+from rdf_utils.namespace import URL_SECORO_M, URL_SECORO_MM
 from bdd_dsl.models.urirefs import (
     URI_EXEC_PRED_HAS_CONFIG,
     URI_EXEC_PRED_PATH,

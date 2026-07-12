@@ -3,7 +3,7 @@ from typing import Any, Generator, Iterable, Optional
 from rdflib import RDF, Graph, URIRef, BNode
 from rdflib.query import ResultRow
 from rdf_utils.models.common import ModelBase, get_node_types
-from rdf_utils.uri import URL_MM_PYTHON_SHACL, URL_SECORO_MM
+from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_MM
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.models.environment import EnvModelLoader, ObjectModel, WorkspaceModel
 from bdd_dsl.models.agent import AgentModel, AgnModelLoader

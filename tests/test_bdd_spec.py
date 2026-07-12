@@ -2,7 +2,7 @@
 import unittest
 import rdflib
 from rdf_utils.resolver import install_resolver
-from rdf_utils.uri import URL_SECORO_M
+from rdf_utils.namespace import URL_SECORO_M
 from bdd_dsl.models.user_story import UserStoryLoader
 from bdd_dsl.models.frames import FR_CRITERIA, FR_VARIATIONS
 from bdd_dsl.utils.jinja import prepare_jinja2_template_data
