@@ -2,7 +2,7 @@
 import unittest
 from urllib.request import HTTPError
 from rdflib import Dataset
-from rdf_utils.uri import URL_SECORO_M, URL_MM_PYTHON_SHACL
+from rdf_utils.namespace import URL_SECORO_M, URL_MM_PYTHON_SHACL
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
