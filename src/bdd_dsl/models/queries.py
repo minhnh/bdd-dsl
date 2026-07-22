@@ -1,5 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from rdf_utils.namespace import URL_SECORO_M
+from rdf_utils.models.vocab import URI_EXEC_PRED_HAS_CONFIG
 from bdd_dsl.models.namespace import PREFIX_TRANS
 from bdd_dsl.models.uri import (
     URI_TRANS,
@@ -29,7 +30,6 @@ from bdd_dsl.models.urirefs import (
     URI_ENV_PRED_HAS_OBJ_MODEL,
     URI_ENV_TYPE_OBJ_MODEL,
     URI_ENV_TYPE_MOD_OBJ,
-    URI_EXEC_PRED_HAS_CONFIG,
     URI_TASK_TYPE_TASK,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENARIO_TMPL,

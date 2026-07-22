@@ -11,6 +11,8 @@ from rdf_utils.models.python import (
     URI_PY_PRED_MODULE_NAME,
     load_py_module_attr,
 )
+from rdf_utils.models.execution import load_attr_path
+from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_RES_PATH
 from rdf_utils.uri import NamespaceManager, try_expand_curie
 from bdd_dsl.behave import (
     PARAM_EVT,
@@ -25,10 +27,9 @@ from bdd_dsl.behave import (
     load_ws_models_from_table,
     parse_str_param,
 )
-from bdd_dsl.execution.common import load_attr_has_config, load_attr_path
+from bdd_dsl.execution.common import load_attr_has_config
 from bdd_dsl.execution.behaviour import Behaviour
 from bdd_dsl.execution.scenario import ExecutionModel
-from bdd_dsl.models.urirefs import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_RES_PATH
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
 

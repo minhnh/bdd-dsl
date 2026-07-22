@@ -9,17 +9,16 @@ from rdf_utils.models.python import (
     URI_PY_PRED_MODULE_NAME,
     load_py_module_attr,
 )
+from rdf_utils.models.execution import load_attr_path
 from rdf_utils.resolver import install_resolver
 from rdf_utils.constraints import check_shacl_constraints
 from bdd_dsl.execution.common import (
     URL_MM_EXEC_SHACL,
-    get_path_of_node,
     load_attr_has_config,
-    load_attr_path,
 )
 from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel
-from bdd_dsl.models.urirefs import URI_EXEC_TYPE_SYS_RES
+from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_SYS_RES
 from bdd_dsl.models.user_story import UserStoryLoader
 
 
@@ -70,8 +69,7 @@ class BDDExecTest(unittest.TestCase):
                 f"Object '{obj_model.id}' has type '{URI_EXEC_TYPE_SYS_RES}' but no corresponding model",
             )
             for model_id in obj_model.model_type_to_id[URI_EXEC_TYPE_SYS_RES]:
-                # assertion already in function
-                _ = get_path_of_node(graph=self.graph, node_id=model_id)
+                self.assertTrue(obj_model.models[model_id].has_attr(URI_EXEC_PRED_PATH))
 
         elif URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
             self.assertTrue(
