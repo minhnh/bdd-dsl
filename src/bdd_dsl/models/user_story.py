@@ -1,15 +1,20 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Generator, Iterable, Optional
-from rdflib import RDF, Graph, URIRef, BNode
-from rdflib.query import ResultRow
-from rdf_utils.models.common import ModelBase, get_node_types
-from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_MM
+from collections.abc import Generator, Iterable
+from typing import Any
+
 from rdf_utils.constraints import check_shacl_constraints
-from bdd_dsl.models.environment import EnvModelLoader, ObjectModel, WorkspaceModel
+from rdf_utils.models.common import ModelBase, get_node_types
+from rdf_utils.models.vocab import (
+    URI_AGN_PRED_HAS_AGN,
+    URI_ENV_PRED_HAS_OBJ,
+    URI_ENV_PRED_HAS_WS,
+)
+from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_MM
+from rdflib import RDF, BNode, Graph, URIRef
+from rdflib.query import ResultRow
+
 from bdd_dsl.models.agent import AgentModel, AgnModelLoader
-from bdd_dsl.models.time_constraint import process_time_constraint_model
 from bdd_dsl.models.clauses import (
-    load_bhv_pickplace,
     DEFAULT_FLUENT_LOADERS,
     FluentClauseLoader,
     FluentClauseLoaderProtocol,
@@ -18,38 +23,37 @@ from bdd_dsl.models.clauses import (
     WhenBehaviourModel,
     WhenBhvLoader,
     WhenBhvLoaderProtocol,
+    load_bhv_pickplace,
 )
-from bdd_dsl.models.variation import TaskVariationModel
+from bdd_dsl.models.environment import EnvModelLoader, ObjectModel, WorkspaceModel
 from bdd_dsl.models.queries import Q_USER_STORY
+from bdd_dsl.models.time_constraint import process_time_constraint_model
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_GIVEN,
+    URI_BDD_PRED_HAS_AC,
+    URI_BDD_PRED_HAS_CLAUSE,
+    URI_BDD_PRED_HAS_SCENE,
     URI_BDD_PRED_HAS_VARIATION,
+    URI_BDD_PRED_IN_SET,
+    URI_BDD_PRED_OF_SCENARIO,
+    URI_BDD_PRED_OF_TMPL,
+    URI_BDD_PRED_REF_VAR,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_WHEN,
     URI_BDD_TYPE_CONFIG,
+    URI_BDD_TYPE_EXISTS,
+    URI_BDD_TYPE_FLUENT_CLAUSE,
+    URI_BDD_TYPE_FORALL,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENE_AGN,
     URI_BDD_TYPE_SCENE_OBJ,
-    URI_BDD_PRED_HAS_SCENE,
-    URI_BDD_PRED_OF_SCENARIO,
-    URI_BDD_PRED_OF_TMPL,
-    URI_BDD_PRED_HAS_AC,
     URI_BDD_TYPE_SCENE_WS,
     URI_BDD_TYPE_US,
     URI_BDD_TYPE_WHEN_BHV,
     URI_BHV_PRED_OF_BHV,
     URI_TASK_PRED_OF_TASK,
-    URI_ENV_PRED_HAS_OBJ,
-    URI_ENV_PRED_HAS_WS,
-    URI_AGN_PRED_HAS_AGN,
-    URI_BDD_PRED_HAS_CLAUSE,
-    URI_BDD_PRED_IN_SET,
-    URI_BDD_PRED_REF_VAR,
-    URI_BDD_TYPE_EXISTS,
-    URI_BDD_TYPE_FLUENT_CLAUSE,
-    URI_BDD_TYPE_FORALL,
 )
-
+from bdd_dsl.models.variation import TaskVariationModel
 
 BDD_SHACL_URLS = {
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd.shacl.ttl": "turtle",
@@ -177,7 +181,7 @@ class SceneModel(ModelBase):
     def has_invariant_elem(self, elem_id: URIRef) -> bool:
         return elem_id in self.objects or elem_id in self.workspaces or elem_id in self.agents
 
-    def get_variable_elems_re(self, var_val: Any, var_elems: Optional[set[URIRef]] = None) -> None:
+    def get_variable_elems_re(self, var_val: Any, var_elems: set[URIRef] | None = None) -> None:
         if var_elems is None:
             var_elems = set()
 
@@ -194,10 +198,10 @@ class SceneModel(ModelBase):
 
 
 class IHasClause(ModelBase):
-    _forall_id: Optional[URIRef]
-    _when_bhv_id: Optional[URIRef]
+    _forall_id: URIRef | None
+    _when_bhv_id: URIRef | None
     _fluent_loader: FluentClauseLoader
-    _bhv_loader: Optional[WhenBhvLoader]
+    _bhv_loader: WhenBhvLoader | None
     exists_clauses: set[URIRef]
     clauses: dict[URIRef, IClause]
     _path_to_clauses: dict[URIRef, URIRef | None]
@@ -210,9 +214,9 @@ class IHasClause(ModelBase):
         node_id: URIRef,
         scenario: ScenarioModel,
         fluent_loader: FluentClauseLoader,
-        bhv_loader: Optional[WhenBhvLoader] = None,
-        graph: Optional[Graph] = None,
-        types: Optional[set[URIRef]] = None,
+        bhv_loader: WhenBhvLoader | None = None,
+        graph: Graph | None = None,
+        types: set[URIRef] | None = None,
     ) -> None:
         super().__init__(node_id=node_id, graph=graph, types=types)
         self.variables = set()
@@ -360,7 +364,7 @@ class IHasClause(ModelBase):
             elif isinstance(fc, IHasClause):
                 yield from fc.fluent_clauses()
             else:
-                raise ValueError(f"Unexpected clause type ({type(fc)}): {fc}")
+                raise TypeError(f"Unexpected clause type ({type(fc)}): {fc}")
 
     def config_clauses(self) -> Generator[FluentClauseModel, None, None]:
         for fc in self.fluent_clauses():
@@ -380,7 +384,7 @@ class ForAllModel(IHasClause, IClause):
         graph: Graph,
         fluent_loader: FluentClauseLoader,
         bhv_loader: WhenBhvLoader,
-        types: Optional[set[URIRef]] = None,
+        types: set[URIRef] | None = None,
     ) -> None:
         IHasClause.__init__(
             self,
@@ -433,7 +437,7 @@ class ThereExistsModel(IHasClause, IClause):
         scenario: ScenarioModel,
         fluent_loader: FluentClauseLoader,
         graph: Graph,
-        types: Optional[set[URIRef]] = None,
+        types: set[URIRef] | None = None,
     ) -> None:
         IHasClause.__init__(
             self,
@@ -471,17 +475,20 @@ class ScenarioVariantModel(IHasClause):
         us_graph: Graph,
         full_graph: Graph,
         var_id: URIRef,
-        fluent_loaders: dict[URIRef, FluentClauseLoaderProtocol] = DEFAULT_FLUENT_LOADERS,
-        bhv_loaders: list[WhenBhvLoaderProtocol] = [load_bhv_pickplace],
+        fluent_loaders: dict[URIRef, FluentClauseLoaderProtocol] | None = None,
+        bhv_loaders: list[WhenBhvLoaderProtocol] | None = None,
     ) -> None:
         node_val = us_graph.value(subject=var_id, predicate=URI_BDD_PRED_OF_SCENARIO)
-        assert node_val is not None and isinstance(node_val, URIRef), (
-            f"ScenarioVariant '{var_id}' does not refer to a Scenario"
-        )
+        if not isinstance(node_val, URIRef):
+            raise TypeError(f"ScenarioVariant '{var_id}' does not link to a Scenario URI")
         scenario_id = node_val
 
         scenario = ScenarioModel(scenario_id=scenario_id, graph=us_graph)
+        if fluent_loaders is None:
+            fluent_loaders = DEFAULT_FLUENT_LOADERS
         fc_loader = FluentClauseLoader(loaders=fluent_loaders)
+        if bhv_loaders is None:
+            bhv_loaders = [load_bhv_pickplace]
         bhv_loader = WhenBhvLoader(loaders=bhv_loaders)
         super().__init__(
             node_id=var_id,
@@ -551,7 +558,7 @@ class ScenarioVariantModel(IHasClause):
         return whn_bhv
 
 
-class UserStoryLoader(object):
+class UserStoryLoader:
     def __init__(self, graph: Graph, shacl_check=True, quiet=False) -> None:
         if shacl_check:
             check_shacl_constraints(graph=graph, shacl_dict=BDD_SHACL_URLS, quiet=quiet)
