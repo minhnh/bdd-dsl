@@ -1,5 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from behave import given, then, when
+
 from bdd_dsl.behave import (
     CLAUSE_BG_AGENTS,
     CLAUSE_BG_OBJECTS,
@@ -14,15 +15,14 @@ from bdd_dsl.behave import (
     CLAUSE_TC_DURING,
 )
 from bdd_dsl.execution.mockup import (
+    behaviour_mockup,
+    given_agents_mockup,
     given_objects_mockup,
     given_scene_mockup,
     given_workspaces_mockup,
-    given_agents_mockup,
     is_located_at_mockup,
     move_safe_mockup,
-    behaviour_mockup,
 )
-
 
 given(CLAUSE_BG_OBJECTS)(given_objects_mockup)
 given(CLAUSE_BG_WORKSPACES)(given_workspaces_mockup)

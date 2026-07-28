@@ -1,30 +1,33 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Iterable, Optional, Protocol
+from collections.abc import Iterable
+from typing import Any, Protocol
+
 from jinja2 import Environment, FileSystemLoader, Template
+from rdf_utils.caching import read_file_and_cache, read_url_and_cache
 from rdflib import Graph, URIRef
 from rdflib.namespace import NamespaceManager
-from rdf_utils.caching import read_file_and_cache, read_url_and_cache
+
 from bdd_dsl.models.clauses import (
     FluentClauseModel,
     WhenBehaviourModel,
 )
 from bdd_dsl.models.frames import (
     FR_AGENTS,
-    FR_OBJECTS,
-    FR_NAME,
     FR_CRITERIA,
+    FR_NAME,
+    FR_OBJECTS,
     FR_VARIATIONS,
     FR_WS,
 )
 from bdd_dsl.models.urirefs import (
-    URI_BDD_TYPE_CONFIG,
-    URI_BDD_TYPE_MOVE_SAFE,
-    URI_BDD_TYPE_SORTED,
     URI_BDD_PRED_REF_AGN,
     URI_BDD_PRED_REF_OBJ,
     URI_BDD_PRED_REF_WS,
+    URI_BDD_TYPE_CONFIG,
     URI_BDD_TYPE_IS_HELD,
     URI_BDD_TYPE_LOCATED_AT,
+    URI_BDD_TYPE_MOVE_SAFE,
+    URI_BDD_TYPE_SORTED,
     URI_BDD_TYPE_STR_TMPL,
     URI_TIME_TYPE_AFTER_EVT,
     URI_TIME_TYPE_BEFORE_EVT,
@@ -200,7 +203,7 @@ def get_bhv_str_pickplace(
     return tmpl.render(var_values=var_values, ns_manager=ns_manager)
 
 
-class GherkinClauseStrGen(object):
+class GherkinClauseStrGen:
     _tc_str_gens: dict[URIRef, ModelToStrProtocol]
     _fc_str_gens: dict[URIRef, FluentClauseToStringProtocol]
     _wb_str_gens: list[WhenBhvToStringProtocol]
@@ -279,15 +282,15 @@ def get_gherkin_clauses_re(
             exists_set = var_values[exists_model.in_set]
             if isinstance(exists_set, str):
                 # will also raise for URIRef
-                raise ValueError(
+                raise TypeError(
                     f"ThereExists '{exists_model.id}': expected a set of value, got ({type(exists_set)}): {exists_set}"
                 )
             elif not isinstance(exists_set, Iterable):
-                raise ValueError(
+                raise TypeError(
                     f"ThereExists '{exists_model.id}': value 'in-set' not an Iterable: {exists_set}"
                 )
         else:
-            raise RuntimeError(
+            raise TypeError(
                 f"ThereExists '{exists_model.id}': unhandled type for 'in-set': {exists_model.in_set}"
             )
         exists_str_set = []
@@ -340,7 +343,7 @@ def get_gherkin_clauses_re(
                     f"ForAll '{w_clause.id}': value 'in-set' not an Iterable: {forall_set}"
                 )
             else:
-                raise RuntimeError(
+                raise TypeError(
                     f"ForAll '{w_clause.id}': unhandled type for 'in-set': {w_clause.in_set}"
                 )
 
@@ -448,12 +451,14 @@ def prepare_scenario_variant_data(
 def prepare_jinja2_template_data(
     us_loader: UserStoryLoader,
     full_graph: Graph,
-    ns_manager: Optional[NamespaceManager] = None,
+    ns_manager: NamespaceManager | None = None,
     tc_str_gens: dict[URIRef, ModelToStrProtocol] = DEFAULT_TIME_CSTR_STR_GENS,
     fc_str_gens: dict[URIRef, FluentClauseToStringProtocol] = DEFAULT_FLUENT_CLAUSE_STR_GENS,
-    wb_str_gens: list[WhenBhvToStringProtocol] = [get_bhv_str_pickplace],
+    wb_str_gens: list[WhenBhvToStringProtocol] | None = None,
 ) -> list[dict]:
     """TODO(minhnh): specify which template"""
+    if wb_str_gens is None:
+        wb_str_gens = [get_bhv_str_pickplace]
     if ns_manager is None:
         ns_manager = full_graph.namespace_manager
 

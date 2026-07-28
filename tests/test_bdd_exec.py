@@ -1,26 +1,27 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import unittest
 from urllib.request import HTTPError
-from rdflib import Dataset
-from rdf_utils.namespace import URL_SECORO_M, URL_MM_PYTHON_SHACL
+
+from rdf_utils.constraints import check_shacl_constraints
+from rdf_utils.models.execution import load_attr_path
 from rdf_utils.models.python import (
-    URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,
+    URI_PY_TYPE_MODULE_ATTR,
     load_py_module_attr,
 )
-from rdf_utils.models.execution import load_attr_path
+from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_SYS_RES
+from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_M
 from rdf_utils.resolver import install_resolver
-from rdf_utils.constraints import check_shacl_constraints
+from rdflib import Dataset
+
 from bdd_dsl.execution.common import (
     URL_MM_EXEC_SHACL,
     load_attr_has_config,
 )
 from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel
-from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_SYS_RES
 from bdd_dsl.models.user_story import UserStoryLoader
-
 
 SPEC_MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/environments/secorolab.env.json": "json-ld",

@@ -1,14 +1,17 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from __future__ import annotations
+
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Any, Generator, Optional, Protocol
-from trinary import Trinary, Unknown
-from rdflib import Graph, URIRef
+from typing import Any, Protocol
+
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase
+from rdflib import Graph, URIRef
+from trinary import Trinary, Unknown
+
 from bdd_dsl.execution.scenario import ScenarioExecutionModel
-from bdd_dsl.models.time_constraint import get_duration
-from bdd_dsl.models.user_story import ScenarioVariantModel
 from bdd_dsl.models.clauses import FluentClauseModel
+from bdd_dsl.models.time_constraint import get_duration
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_CLAUSE,
     URI_OBS_TYPE_POLICY,
@@ -19,6 +22,7 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
+from bdd_dsl.models.user_story import ScenarioVariantModel
 
 
 @dataclass
@@ -47,15 +51,15 @@ def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Tr
 class ObsPolicyModel(ModelBase):
     trinary_timeline: list[TrinaryStamped]
 
-    start_time: Optional[float]
-    end_time: Optional[float]
+    start_time: float | None
+    end_time: float | None
 
     fluent_id: URIRef
     fluent_types: set[URIRef]
     duration_type: URIRef
-    start_event: Optional[URIRef]
-    end_event: Optional[URIRef]
-    horizon: Optional[float]
+    start_event: URIRef | None
+    end_event: URIRef | None
+    horizon: float | None
 
     def __init__(
         self,
@@ -64,9 +68,9 @@ class ObsPolicyModel(ModelBase):
         fluent_id: URIRef,
         fluent_types: set[URIRef],
         duration_type: URIRef,
-        start_event: Optional[URIRef],
-        end_event: Optional[URIRef],
-        horizon: Optional[float],
+        start_event: URIRef | None,
+        end_event: URIRef | None,
+        horizon: float | None,
     ) -> None:
         super().__init__(node_id=node_id, graph=graph)
         if URI_OBS_TYPE_POLICY not in self.types:
@@ -234,7 +238,7 @@ class ObsPolicyModel(ModelBase):
 
         for obs_pol_id in graph.subjects(predicate=URI_BDD_PRED_OF_CLAUSE, object=fc.id):
             if not isinstance(obs_pol_id, URIRef):
-                raise ValueError(
+                raise TypeError(
                     f"Fluent '{fc.id}' is not linked via 'of-clause' to a ObservationPolicy URI: {obs_pol_id}"
                 )
 
@@ -250,12 +254,12 @@ class ObsPolicyModel(ModelBase):
             )
 
 
-class ObservationManager(object):
+class ObservationManager:
     scenario_exec: ScenarioExecutionModel
-    scr_start_time: Optional[float]
-    scr_end_time: Optional[float]
+    scr_start_time: float | None
+    scr_end_time: float | None
 
-    bhv_result: Optional[TrinaryStamped]
+    bhv_result: TrinaryStamped | None
 
     obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> ObsPolicyModel
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs

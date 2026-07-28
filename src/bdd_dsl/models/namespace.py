@@ -1,12 +1,13 @@
-from rdflib import Namespace, Graph
-from rdf_utils.namespace import NS_MM_GEOM, NS_MM_GEOM_REL, NS_MM_GEOM_COORD, NS_MM_ENV
+from rdf_utils.namespace import NS_MM_ENV, NS_MM_GEOM, NS_MM_GEOM_COORD, NS_MM_GEOM_REL
+from rdflib import Graph, Namespace
+
 from bdd_dsl.models.uri import (
     URI_MM_BDD,
     URI_MM_BHV,
-    URI_MM_SIM,
     URI_MM_OBS,
-    URI_MM_TASK,
     URI_MM_ROS,
+    URI_MM_SIM,
+    URI_MM_TASK,
 )
 
 # Namespaces

@@ -1,16 +1,18 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from enum import Enum
-from typing import Any, Generator, Union
 from ast import literal_eval
+from collections.abc import Generator
+from enum import Enum
+from typing import Any
+
 from behave.model import Table
-from rdflib import Graph
-from rdflib.term import Node as RDFNode
-from rdflib.namespace import NamespaceManager
 from rdf_utils.uri import try_parse_n3_iterable, try_parse_n3_string
+from rdflib import Graph
+from rdflib.namespace import NamespaceManager
+from rdflib.term import Node as RDFNode
+
 from bdd_dsl.models.agent import AgentModel
 from bdd_dsl.models.environment import ObjectModel, WorkspaceModel
 from bdd_dsl.models.user_story import SceneModel
-
 
 PARAM_OBJ = "obj_str"
 PARAM_WS = "ws_str"
@@ -90,7 +92,7 @@ class ParamType(Enum):
 
 def parse_str_param(
     param_str: str, ns_manager: NamespaceManager
-) -> tuple[ParamType, list[Union[RDFNode, str]]]:
+) -> tuple[ParamType, list[RDFNode | str]]:
     # ThereExists string representation: 'any of [set items]'
     if param_str.startswith("any of "):
         list_str = param_str.split("any of ")[1]
@@ -99,9 +101,9 @@ def parse_str_param(
         except SyntaxError as e:
             raise RuntimeError(f"unable to parse '{list_str}': {e}")
 
-        assert isinstance(
-            n3_str_list, list
-        ), f"can't parse as a list (type={type(n3_str_list)}): {list_str}"
+        assert isinstance(n3_str_list, list), (
+            f"can't parse as a list (type={type(n3_str_list)}): {list_str}"
+        )
 
         n3_term_list = try_parse_n3_iterable(
             n3_str_iterable=n3_str_list, ns_manager=ns_manager, quiet=False
@@ -116,9 +118,9 @@ def parse_str_param(
         except SyntaxError as e:
             raise RuntimeError(f"unable to parse '{param_str}': {e}")
 
-        assert isinstance(
-            n3_str_list, list
-        ), f"can't parse as a list (type={type(n3_str_list)}): {param_str}"
+        assert isinstance(n3_str_list, list), (
+            f"can't parse as a list (type={type(n3_str_list)}): {param_str}"
+        )
 
         n3_term_list = try_parse_n3_iterable(
             n3_str_iterable=n3_str_list, ns_manager=ns_manager, quiet=False

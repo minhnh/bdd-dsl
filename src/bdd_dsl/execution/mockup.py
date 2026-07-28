@@ -1,34 +1,36 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from time import sleep
-from typing import Any, Optional
-from behave.runner import Context
+from typing import Any
+
 from behave.model import Scenario
-from rdflib import Graph
+from behave.runner import Context
 from rdf_utils.models.common import ModelLoader, URIRef
+from rdf_utils.models.execution import load_attr_path
 from rdf_utils.models.python import (
-    URI_PY_TYPE_MODULE_ATTR,
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,
+    URI_PY_TYPE_MODULE_ATTR,
     load_py_module_attr,
 )
-from rdf_utils.models.execution import load_attr_path
 from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_RES_PATH
 from rdf_utils.uri import NamespaceManager, try_expand_curie
+from rdflib import Graph
+
 from bdd_dsl.behave import (
+    PARAM_AGN,
     PARAM_EVT,
     PARAM_FROM_EVT,
-    PARAM_UNTIL_EVT,
-    PARAM_AGN,
     PARAM_OBJ,
+    PARAM_UNTIL_EVT,
     PARAM_WS,
-    load_obj_models_from_table,
     load_agn_models_from_table,
+    load_obj_models_from_table,
     load_str_params,
     load_ws_models_from_table,
     parse_str_param,
 )
-from bdd_dsl.execution.common import load_attr_has_config
 from bdd_dsl.execution.behaviour import Behaviour
+from bdd_dsl.execution.common import load_attr_has_config
 from bdd_dsl.execution.scenario import ExecutionModel
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
@@ -220,9 +222,9 @@ def move_safe_mockup(context: Context, **kwargs: Any):
 
 
 class PickplaceBehaviourMockup(Behaviour):
-    agn_ids: Optional[list[URIRef]]
-    obj_ids: Optional[list[URIRef]]
-    place_ws_ids: Optional[list[URIRef]]
+    agn_ids: list[URIRef] | None
+    obj_ids: list[URIRef] | None
+    place_ws_ids: list[URIRef] | None
 
     def __init__(
         self,

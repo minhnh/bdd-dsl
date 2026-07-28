@@ -1,15 +1,14 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from abc import abstractmethod, ABC
-from typing import List
+from abc import ABC, abstractmethod
 
 
 class EventHandler(ABC):
-    def __init__(self, id: str, events: List[str]) -> None:
+    def __init__(self, id: str, events: list[str]) -> None:
         self.id = id
         self._events = events
 
     @property
-    def event_names(self) -> List[str]:
+    def event_names(self) -> list[str]:
         return self._events
 
     @abstractmethod
@@ -26,7 +25,7 @@ class EventHandler(ABC):
 
 
 class SimpleEventLoop(EventHandler):
-    def __init__(self, id: str, events: List[str]) -> None:
+    def __init__(self, id: str, events: list[str]) -> None:
         super().__init__(id, events)
         self._current_events = {}
         self._future_events = {}

@@ -1,8 +1,10 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import abc
-from bdd_dsl.events.event_handler import EventHandler
+
 from py_trees.behaviour import Behaviour as PTBehaviour
 from py_trees.common import Status as PTStatus
+
+from bdd_dsl.events.event_handler import EventHandler
 
 
 class ActionWithEvents(PTBehaviour, metaclass=abc.ABCMeta):

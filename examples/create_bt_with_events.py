@@ -1,17 +1,17 @@
-from os.path import join, dirname
+from os.path import dirname, join
+
+from bdd_dsl.behaviours.robosuite import SimulatedScenario
+from bdd_dsl.events.zmq import ZmqEventClient
 
 # import py_trees as pt
 # from pprint import pprint
 from bdd_dsl.utils.json import (
-    load_metamodels,
     create_bt_from_graph,
     create_event_handler_from_data,
-    get_bt_event_data_from_graph,
     create_subtree_behaviours,
+    get_bt_event_data_from_graph,
+    load_metamodels,
 )
-from bdd_dsl.behaviours.robosuite import SimulatedScenario
-from bdd_dsl.events.zmq import ZmqEventClient
-
 
 PKG_ROOT = join(dirname(__file__), "..")
 MODELS_PATH = join(PKG_ROOT, "models")

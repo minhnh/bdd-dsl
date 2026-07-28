@@ -1,9 +1,12 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Optional, Protocol
-from rdflib import BNode, Literal, URIRef, Graph
-from rdf_utils.models.common import ModelBase
+from typing import Protocol
+
 from rdf_utils.collection import load_list_re
+from rdf_utils.models.common import ModelBase
+from rdflib import BNode, Graph, Literal, URIRef
+
 from bdd_dsl.exception import BDDConstraintViolation
+from bdd_dsl.models.time_constraint import process_time_constraint_model
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_ARG_NAMES,
     URI_BDD_PRED_ARG_VARS,
@@ -29,10 +32,9 @@ from bdd_dsl.models.urirefs import (
     URI_BHV_TYPE_PLACE,
     URI_TIME_TYPE_TC,
 )
-from bdd_dsl.models.time_constraint import process_time_constraint_model
 
 
-class IClause(object):
+class IClause:
     clause_of: URIRef
 
     def __init__(self, node_id: URIRef, graph: Graph) -> None:
@@ -47,7 +49,7 @@ class FluentClauseModel(ModelBase, IClause):
     variable_by_role: dict[URIRef, list[URIRef]]  # map role URI -> ScenarioVariable URIs
     variables: set[URIRef]
 
-    def __init__(self, graph: Graph, clause_id: URIRef, types: Optional[set[URIRef]]) -> None:
+    def __init__(self, graph: Graph, clause_id: URIRef, types: set[URIRef] | None) -> None:
         ModelBase.__init__(self, graph=graph, node_id=clause_id, types=types)
         IClause.__init__(self, node_id=clause_id, graph=graph)
 
@@ -92,24 +94,19 @@ def load_located_at_info(graph: Graph, clause: FluentClauseModel) -> None:
             f" does not refer to exactly 1 workspace: {clause.variable_by_role[URI_BDD_PRED_REF_WS]}"
         )
 
-    return
-
 
 def load_held_by_info(graph: Graph, clause: FluentClauseModel) -> None:
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_OBJ)
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_AGN)
-    return
 
 
 def load_move_safe_info(graph: Graph, clause: FluentClauseModel) -> None:
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_AGN)
-    return
 
 
 def load_sorted_info(graph: Graph, clause: FluentClauseModel) -> None:
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_OBJ)
     clause.add_variables_by_role(graph=graph, role_pred=URI_BDD_PRED_REF_WS)
-    return
 
 
 def load_has_config_info(graph: Graph, clause: FluentClauseModel) -> None:
@@ -126,7 +123,6 @@ def load_has_config_info(graph: Graph, clause: FluentClauseModel) -> None:
         f"HasConfig Pred '{clause.id}' missing 'config-name' pred to Literal: {cfg_name}"
     )
     clause.set_attr(key=URI_BDD_PRED_CFG_NAME, val=cfg_name.toPython())
-    return
 
 
 def get_clause_config(clause: FluentClauseModel) -> tuple[URIRef, str, URIRef]:
@@ -176,7 +172,7 @@ DEFAULT_FLUENT_LOADERS = {
 }
 
 
-class FluentClauseLoader(object):
+class FluentClauseLoader:
     _loaders: dict[URIRef, FluentClauseLoaderProtocol]
 
     def __init__(self, loaders: dict[URIRef, FluentClauseLoaderProtocol]) -> None:
@@ -247,7 +243,7 @@ def load_bhv_pickplace(graph: Graph, when_bhv: WhenBehaviourModel) -> None:
         when_bhv.set_attr(key=URI_BHV_PRED_TARGET_WS, val=target_ws_id)
 
 
-class WhenBhvLoader(object):
+class WhenBhvLoader:
     _loaders: list[WhenBhvLoaderProtocol]
 
     def __init__(self, loaders: list[WhenBhvLoaderProtocol]) -> None:

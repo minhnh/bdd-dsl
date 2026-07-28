@@ -1,13 +1,15 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from typing import Any
+
 from behave.runner import Context
-from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
-from rdflib import Graph, URIRef
 from rdf_utils.caching import read_url_and_cache
+from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     import_attr_from_model,
 )
+from rdflib import Graph, URIRef
+
 from bdd_dsl.execution.behaviour import Behaviour, BehaviourImplModel
 from bdd_dsl.execution.common import URL_Q_SCENARIO_EXEC
 from bdd_dsl.models.time_constraint import get_duration
@@ -70,7 +72,7 @@ class ScenarioExecutionModel(ModelBase):
         # Behaviour Implementation model
         bhv_impl_id = graph.value(subject=self.id, predicate=URI_BDD_PRED_HAS_BHV_IMPL, any=False)
         if not isinstance(bhv_impl_id, URIRef):
-            raise ValueError(
+            raise TypeError(
                 f"ScenarioExecution '{self.id}' doesn't link to a BehaviourImplementation URI: {bhv_impl_id}"
             )
         self.bhv_impl = BehaviourImplModel(graph=graph, bhv_impl_id=bhv_impl_id)
@@ -81,13 +83,13 @@ class ScenarioExecutionModel(ModelBase):
         self.obs_policy_uris = set()
         for obs_pol_id in graph.objects(subject=self.id, predicate=URI_OBS_PRED_POLICY):
             if not isinstance(obs_pol_id, URIRef):
-                raise ValueError(
+                raise TypeError(
                     f"ScenarioExecution {self.id} doesn't link to an ObservationPolicy URI: {obs_pol_id}"
                 )
             self.obs_policy_uris.add(obs_pol_id)
 
 
-class ExecutionModel(object):
+class ExecutionModel:
     _bhv_impl_by_scr_var: dict[URIRef, BehaviourImplModel]
     _scr_exec_by_scr_var: dict[URIRef, ModelBase]
     _scr_exec_graph: Graph

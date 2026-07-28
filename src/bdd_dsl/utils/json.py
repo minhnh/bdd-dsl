@@ -1,36 +1,37 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from importlib import import_module
-from typing import List, Optional, Tuple, Type
-from socket import _GLOBAL_DEFAULT_TIMEOUT
 import json
-from pyld import jsonld
+from importlib import import_module
+from socket import _GLOBAL_DEFAULT_TIMEOUT
+
 import py_trees as pt
 import rdflib
+from pyld import jsonld
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
+
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler, SimpleEventLoop
-from bdd_dsl.models.queries import (
-    EVENT_LOOP_QUERY,
-    BEHAVIOUR_TREE_QUERY,
-    Q_BT_SEQUENCE,
-    Q_BT_PARALLEL,
-)
 from bdd_dsl.models.frames import (
-    EVENT_LOOP_FRAME,
     BEHAVIOUR_TREE_FRAME,
-    FR_NAME,
-    FR_DATA,
-    FR_EVENTS,
-    FR_SUBTREE,
-    FR_TYPE,
+    EVENT_LOOP_FRAME,
     FR_CHILDREN,
-    FR_START_E,
+    FR_DATA,
+    FR_EL,
     FR_END_E,
-    FR_IMPL_MODULE,
-    FR_IMPL_CLASS,
+    FR_EVENTS,
     FR_IMPL_ARG_NAMES,
     FR_IMPL_ARG_VALS,
-    FR_EL,
+    FR_IMPL_CLASS,
+    FR_IMPL_MODULE,
+    FR_NAME,
+    FR_START_E,
+    FR_SUBTREE,
+    FR_TYPE,
+)
+from bdd_dsl.models.queries import (
+    BEHAVIOUR_TREE_QUERY,
+    EVENT_LOOP_QUERY,
+    Q_BT_PARALLEL,
+    Q_BT_SEQUENCE,
 )
 
 
@@ -81,12 +82,12 @@ def get_type_set(data: dict) -> set:
         for t in data_types:
             data_types_set.add(t)
     else:
-        raise RuntimeError(f"unexpected type for '{FR_TYPE}' field: {type(data[FR_TYPE])}")
+        raise TypeError(f"unexpected type for '{FR_TYPE}' field: {type(data[FR_TYPE])}")
     return data_types_set
 
 
 def create_event_handler_from_data(
-    el_data: dict, e_handler_cls: Type[EventHandler], e_handler_kwargs: dict
+    el_data: dict, e_handler_cls: type[EventHandler], e_handler_kwargs: dict
 ) -> EventHandler:
     """Create an event handler object from framed, dictionary-like data.
 
@@ -97,7 +98,7 @@ def create_event_handler_from_data(
 
 
 def create_event_handler_from_graph(
-    graph: rdflib.Graph, e_handler_cls: Type[EventHandler], e_handler_kwargs: dict
+    graph: rdflib.Graph, e_handler_cls: type[EventHandler], e_handler_kwargs: dict
 ) -> list:
     model = query_graph(graph, EVENT_LOOP_QUERY)
     framed_model = jsonld.frame(model, EVENT_LOOP_FRAME)
@@ -129,7 +130,7 @@ def load_python_event_action(node_data: dict, event_handler: EventHandler):
 
     action_cls = getattr(import_module(node_data[FR_IMPL_MODULE]), node_data[FR_IMPL_CLASS])
     if not issubclass(action_cls, ActionWithEvents):
-        raise ValueError(
+        raise TypeError(
             f"'{action_cls.__name__}' is not a subclass of '{ActionWithEvents.__name__}'"
         )
 
@@ -137,9 +138,9 @@ def load_python_event_action(node_data: dict, event_handler: EventHandler):
     if FR_IMPL_ARG_NAMES in node_data and FR_IMPL_ARG_VALS in node_data:
         kwarg_names = node_data[FR_IMPL_ARG_NAMES]
         kwarg_vals = node_data[FR_IMPL_ARG_VALS]
-        if not isinstance(kwarg_names, List):
+        if not isinstance(kwarg_names, list):
             kwarg_names = [kwarg_names]
-        if not isinstance(kwarg_vals, List):
+        if not isinstance(kwarg_vals, list):
             kwarg_vals = [kwarg_vals]
 
         if len(kwarg_names) != len(kwarg_vals):
@@ -183,14 +184,14 @@ def create_subtree_behaviours(
 
 
 def get_bt_event_data_from_graph(
-    graph: rdflib.Graph, bt_root_name: Optional[str] = None
-) -> List[tuple]:
+    graph: rdflib.Graph, bt_root_name: str | None = None
+) -> list[tuple]:
     bt_model = query_graph(graph, BEHAVIOUR_TREE_QUERY)
     bt_model_framed = jsonld.frame(bt_model, BEHAVIOUR_TREE_FRAME)
 
-    assert isinstance(
-        bt_model_framed, dict
-    ), f"unexpected type for framed model: {type(bt_model_framed)}"
+    assert isinstance(bt_model_framed, dict), (
+        f"unexpected type for framed model: {type(bt_model_framed)}"
+    )
 
     if FR_DATA not in bt_model_framed:
         if bt_root_name is not None and bt_model_framed[FR_NAME] != bt_root_name:
@@ -211,9 +212,11 @@ def get_bt_event_data_from_graph(
 def create_bt_from_graph(
     graph: rdflib.Graph,
     bt_name: str,
-    e_handler_cls: Type[EventHandler] = SimpleEventLoop,
-    e_handler_kwargs: dict = {},
-) -> List[Tuple]:
+    e_handler_cls: type[EventHandler] = SimpleEventLoop,
+    e_handler_kwargs: dict | None = None,
+) -> list[tuple]:
+    if e_handler_kwargs is None:
+        e_handler_kwargs = {}
     e_data_and_bts = get_bt_event_data_from_graph(graph, bt_name)
 
     # multiple BT roots
