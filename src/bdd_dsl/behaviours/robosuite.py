@@ -1,15 +1,17 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import time
+
 import numpy as np
-import robosuite as rs
 import py_trees as pt
+import robosuite as rs
+
 from bdd_dsl.behaviours.actions import ActionWithEvents
 from bdd_dsl.events.event_handler import EventHandler
 
 # from pprint import pprint
 
 
-class SimulatedScenario(object):
+class SimulatedScenario:
     def __init__(
         self,
         event_handler: EventHandler,
@@ -65,7 +67,7 @@ class SimulatedScenario(object):
         try:
             # actions = np.random.randn(self.env.robots[0].dof)  # sample random action
             actions = self.blackboard.actions
-            obs, reward, done, info = self.env.step(actions)  # take action in the environment
+            obs, _reward, done, _info = self.env.step(actions)  # take action in the environment
             # pprint(obs)
             self.blackboard.measurements = obs
         except KeyError:

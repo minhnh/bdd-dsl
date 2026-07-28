@@ -1,14 +1,15 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from os.path import join, dirname
 import unittest
+from os.path import dirname, join
+
 import rdflib
 from py_trees.trees import BehaviourTree
+
 from bdd_dsl.events.event_handler import SimpleEventLoop
 from bdd_dsl.utils.json import (
-    create_event_handler_from_graph,
     create_bt_from_graph,
+    create_event_handler_from_graph,
 )
-
 
 PKG_ROOT = join(dirname(__file__), "..")
 META_MODELs_PATH = join(PKG_ROOT, "metamodels")

@@ -1,18 +1,22 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-import time
-import multiprocessing
 import logging
+import multiprocessing
+import time
+
 from behave import fixture
 from behave.runner import Context
-from bdd_dsl.events.zmq import ZmqEventServer, ZmqEventClient
-from bdd_dsl.exception import GracefulExit
+
 from bdd_dsl.behaviours.robosuite import SimulatedScenario
+from bdd_dsl.events.zmq import ZmqEventClient, ZmqEventServer
+from bdd_dsl.exception import GracefulExit
+from bdd_dsl.models.frames import FR_EVENTS, FR_NAME
 from bdd_dsl.utils.json import create_event_handler_from_data, create_subtree_behaviours
-from bdd_dsl.models.frames import FR_NAME, FR_EVENTS
+
+logger = logging.getLogger(__name__)
 
 
 def zmq_event_server_process(**kwargs):
-    event_names = kwargs.get("event_names", list())
+    event_names = kwargs.get("event_names", [])
     if not event_names:
         raise ValueError("'event_names' not specified or empty list of events")
     hostname = kwargs.get("hostname", "*")
@@ -25,7 +29,7 @@ def zmq_event_server_process(**kwargs):
             server.handle_request()
             time.sleep(sleep_time)
         except GracefulExit as e:
-            logging.info(f"zmq_event_server_process: terminating with signum '{e.signum}'")
+            logger.info(f"zmq_event_server_process: terminating with signum '{e.signum}'")
             break
 
 
@@ -39,7 +43,7 @@ def setup_event_server(context: Context, *args, **kwargs):
         event_server_process.start()
         context.add_cleanup(event_server_process.terminate)
     except GracefulExit as e:
-        logging.info(f"setup_event_server: terminating with signum '{e.signum}'")
+        logger.info(f"setup_event_server: terminating with signum '{e.signum}'")
 
 
 def sim_execution_process(**kwargs):
@@ -67,7 +71,7 @@ def sim_execution_process(**kwargs):
             done = pickup_scenario.step()
         except GracefulExit as e:
             pickup_scenario.interrupt()
-            logging.info(f"sim_execution_process: terminating with signum '{e.signum}'")
+            logger.info(f"sim_execution_process: terminating with signum '{e.signum}'")
             break
 
 
@@ -80,4 +84,4 @@ def setup_sim(context: Context, *args, **kwargs):
         sim_process.start()
         context.add_cleanup(sim_process.terminate)
     except GracefulExit as e:
-        logging.info(f"setup_event_server: terminating with signum '{e.signum}'")
+        logger.info(f"setup_event_server: terminating with signum '{e.signum}'")

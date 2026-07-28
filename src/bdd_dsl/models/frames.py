@@ -1,28 +1,28 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from bdd_dsl.models.uri import (
-    URI_TRANS,
-    URI_MM_EVENT,
-    URI_MM_BT,
-    URI_M_CRDN,
-)
 from bdd_dsl.models.namespace import (
     PREFIX_TRANS,
 )
 from bdd_dsl.models.queries import (
-    Q_HAS_EVENT,
-    Q_HAS_ROOT,
-    Q_HAS_EL_CONN,
     Q_HAS_CHILD,
-    Q_HAS_PARENT,
-    Q_HAS_START_E,
+    Q_HAS_EL_CONN,
     Q_HAS_END_E,
-    Q_IMPL_MODULE,
-    Q_IMPL_CLASS,
+    Q_HAS_EVENT,
+    Q_HAS_PARENT,
+    Q_HAS_ROOT,
+    Q_HAS_START_E,
+    Q_HAS_SUBTREE,
     Q_IMPL_ARG_NAME,
     Q_IMPL_ARG_VALUE,
-    Q_PREFIX_EVENT,
+    Q_IMPL_CLASS,
+    Q_IMPL_MODULE,
     Q_PREFIX_BT,
-    Q_HAS_SUBTREE,
+    Q_PREFIX_EVENT,
+)
+from bdd_dsl.models.uri import (
+    URI_M_CRDN,
+    URI_MM_BT,
+    URI_MM_EVENT,
+    URI_TRANS,
 )
 
 FR_NAME = "name"

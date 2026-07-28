@@ -3,13 +3,14 @@ import sys
 import time
 from json import JSONDecodeError
 from urllib.error import HTTPError
+
 from behave.model import Step
 from behave.runner import Context
-from rdflib import Dataset
-from rdf_utils.uri import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
-from bdd_dsl.execution.mockup import before_all_mockup, before_scenario
+from rdf_utils.uri import URL_SECORO_M
+from rdflib import Dataset
 
+from bdd_dsl.execution.mockup import before_all_mockup, before_scenario
 
 MODELS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/agents/isaac-sim.agn.json": "json-ld",

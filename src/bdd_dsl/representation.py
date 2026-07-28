@@ -1,6 +1,8 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from collections.abc import Iterable
 from numbers import Number
-from typing import Any, Iterable, Optional, Protocol
+from typing import Any, Protocol
+
 from rdf_utils.models.common import ModelBase
 from rdflib import URIRef
 from rdflib.namespace import NamespaceManager
@@ -44,7 +46,7 @@ def get_clause_role_rep(scenario: ScenarioModel, clause: IClause) -> str:
     raise ValueError(f"Role '{clause.clause_of}' is not Given/When/Then of '{scenario.id}'")
 
 
-def var_val_to_str(var_val: Any, ns_manager: Optional[NamespaceManager] = None) -> str:
+def var_val_to_str(var_val: Any, ns_manager: NamespaceManager | None = None) -> str:
     if isinstance(var_val, URIRef):
         return var_val.n3(namespace_manager=ns_manager)
 
@@ -69,7 +71,7 @@ def get_model_rep(
     model: ModelBase,
     tmpl_str: str,
     attr_mappings: dict[URIRef, str],
-    ns_manager: Optional[NamespaceManager] = None,
+    ns_manager: NamespaceManager | None = None,
 ) -> str:
     subs = {}
     for attr_uri, sub_key in attr_mappings.items():
@@ -92,13 +94,13 @@ class ModelToStrProtocol(Protocol):
     """
 
     def __call__(
-        self, model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
-    ) -> Optional[str]: ...
+        self, model: ModelBase, ns_manager: NamespaceManager | None, **kwargs: Any
+    ) -> str | None: ...
 
 
 def get_str_tc_before_event(
-    model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
-) -> Optional[str]:
+    model: ModelBase, ns_manager: NamespaceManager | None, **kwargs: Any
+) -> str | None:
     if URI_TIME_TYPE_BEFORE_EVT not in model.types:
         return None
 
@@ -111,8 +113,8 @@ def get_str_tc_before_event(
 
 
 def get_str_tc_after_event(
-    model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
-) -> Optional[str]:
+    model: ModelBase, ns_manager: NamespaceManager | None, **kwargs: Any
+) -> str | None:
     if URI_TIME_TYPE_AFTER_EVT not in model.types:
         return None
 
@@ -125,8 +127,8 @@ def get_str_tc_after_event(
 
 
 def get_str_tc_during_events(
-    model: ModelBase, ns_manager: Optional[NamespaceManager], **kwargs: Any
-) -> Optional[str]:
+    model: ModelBase, ns_manager: NamespaceManager | None, **kwargs: Any
+) -> str | None:
     if URI_TIME_TYPE_DURING not in model.types:
         return None
 
@@ -156,7 +158,7 @@ class VariableStrTemplate:
             raise ValueError(f"VariableStrTemplate: invalid mappings for '{self.tmpl_str}': {e}")
 
     def render(
-        self, var_values: dict[URIRef, Any], ns_manager: Optional[NamespaceManager] = None
+        self, var_values: dict[URIRef, Any], ns_manager: NamespaceManager | None = None
     ) -> str:
         subs = {}
         for uri, uri_map in self.var_map.items():
@@ -174,7 +176,7 @@ class VarTmplCreatorProtocol(Protocol):
     Should return None if model is invalid, e.g., wrong types.
     """
 
-    def __call__(self, model: ModelBase, **kwargs: Any) -> Optional[VariableStrTemplate]: ...
+    def __call__(self, model: ModelBase, **kwargs: Any) -> VariableStrTemplate | None: ...
 
 
 class ClauseRepBuilder:
@@ -196,7 +198,7 @@ class ClauseRepBuilder:
         role: str,
         clause: FluentClauseModel,
         val_dict: dict[URIRef, Any],
-        ns_manager: Optional[NamespaceManager],
+        ns_manager: NamespaceManager | None,
     ) -> str:
         clause_rep = self._render_var_clause(
             clause=clause, val_dict=val_dict, ns_manager=ns_manager
@@ -208,7 +210,7 @@ class ClauseRepBuilder:
         self,
         clause: WhenBehaviourModel,
         val_dict: dict[URIRef, Any],
-        ns_manager: Optional[NamespaceManager],
+        ns_manager: NamespaceManager | None,
     ) -> str:
         clause_rep = self._render_var_clause(
             clause=clause, val_dict=val_dict, ns_manager=ns_manager
@@ -219,7 +221,7 @@ class ClauseRepBuilder:
         self,
         clause: FluentClauseModel | WhenBehaviourModel,
         val_dict: dict[URIRef, Any],
-        ns_manager: Optional[NamespaceManager],
+        ns_manager: NamespaceManager | None,
     ) -> str:
         if clause.id not in self._clause_templates:
             for tmpl_crtr in self._clause_tmpl_creators:
@@ -239,7 +241,7 @@ class ClauseRepBuilder:
     def _render_tc(
         self,
         clause: FluentClauseModel | WhenBehaviourModel,
-        ns_manager: Optional[NamespaceManager],
+        ns_manager: NamespaceManager | None,
     ) -> str:
 
         # Render time constraint
@@ -264,7 +266,7 @@ class ScenarioVariantRep:
         scr_var: ScenarioVariantModel,
         clause_rep_builder: ClauseRepBuilder,
         val_dict: dict[URIRef, Any],
-        ns_manager: Optional[NamespaceManager] = None,
+        ns_manager: NamespaceManager | None = None,
     ) -> None:
         self.variant_rep = scr_var.id.n3(ns_manager)
         self.bhv_rep = clause_rep_builder.render_when_bhv_clause(
@@ -293,7 +295,7 @@ class ScenarioVariantRep:
         return self._clause_reps[clause_id]
 
 
-def get_tmpl_bhv_pickplace(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+def get_tmpl_bhv_pickplace(model: ModelBase, **kwargs) -> VariableStrTemplate | None:
     if not isinstance(model, WhenBehaviourModel):
         return None
 
@@ -348,7 +350,7 @@ def get_tmpl_bhv_pickplace(model: ModelBase, **kwargs) -> Optional[VariableStrTe
     )
 
 
-def get_tmpl_fc_located_at(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+def get_tmpl_fc_located_at(model: ModelBase, **kwargs) -> VariableStrTemplate | None:
     if not isinstance(model, FluentClauseModel):
         return None
 
@@ -377,7 +379,7 @@ def get_tmpl_fc_located_at(model: ModelBase, **kwargs) -> Optional[VariableStrTe
     )
 
 
-def get_tmpl_fc_is_held(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+def get_tmpl_fc_is_held(model: ModelBase, **kwargs) -> VariableStrTemplate | None:
     if not isinstance(model, FluentClauseModel):
         return None
 
@@ -405,7 +407,7 @@ def get_tmpl_fc_is_held(model: ModelBase, **kwargs) -> Optional[VariableStrTempl
     )
 
 
-def get_tmpl_fc_config(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+def get_tmpl_fc_config(model: ModelBase, **kwargs) -> VariableStrTemplate | None:
     if not isinstance(model, FluentClauseModel):
         return None
 
@@ -432,7 +434,7 @@ def get_tmpl_fc_config(model: ModelBase, **kwargs) -> Optional[VariableStrTempla
     )
 
 
-def get_tmpl_fc_str_tmpl(model: ModelBase, **kwargs) -> Optional[VariableStrTemplate]:
+def get_tmpl_fc_str_tmpl(model: ModelBase, **kwargs) -> VariableStrTemplate | None:
     if not isinstance(model, FluentClauseModel):
         return None
 

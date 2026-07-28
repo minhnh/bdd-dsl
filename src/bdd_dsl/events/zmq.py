@@ -1,10 +1,13 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from enum import StrEnum, IntEnum
 import logging
 import time
-from typing import List
+from enum import IntEnum, StrEnum
+
 import zmq
+
 from bdd_dsl.events.event_handler import EventHandler
+
+logger = logging.getLogger(__name__)
 
 
 class MessageKey(StrEnum):
@@ -31,11 +34,11 @@ class EventDataKey(StrEnum):
     SOURCE = "SOURCE"
 
 
-class ZmqEventServer(object):
+class ZmqEventServer:
     def __init__(
         self,
         id: str,
-        events: List[str],
+        events: list[str],
         hostname: str = "*",
         port: int = 5555,
         queue_size: int = 10,
@@ -75,7 +78,7 @@ class ZmqEventServer(object):
             or MessageKey.DATA not in message
             or EventDataKey.ID not in message[MessageKey.DATA]
         ):
-            logging.error(f"request missing required fields: {message}")
+            logger.error(f"request missing required fields: {message}")
             response[MessageKey.STATUS] = ResponseType.INVALID_REQUEST
             self._socket.send_json(response)
             return message
@@ -106,7 +109,7 @@ class ZmqEventServer(object):
 
         else:
             # unrecognized request type
-            logging.error(f"invalid request type: {req_type}")
+            logger.error(f"invalid request type: {req_type}")
             response[MessageKey.STATUS] = ResponseType.INVALID_REQUEST
 
         # send response
@@ -115,7 +118,7 @@ class ZmqEventServer(object):
 
 
 class ZmqEventClient(EventHandler):
-    def __init__(self, id: str, events: List[str], hostname="localhost", port=5555):
+    def __init__(self, id: str, events: list[str], hostname="localhost", port=5555):
         super().__init__(id, events)
         self.hostname = hostname
         self.port = port
@@ -134,9 +137,7 @@ class ZmqEventClient(EventHandler):
         resp = self._send_request(
             {MessageKey.TYPE: RequestType.CONSUME, MessageKey.DATA: {EventDataKey.ID: event_id}}
         )
-        if resp[MessageKey.STATUS] == ResponseType.UNRECOGNIZED_EVENT:
-            return False
-        return True
+        return resp[MessageKey.STATUS] != ResponseType.UNRECOGNIZED_EVENT
 
     def produce(self, event_id: str) -> None:
         self._send_request(

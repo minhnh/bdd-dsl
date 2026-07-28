@@ -1,9 +1,12 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Iterable, Iterator, Optional
 import itertools
-from rdflib import BNode, Graph, URIRef, Literal
+from collections.abc import Iterable, Iterator
+from typing import Any
+
 from rdf_utils.collection import load_list_re
 from rdf_utils.models.common import ModelBase, get_node_types
+from rdflib import BNode, Graph, Literal, URIRef
+
 from bdd_dsl.models.namespace import NS_MM_BDD
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_ELEMS,
@@ -16,7 +19,6 @@ from bdd_dsl.models.urirefs import (
     URI_TASK_PRED_OF_TASK,
 )
 
-
 URI_BDD_TYPE_COMBINATION = NS_MM_BDD["Combination"]
 URI_BDD_TYPE_PERMUTATION = NS_MM_BDD["Permutation"]
 URI_BDD_PRED_FROM = NS_MM_BDD["from"]
@@ -24,15 +26,12 @@ URI_BDD_PRED_REP_ALLOWED = NS_MM_BDD["repetition-allowed"]
 URI_BDD_PRED_LENGTH = NS_MM_BDD["length"]
 
 
-def try_get_const_set_elems(graph: Graph, set_id: URIRef) -> Optional[list]:
+def try_get_const_set_elems(graph: Graph, set_id: URIRef) -> list | None:
     sets_data_types = get_node_types(graph=graph, node_id=set_id)
     if URI_BDD_TYPE_CONST_SET not in sets_data_types:
         return None
 
-    elem_list = []
-    for elem in graph.objects(subject=set_id, predicate=URI_BDD_PRED_ELEMS):
-        elem_list.append(elem)
-    return elem_list
+    return list(graph.objects(subject=set_id, predicate=URI_BDD_PRED_ELEMS))
 
 
 class SetEnumerationModel(ModelBase):
@@ -74,9 +73,7 @@ class SetEnumerationModel(ModelBase):
         assert URI_BDD_TYPE_CONST_SET in set_model.types, (
             f"type(s) not handled for Set {set_model.id}: {set_model.types}"
         )
-        from_list = []
-        for elem in graph.objects(subject=set_model.id, predicate=URI_BDD_PRED_ELEMS):
-            from_list.append(elem)
+        from_list = list(graph.objects(subject=set_model.id, predicate=URI_BDD_PRED_ELEMS))
         self.set_attr(key=URI_BDD_PRED_FROM, val=from_list)
 
         # if no length specified, set to length of list
@@ -253,7 +250,7 @@ def get_task_variations(task_var: TaskVariationModel) -> tuple[list[URIRef], lis
                 # list
                 uri_iterables.append(set_data)
             else:
-                raise RuntimeError(
+                raise TypeError(
                     f"TaskVariation {task_var.id}: sets for cartesian product not list or URIRef: {set_data}"
                 )
 

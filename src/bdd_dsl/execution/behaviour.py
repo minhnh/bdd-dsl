@@ -1,9 +1,11 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from abc import ABC, abstractmethod
-from typing import Any, Optional
-from rdflib import Graph, URIRef
+from typing import Any
+
 from behave.runner import Context
 from rdf_utils.models.common import ModelBase, get_node_types
+from rdflib import Graph, URIRef
+
 from bdd_dsl.models.urirefs import URI_BHV_PRED_OF_BHV
 
 
@@ -28,7 +30,7 @@ class Behaviour(ModelBase, ABC):
 
 
 class BehaviourImplModel(ModelBase):
-    behaviour: Optional[Behaviour]
+    behaviour: Behaviour | None
     behaviour_uri: URIRef
     behaviour_types: set[URIRef]
 
