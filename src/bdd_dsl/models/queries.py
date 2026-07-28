@@ -1,19 +1,27 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.namespace import URL_SECORO_M
-from rdf_utils.models.vocab import URI_EXEC_PRED_HAS_CONFIG
-from bdd_dsl.models.namespace import PREFIX_TRANS
-from bdd_dsl.models.uri import (
-    URI_TRANS,
-    URI_MM_EVENT,
-    URI_MM_BT,
-    URI_MM_PY,
-)
-from bdd_dsl.models.urirefs import (
+from rdf_utils.models.vocab import (
     URI_AGN_PRED_HAS_AGN_MODEL,
     URI_AGN_PRED_OF_AGN,
     URI_AGN_TYPE_AGN,
     URI_AGN_TYPE_AGN_MODEL,
     URI_AGN_TYPE_MOD_AGN,
+    URI_ENV_PRED_HAS_OBJ_MODEL,
+    URI_ENV_PRED_OF_OBJ,
+    URI_ENV_TYPE_MOD_OBJ,
+    URI_ENV_TYPE_OBJ,
+    URI_ENV_TYPE_OBJ_MODEL,
+    URI_EXEC_PRED_HAS_CONFIG,
+)
+from rdf_utils.namespace import URL_SECORO_M
+
+from bdd_dsl.models.namespace import PREFIX_TRANS
+from bdd_dsl.models.uri import (
+    URI_MM_BT,
+    URI_MM_EVENT,
+    URI_MM_PY,
+    URI_TRANS,
+)
+from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_GIVEN,
     URI_BDD_PRED_HAS_AC,
     URI_BDD_PRED_HAS_SCENE,
@@ -23,20 +31,15 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_TMPL,
     URI_BDD_PRED_THEN,
     URI_BDD_PRED_WHEN,
-    URI_BDD_TYPE_TASK_VAR,
-    URI_BHV_TYPE_BHV,
-    URI_ENV_PRED_OF_OBJ,
-    URI_ENV_TYPE_OBJ,
-    URI_ENV_PRED_HAS_OBJ_MODEL,
-    URI_ENV_TYPE_OBJ_MODEL,
-    URI_ENV_TYPE_MOD_OBJ,
-    URI_TASK_TYPE_TASK,
     URI_BDD_TYPE_SCENARIO,
     URI_BDD_TYPE_SCENARIO_TMPL,
     URI_BDD_TYPE_SCENARIO_VARIANT,
+    URI_BDD_TYPE_TASK_VAR,
     URI_BDD_TYPE_US,
     URI_BHV_PRED_OF_BHV,
+    URI_BHV_TYPE_BHV,
     URI_TASK_PRED_OF_TASK,
+    URI_TASK_TYPE_TASK,
 )
 
 # URLs to public queries

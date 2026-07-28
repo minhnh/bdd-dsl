@@ -1,9 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.namespace import (
-    NS_MM_ENV,
-    NS_MM_AGN,
-    NS_MM_TIME,
-)
+from rdf_utils.namespace import NS_MM_TIME
+
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
@@ -11,28 +8,6 @@ from bdd_dsl.models.namespace import (
     NS_MM_ROS,
     NS_MM_TASK,
 )
-
-# Environment
-URI_ENV_TYPE_OBJ = NS_MM_ENV["Object"]
-URI_ENV_TYPE_WS = NS_MM_ENV["Workspace"]
-URI_ENV_TYPE_WS_WS = NS_MM_ENV["WorkspaceHasWorkspace"]
-URI_ENV_TYPE_WS_OBJ = NS_MM_ENV["WorkspaceHasObject"]
-URI_ENV_TYPE_RIGID_OBJ = NS_MM_ENV["RigidObject"]
-URI_ENV_TYPE_MOD_OBJ = NS_MM_ENV["ModelledObject"]
-URI_ENV_TYPE_OBJ_MODEL = NS_MM_ENV["ObjectModel"]
-URI_ENV_PRED_HAS_OBJ_MODEL = NS_MM_ENV["has-object-model"]
-URI_ENV_PRED_HAS_OBJ = NS_MM_ENV["has-object"]
-URI_ENV_PRED_OF_OBJ = NS_MM_ENV["of-object"]
-URI_ENV_PRED_HAS_WS = NS_MM_ENV["has-workspace"]
-URI_ENV_PRED_OF_WS = NS_MM_ENV["of-workspace"]
-
-# Agent
-URI_AGN_TYPE_AGN = NS_MM_AGN["Agent"]
-URI_AGN_TYPE_MOD_AGN = NS_MM_AGN["ModelledAgent"]
-URI_AGN_TYPE_AGN_MODEL = NS_MM_AGN["AgentModel"]
-URI_AGN_PRED_OF_AGN = NS_MM_AGN["of-agent"]
-URI_AGN_PRED_HAS_AGN = NS_MM_AGN["has-agent"]
-URI_AGN_PRED_HAS_AGN_MODEL = NS_MM_AGN["has-agent-model"]
 
 # Behaviour
 URI_BHV_TYPE_BHV = NS_MM_BHV["Behaviour"]

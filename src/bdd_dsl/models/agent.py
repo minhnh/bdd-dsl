@@ -1,16 +1,18 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Dict, Optional
-from rdflib import Graph, URIRef
+from typing import Any
+
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader
+from rdf_utils.models.vocab import URI_AGN_PRED_HAS_AGN_MODEL
+from rdflib import Graph, URIRef
+
 from bdd_dsl.execution.common import load_attr_has_config
 from bdd_dsl.models.queries import Q_MODELLED_AGENT
-from bdd_dsl.models.urirefs import URI_AGN_PRED_HAS_AGN_MODEL
 
 
 class AgentModel(ModelBase):
-    models: Dict[URIRef, ModelBase]
+    models: dict[URIRef, ModelBase]
     model_types: set[URIRef]
-    model_type_to_id: Dict[URIRef, set[URIRef]]  # map a model type to a set of model URIs
+    model_type_to_id: dict[URIRef, set[URIRef]]  # map a model type to a set of model URIs
 
     def __init__(self, graph: Graph, agent_id: URIRef) -> None:
         super().__init__(graph=graph, node_id=agent_id)
@@ -47,10 +49,10 @@ class AgentModel(ModelBase):
         raise RuntimeError(f"object '{self.id}' doesn't have a model of type '{model_type}'")
 
 
-class AgnModelLoader(object):
+class AgnModelLoader:
     _model_loader: ModelLoader
-    _modelled_agn_g: Optional[Graph]
-    _agn_models: Dict[URIRef, AgentModel]
+    _modelled_agn_g: Graph | None
+    _agn_models: dict[URIRef, AgentModel]
 
     def __init__(self):
         self._agn_models = {}  # Agent URI -> AgentModel instance

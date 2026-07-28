@@ -1,11 +1,9 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from typing import Any, Optional, Generator
-from rdflib import Graph, URIRef
-from rdflib.exceptions import UniquenessError
+from collections.abc import Generator
+from typing import Any
+
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, ModelLoader, get_node_types
-from bdd_dsl.execution.common import load_attr_has_config
-from bdd_dsl.models.queries import Q_MODELLED_OBJECT
-from bdd_dsl.models.urirefs import (
+from rdf_utils.models.vocab import (
     URI_ENV_PRED_HAS_OBJ,
     URI_ENV_PRED_HAS_OBJ_MODEL,
     URI_ENV_PRED_HAS_WS,
@@ -13,6 +11,11 @@ from bdd_dsl.models.urirefs import (
     URI_ENV_TYPE_WS_OBJ,
     URI_ENV_TYPE_WS_WS,
 )
+from rdflib import Graph, URIRef
+from rdflib.exceptions import UniquenessError
+
+from bdd_dsl.execution.common import load_attr_has_config
+from bdd_dsl.models.queries import Q_MODELLED_OBJECT
 
 
 class ObjectModel(ModelBase):
@@ -70,7 +73,7 @@ class WorkspaceModel(ModelBase):
 
 
 def _get_ws_objects_re(
-    ws_id: URIRef, ws_dict: dict[URIRef, WorkspaceModel], ws_path: Optional[set[URIRef]] = None
+    ws_id: URIRef, ws_dict: dict[URIRef, WorkspaceModel], ws_path: set[URIRef] | None = None
 ) -> Generator[URIRef, None, None]:
     if ws_path is None:
         ws_path = set()
@@ -95,7 +98,7 @@ def _load_ws_re(
     ws_id: URIRef,
     graph: Graph,
     ws_dict: dict[URIRef, WorkspaceModel],
-    ws_path: Optional[set[URIRef]] = None,
+    ws_path: set[URIRef] | None = None,
 ) -> None:
     if ws_path is None:
         ws_path = set()
@@ -135,9 +138,9 @@ def _load_ws_re(
             _load_ws_re(ws_id=sub_ws_id, graph=graph, ws_dict=ws_dict, ws_path=ws_path)
 
 
-class EnvModelLoader(object):
+class EnvModelLoader:
     _model_loader: ModelLoader
-    _modelled_obj_g: Optional[Graph]
+    _modelled_obj_g: Graph | None
     _obj_models: dict[URIRef, ObjectModel]
     _ws_models: dict[URIRef, WorkspaceModel]
 
