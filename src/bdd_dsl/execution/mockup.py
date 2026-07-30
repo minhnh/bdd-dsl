@@ -30,7 +30,6 @@ from bdd_dsl.behave import (
     parse_str_param,
 )
 from bdd_dsl.execution.behaviour import Behaviour
-from bdd_dsl.execution.common import load_attr_has_config
 from bdd_dsl.execution.scenario import ExecutionModel
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
@@ -78,10 +77,8 @@ def before_scenario(context: Context, scenario: Scenario):
         f"scene '{scenario_var_model.scene.id}' has no agent"
     )
 
-    scenario_var_model.scene.env_model_loader.register_attr_loaders(
-        load_attr_path, load_attr_has_config, load_py_module_attr
-    )
-    scenario_var_model.scene.agn_model_loader.register_attr_loaders(load_py_module_attr)
+    scenario_var_model.scene.element_loader.register(load_attr_path)
+    scenario_var_model.scene.element_loader.register(load_py_module_attr)
     context.current_scenario = scenario_var_model
 
 
@@ -121,8 +118,10 @@ def given_workspaces_mockup(context: Context):
     for ws_model in load_ws_models_from_table(
         table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
     ):
-        env_loader = context.current_scenario.scene.env_model_loader
-        for obj_model in env_loader.load_ws_objects(graph=context.model_graph, ws_id=ws_model.id):
+        element_loader = context.current_scenario.scene.element_loader
+        for obj_model in element_loader.load_ws_objects(
+            graph=context.model_graph, ws_id=ws_model.id
+        ):
             if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
                 for py_model_uri in obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
                     py_model = obj_model.models[py_model_uri]

@@ -14,13 +14,10 @@ from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_SYS_RES
 from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_M
 from rdf_utils.resolver import install_resolver
 from rdflib import Dataset
+from scene_dsl.rdf_parser.agent import AgentModel
+from scene_dsl.rdf_parser.environment import ObjectModel
 
-from bdd_dsl.execution.common import (
-    URL_MM_EXEC_SHACL,
-    load_attr_has_config,
-)
-from bdd_dsl.models.agent import AgentModel
-from bdd_dsl.models.environment import ObjectModel
+from bdd_dsl.execution.common import URL_MM_EXEC_SHACL
 from bdd_dsl.models.user_story import UserStoryLoader
 
 SPEC_MODEL_URLS = {
@@ -113,24 +110,22 @@ class BDDExecTest(unittest.TestCase):
                 scr_var = self.us_loader.load_scenario_variant(
                     full_graph=self.graph, variant_id=scr_var_uri
                 )
-                scr_var.scene.env_model_loader.register_attr_loaders(
-                    load_attr_path, load_attr_has_config, load_py_module_attr
-                )
+                scr_var.scene.element_loader.register(load_attr_path)
+                scr_var.scene.element_loader.register(load_py_module_attr)
                 for obj_id in scr_var.scene.objects:
-                    obj_model = scr_var.scene.env_model_loader.load_object_model(
+                    obj_model = scr_var.scene.element_loader.load_object_model(
                         obj_id=obj_id, graph=self.graph
                     )
                     self._test_obj_model(obj_model=obj_model)
 
                 for ws_id in scr_var.scene.workspaces:
-                    for obj_model in scr_var.scene.env_model_loader.load_ws_objects(
+                    for obj_model in scr_var.scene.element_loader.load_ws_objects(
                         ws_id=ws_id, graph=self.graph
                     ):
                         self._test_obj_model(obj_model=obj_model)
 
-                scr_var.scene.agn_model_loader.register_attr_loaders(load_py_module_attr)
                 for agn_id in scr_var.scene.agents:
-                    agn_model = scr_var.scene.agn_model_loader.load_agent_model(
+                    agn_model = scr_var.scene.element_loader.load_agent_model(
                         agent_id=agn_id, graph=self.graph
                     )
                     self._test_agn_model(agn_model=agn_model)

@@ -38,6 +38,15 @@ jobs:
     - name: Install rdf-utils package
       run: pip install .
       working-directory: ./rdf-utils
+    - name: Checkout scene-dsl
+      uses: actions/checkout@v7
+      with:
+        repository: minhnh/scene-dsl
+        ref: main
+        path: scene-dsl
+    - name: Install scene-dsl package
+      run: pip install .
+      working-directory: ./scene-dsl
     - uses: actions/checkout@v7
       with:
         submodules: true

@@ -1,17 +1,4 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.models.vocab import (
-    URI_AGN_PRED_HAS_AGN_MODEL,
-    URI_AGN_PRED_OF_AGN,
-    URI_AGN_TYPE_AGN,
-    URI_AGN_TYPE_AGN_MODEL,
-    URI_AGN_TYPE_MOD_AGN,
-    URI_ENV_PRED_HAS_OBJ_MODEL,
-    URI_ENV_PRED_OF_OBJ,
-    URI_ENV_TYPE_MOD_OBJ,
-    URI_ENV_TYPE_OBJ,
-    URI_ENV_TYPE_OBJ_MODEL,
-    URI_EXEC_PRED_HAS_CONFIG,
-)
 from rdf_utils.namespace import URL_SECORO_M
 
 from bdd_dsl.models.namespace import PREFIX_TRANS
@@ -230,49 +217,5 @@ WHERE {{
 
     ?behaviour a {URI_BHV_TYPE_BHV.n3()} .
     ?task a {URI_TASK_TYPE_TASK.n3()} .
-}}
-"""
-
-Q_MODELLED_OBJECT = f"""
-CONSTRUCT {{
-    ?obj a ?objType ;
-        {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
-        {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
-    ?objModel a ?objModelType .
-}}
-WHERE {{
-    ?modelledObj a {URI_ENV_TYPE_MOD_OBJ.n3()} ;
-        {URI_ENV_PRED_HAS_OBJ_MODEL.n3()} ?objModel ;
-        {URI_ENV_PRED_OF_OBJ.n3()} ?obj .
-    OPTIONAL {{
-        ?modelledObj {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
-    }}
-    ?obj a {URI_ENV_TYPE_OBJ.n3()} ;
-        a ?objType .
-
-    ?objModel a {URI_ENV_TYPE_OBJ_MODEL.n3()} ;
-        a ?objModelType .
-}}
-"""
-
-Q_MODELLED_AGENT = f"""
-CONSTRUCT {{
-    ?agn a ?agnType ;
-        {URI_AGN_PRED_HAS_AGN_MODEL.n3()} ?agnModel ;
-        {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
-    ?agnModel a ?agnModelType .
-}}
-WHERE {{
-    ?modelledAgn a {URI_AGN_TYPE_MOD_AGN.n3()} ;
-        {URI_AGN_PRED_HAS_AGN_MODEL.n3()} ?agnModel ;
-        {URI_AGN_PRED_OF_AGN.n3()} ?agn .
-    OPTIONAL {{
-        ?modelledAgn {URI_EXEC_PRED_HAS_CONFIG.n3()} ?configs .
-    }}
-    ?agn a {URI_AGN_TYPE_AGN.n3()} ;
-        a ?agnType .
-
-    ?agnModel a {URI_AGN_TYPE_AGN_MODEL.n3()} ;
-        a ?agnModelType .
 }}
 """
