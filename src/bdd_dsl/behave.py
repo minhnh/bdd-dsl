@@ -9,10 +9,9 @@ from rdf_utils.uri import try_parse_n3_iterable, try_parse_n3_string
 from rdflib import Graph
 from rdflib.namespace import NamespaceManager
 from rdflib.term import Node as RDFNode
-
-from bdd_dsl.models.agent import AgentModel
-from bdd_dsl.models.environment import ObjectModel, WorkspaceModel
-from bdd_dsl.models.user_story import SceneModel
+from scene_dsl.rdf_parser.agent import AgentModel
+from scene_dsl.rdf_parser.environment import ObjectModel, WorkspaceModel
+from scene_dsl.rdf_parser.scene import SceneModel
 
 PARAM_OBJ = "obj_str"
 PARAM_WS = "ws_str"

@@ -28,6 +28,7 @@ dependencies = [
   "platformdirs",
   "behave",
   "trinary",
+  "scene-dsl",
 ]
 
 [project.urls]

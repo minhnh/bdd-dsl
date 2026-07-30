@@ -40,7 +40,7 @@ from bdd_dsl.models.user_story import (
     ThereExistsModel,
     UserStoryLoader,
 )
-from bdd_dsl.models.variation import get_task_variations
+from bdd_dsl.models.variation import collect_variable_scene_elements, get_task_variations
 from bdd_dsl.representation import (
     ModelToStrProtocol,
     get_str_tc_after_event,
@@ -426,7 +426,7 @@ def prepare_scenario_variant_data(
         var_scene_elems = set()
         var_scene_data = scene_data.copy()
         for var_val in var_values.values():
-            scr_var_model.scene.get_variable_elems_re(var_val=var_val, var_elems=var_scene_elems)
+            collect_variable_scene_elements(scr_var_model.scene, var_val, var_scene_elems)
         if len(var_scene_elems) > 0:
             var_scene_data["elements"] = [
                 elem_id.n3(namespace_manager=ns_manager) for elem_id in var_scene_elems

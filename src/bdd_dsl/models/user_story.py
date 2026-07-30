@@ -1,19 +1,13 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from collections.abc import Generator, Iterable
-from typing import Any
 
 from rdf_utils.constraints import check_shacl_constraints
 from rdf_utils.models.common import ModelBase, get_node_types
-from rdf_utils.models.vocab import (
-    URI_AGN_PRED_HAS_AGN,
-    URI_ENV_PRED_HAS_OBJ,
-    URI_ENV_PRED_HAS_WS,
-)
 from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_MM
-from rdflib import RDF, BNode, Graph, URIRef
+from rdflib import BNode, Graph, URIRef
 from rdflib.query import ResultRow
+from scene_dsl.rdf_parser import scene as scene_models
 
-from bdd_dsl.models.agent import AgentModel, AgnModelLoader
 from bdd_dsl.models.clauses import (
     DEFAULT_FLUENT_LOADERS,
     FluentClauseLoader,
@@ -25,7 +19,6 @@ from bdd_dsl.models.clauses import (
     WhenBhvLoaderProtocol,
     load_bhv_pickplace,
 )
-from bdd_dsl.models.environment import EnvModelLoader, ObjectModel, WorkspaceModel
 from bdd_dsl.models.queries import Q_USER_STORY
 from bdd_dsl.models.time_constraint import process_time_constraint_model
 from bdd_dsl.models.urirefs import (
@@ -45,9 +38,6 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_FLUENT_CLAUSE,
     URI_BDD_TYPE_FORALL,
     URI_BDD_TYPE_SCENARIO,
-    URI_BDD_TYPE_SCENE_AGN,
-    URI_BDD_TYPE_SCENE_OBJ,
-    URI_BDD_TYPE_SCENE_WS,
     URI_BDD_TYPE_US,
     URI_BDD_TYPE_WHEN_BHV,
     URI_BHV_PRED_OF_BHV,
@@ -110,91 +100,6 @@ class ScenarioModel(ModelBase):
             f"Scenario '{self.id}' does not refer to a Task"
         )
         self.task_id = node_val
-
-
-class SceneModel(ModelBase):
-    """Assuming the given graph is constructed as a query result from `URL_Q_BDD_US`"""
-
-    objects: set[URIRef]  # object URIs
-    workspaces: set[URIRef]  # workspace URI -> ws types
-    agents: set[URIRef]  # agent URIs
-    env_model_loader: EnvModelLoader
-    agn_model_loader: AgnModelLoader
-
-    def __init__(self, us_graph: Graph, full_graph: Graph, scene_id: URIRef) -> None:
-        super().__init__(graph=full_graph, node_id=scene_id)
-        self.objects = set()
-        self.workspaces = set()
-        self.agents = set()
-        self.env_model_loader = EnvModelLoader()
-        self.agn_model_loader = AgnModelLoader()
-
-        for comp_id in us_graph.objects(subject=scene_id, predicate=URI_BDD_PRED_HAS_SCENE):
-            comp_types = set(us_graph.objects(subject=comp_id, predicate=RDF.type))
-            assert len(comp_types) > 0, f"composition '{comp_id}' of scene '{scene_id}' has no type"
-
-            if URI_BDD_TYPE_SCENE_OBJ in comp_types:
-                for obj_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_OBJ):
-                    assert isinstance(obj_id, URIRef), (
-                        f"SceneModel {self.id}: obj '{obj_id}' not URIRef"
-                    )
-                    self.objects.add(obj_id)
-
-            if URI_BDD_TYPE_SCENE_WS in comp_types:
-                for ws_id in full_graph.objects(subject=comp_id, predicate=URI_ENV_PRED_HAS_WS):
-                    assert isinstance(ws_id, URIRef), (
-                        f"SceneModel {self.id}: ws '{ws_id}' not URIRef"
-                    )
-                    self.workspaces.add(ws_id)
-
-            if URI_BDD_TYPE_SCENE_AGN in comp_types:
-                for agn_id in full_graph.objects(subject=comp_id, predicate=URI_AGN_PRED_HAS_AGN):
-                    assert isinstance(agn_id, URIRef), (
-                        f"SceneModel {self.id}: agn '{agn_id}' not URIRef"
-                    )
-                    self.agents.add(agn_id)
-
-    def load_obj_model(
-        self, graph: Graph, obj_id: URIRef, override: bool = False, **kwargs: Any
-    ) -> ObjectModel:
-        assert obj_id in self.objects, f"Object '{obj_id}' not in scene"
-        return self.env_model_loader.load_object_model(
-            graph=graph, obj_id=obj_id, override=override, **kwargs
-        )
-
-    def load_ws_model(
-        self, graph: Graph, ws_id: URIRef, override: bool = False, **kwargs: Any
-    ) -> WorkspaceModel:
-        assert ws_id in self.workspaces, f"Workspace '{ws_id}' not in scene"
-        return self.env_model_loader.load_ws_model(
-            graph=graph, ws_id=ws_id, override=override, **kwargs
-        )
-
-    def load_agn_model(
-        self, graph: Graph, agent_id: URIRef, override: bool = False, **kwargs: Any
-    ) -> AgentModel:
-        assert agent_id in self.agents, f"Agent '{agent_id}' not in scene"
-        return self.agn_model_loader.load_agent_model(
-            graph=graph, agent_id=agent_id, override=override, **kwargs
-        )
-
-    def has_invariant_elem(self, elem_id: URIRef) -> bool:
-        return elem_id in self.objects or elem_id in self.workspaces or elem_id in self.agents
-
-    def get_variable_elems_re(self, var_val: Any, var_elems: set[URIRef] | None = None) -> None:
-        if var_elems is None:
-            var_elems = set()
-
-        if isinstance(var_val, URIRef):
-            if self.has_invariant_elem(elem_id=var_val):
-                return
-            var_elems.add(var_val)
-            return
-
-        if isinstance(var_val, (list, tuple)):
-            for v in var_val:
-                self.get_variable_elems_re(var_val=v, var_elems=var_elems)
-            return
 
 
 class IHasClause(ModelBase):
@@ -467,7 +372,7 @@ class ScenarioVariantModel(IHasClause):
 
     us_id: URIRef
     tmpl: ModelBase
-    scene: SceneModel
+    scene: scene_models.SceneModel
     task_variation: TaskVariationModel
 
     def __init__(
@@ -509,7 +414,7 @@ class ScenarioVariantModel(IHasClause):
         assert scene_id is not None and isinstance(scene_id, URIRef), (
             f"ScenarioVariant '{var_id}' does not refer to a Scene"
         )
-        self.scene = SceneModel(us_graph=us_graph, full_graph=full_graph, scene_id=scene_id)
+        self.scene = scene_models.SceneModel(graph=full_graph, scene_id=scene_id)
 
         us_ids = list(us_graph.subjects(object=var_id, predicate=URI_BDD_PRED_HAS_AC))
         assert len(us_ids) == 1 and isinstance(us_ids[0], URIRef), (

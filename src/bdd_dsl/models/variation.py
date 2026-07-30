@@ -6,6 +6,7 @@ from typing import Any
 from rdf_utils.collection import load_list_re
 from rdf_utils.models.common import ModelBase, get_node_types
 from rdflib import BNode, Graph, Literal, URIRef
+from scene_dsl.rdf_parser.scene import SceneModel
 
 from bdd_dsl.models.namespace import NS_MM_BDD
 from bdd_dsl.models.urirefs import (
@@ -24,6 +25,22 @@ URI_BDD_TYPE_PERMUTATION = NS_MM_BDD["Permutation"]
 URI_BDD_PRED_FROM = NS_MM_BDD["from"]
 URI_BDD_PRED_REP_ALLOWED = NS_MM_BDD["repetition-allowed"]
 URI_BDD_PRED_LENGTH = NS_MM_BDD["length"]
+
+
+def collect_variable_scene_elements(
+    scene: SceneModel,
+    value: Any,
+    elements: set[URIRef] | None = None,
+) -> set[URIRef]:
+    """Collect concrete variable values that are not invariant scene members."""
+    result = set() if elements is None else elements
+    if isinstance(value, URIRef):
+        if not scene.has_invariant_elem(value):
+            result.add(value)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            collect_variable_scene_elements(scene, item, result)
+    return result
 
 
 def try_get_const_set_elems(graph: Graph, set_id: URIRef) -> list | None:

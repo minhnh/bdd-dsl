@@ -36,8 +36,17 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       working-directory: ./rdf-utils
     - name: Install rdf-utils package
-      run: pip install .
+      run: pip install ".[all]"
       working-directory: ./rdf-utils
+    - name: Checkout scene-dsl
+      uses: actions/checkout@v7
+      with:
+        repository: secorolab/scene-dsl
+        ref: main
+        path: scene-dsl
+    - name: Install scene-dsl package
+      run: pip install .
+      working-directory: ./scene-dsl
     - uses: actions/checkout@v7
       with:
         submodules: true
