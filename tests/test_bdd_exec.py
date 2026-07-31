@@ -119,9 +119,7 @@ class BDDExecTest(unittest.TestCase):
                     self._test_obj_model(obj_model=obj_model)
 
                 for ws_id in scr_var.scene.workspaces:
-                    for obj_model in scr_var.scene.element_loader.load_ws_objects(
-                        ws_id=ws_id, graph=self.graph
-                    ):
+                    for obj_model in scr_var.scene.load_ws_objects(ws_id=ws_id, graph=self.graph):
                         self._test_obj_model(obj_model=obj_model)
 
                 for agn_id in scr_var.scene.agents:

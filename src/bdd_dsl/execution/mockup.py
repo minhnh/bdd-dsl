@@ -118,8 +118,7 @@ def given_workspaces_mockup(context: Context):
     for ws_model in load_ws_models_from_table(
         table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
     ):
-        element_loader = context.current_scenario.scene.element_loader
-        for obj_model in element_loader.load_ws_objects(
+        for obj_model in context.current_scenario.scene.load_ws_objects(
             graph=context.model_graph, ws_id=ws_model.id
         ):
             if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
