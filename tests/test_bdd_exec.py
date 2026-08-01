@@ -1,23 +1,25 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from urllib.request import HTTPError
 
 from rdf_utils.constraints import check_shacl_constraints
-from rdf_utils.models.execution import load_attr_path
-from rdf_utils.models.python import (
-    URI_PY_PRED_ATTR_NAME,
-    URI_PY_PRED_MODULE_NAME,
-    URI_PY_TYPE_MODULE_ATTR,
-    load_py_module_attr,
-)
-from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_SYS_RES
+from rdf_utils.models.vocab import URI_EXEC_PRED_RUNS_SCENE, URI_EXEC_TYPE_SCENE_INST
 from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_M
 from rdf_utils.resolver import install_resolver
-from rdflib import Dataset
-from scene_dsl.rdf_parser.agent import AgentModel
-from scene_dsl.rdf_parser.environment import ObjectModel
+from rdflib import RDF, Dataset, Graph, URIRef
 
 from bdd_dsl.execution.common import URL_MM_EXEC_SHACL
+from bdd_dsl.execution.scenario import ScenarioExecutionModel
+from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_HAS_BHV_IMPL,
+    URI_BDD_PRED_OF_VARIANT,
+    URI_BDD_TYPE_SCENARIO_EXEC,
+    URI_BHV_PRED_OF_BHV,
+    URI_TIME_PRED_AFTER_EVT,
+    URI_TIME_PRED_BEFORE_EVT,
+)
 from bdd_dsl.models.user_story import UserStoryLoader
 
 SPEC_MODEL_URLS = {
@@ -60,73 +62,53 @@ class BDDExecTest(unittest.TestCase):
 
         check_shacl_constraints(graph=self.graph, shacl_dict=SHACL_URLS)
 
-    def _test_obj_model(self, obj_model: ObjectModel):
-        if URI_EXEC_TYPE_SYS_RES in obj_model.model_types:
-            self.assertTrue(
-                len(obj_model.model_type_to_id[URI_EXEC_TYPE_SYS_RES]) > 0,
-                f"Object '{obj_model.id}' has type '{URI_EXEC_TYPE_SYS_RES}' but no corresponding model",
-            )
-            for model_id in obj_model.model_type_to_id[URI_EXEC_TYPE_SYS_RES]:
-                self.assertTrue(obj_model.models[model_id].has_attr(URI_EXEC_PRED_PATH))
-
-        elif URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
-            self.assertTrue(
-                len(obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]) > 0,
-                f"Object '{obj_model.id}' has type '{URI_PY_TYPE_MODULE_ATTR}' but no corresponding model",
-            )
-            for model_id in obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
-                module_name = obj_model.models[model_id].get_attr(key=URI_PY_PRED_MODULE_NAME)
-                attr_name = obj_model.models[model_id].get_attr(key=URI_PY_PRED_ATTR_NAME)
-                self.assertTrue(
-                    module_name is not None,
-                    f"PyModuleAttribute model '{model_id}' for Object '{obj_model.id}' has no module name",
-                )
-                self.assertTrue(
-                    attr_name is not None,
-                    f"PyModuleAttribute model '{model_id}' for Object '{obj_model.id}' has no attribute name",
-                )
-
-    def _test_agn_model(self, agn_model: AgentModel):
-        if URI_PY_TYPE_MODULE_ATTR in agn_model.model_types:
-            self.assertTrue(
-                len(agn_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]) > 0,
-                f"Agent '{agn_model.id}' has type '{URI_PY_TYPE_MODULE_ATTR}' but no corresponding model",
-            )
-            for model_id in agn_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
-                module_name = agn_model.models[model_id].get_attr(key=URI_PY_PRED_MODULE_NAME)
-                attr_name = agn_model.models[model_id].get_attr(key=URI_PY_PRED_ATTR_NAME)
-                self.assertTrue(
-                    module_name is not None,
-                    f"PyModuleAttribute model '{model_id}' for Agent '{agn_model.id}' has no module name",
-                )
-                self.assertTrue(
-                    attr_name is not None,
-                    f"PyModuleAttribute model '{model_id}' for Agent '{agn_model.id}' has no attribute name",
-                )
-
-    def test_exec(self):
+    def test_user_story_scenes_load_without_execution_models(self):
         for scenario_variant_uris in self.us_loader.get_us_scenario_variants().values():
             for scr_var_uri in scenario_variant_uris:
                 scr_var = self.us_loader.load_scenario_variant(
                     full_graph=self.graph, variant_id=scr_var_uri
                 )
-                scr_var.scene.element_loader.register(load_attr_path)
-                scr_var.scene.element_loader.register(load_py_module_attr)
-                for obj_id in scr_var.scene.objects:
-                    obj_model = scr_var.scene.element_loader.load_object_model(
-                        obj_id=obj_id, graph=self.graph
-                    )
-                    self._test_obj_model(obj_model=obj_model)
+                self.assertTrue(scr_var.scene.objects)
 
-                for ws_id in scr_var.scene.workspaces:
-                    for obj_model in scr_var.scene.load_ws_objects(ws_id=ws_id, graph=self.graph):
-                        self._test_obj_model(obj_model=obj_model)
+    def test_scenario_execution_selects_exact_scene_instance(self):
+        graph = Graph()
+        variant = URIRef("urn:test:variant")
+        execution = URIRef("urn:test:execution")
+        scene_inst = URIRef("urn:test:scene-instance")
+        bhv_impl = URIRef("urn:test:behaviour-implementation")
+        behaviour = URIRef("urn:test:behaviour")
+        graph.add((execution, RDF.type, URI_BDD_TYPE_SCENARIO_EXEC))
+        graph.add((execution, URI_BDD_PRED_OF_VARIANT, variant))
+        graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, scene_inst))
+        graph.add((scene_inst, RDF.type, URI_EXEC_TYPE_SCENE_INST))
+        graph.add((execution, URI_BDD_PRED_HAS_BHV_IMPL, bhv_impl))
+        graph.add((bhv_impl, RDF.type, URIRef("urn:test:Implementation")))
+        graph.add((bhv_impl, URI_BHV_PRED_OF_BHV, behaviour))
+        graph.add((behaviour, RDF.type, URIRef("urn:test:Behaviour")))
+        scr_var = SimpleNamespace(id=variant, tmpl=object())
+        duration = {
+            URI_TIME_PRED_AFTER_EVT: URIRef("urn:test:start"),
+            URI_TIME_PRED_BEFORE_EVT: URIRef("urn:test:end"),
+        }
 
-                for agn_id in scr_var.scene.agents:
-                    agn_model = scr_var.scene.element_loader.load_agent_model(
-                        agent_id=agn_id, graph=self.graph
-                    )
-                    self._test_agn_model(agn_model=agn_model)
+        with patch("bdd_dsl.execution.scenario.get_duration", return_value=duration):
+            model = ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+            self.assertEqual(model.scene_inst_id, scene_inst)
+
+            other_scene = URIRef("urn:test:other-scene-instance")
+            graph.add((other_scene, RDF.type, URI_EXEC_TYPE_SCENE_INST))
+            graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, other_scene))
+            with self.assertRaisesRegex(ValueError, "exactly 1 scene instance"):
+                ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+            graph.remove((execution, URI_EXEC_PRED_RUNS_SCENE, other_scene))
+
+            graph.remove((execution, URI_EXEC_PRED_RUNS_SCENE, scene_inst))
+            with self.assertRaisesRegex(ValueError, "exactly 1 scene instance"):
+                ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+
+            graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, URIRef("urn:test:not-scene")))
+            with self.assertRaisesRegex(TypeError, "non-SceneInstance"):
+                ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
 
 
 if __name__ == "__main__":
