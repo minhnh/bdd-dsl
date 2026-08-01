@@ -6,8 +6,8 @@ from urllib.error import HTTPError
 
 from behave.model import Step
 from behave.runner import Context
+from rdf_utils.namespace import URL_SECORO_M
 from rdf_utils.resolver import install_resolver
-from rdf_utils.uri import URL_SECORO_M
 from rdflib import Dataset
 
 from bdd_dsl.execution.mockup import before_all_mockup, before_scenario

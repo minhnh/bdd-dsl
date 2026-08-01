@@ -5,13 +5,13 @@ from enum import Enum
 from typing import Any
 
 from behave.model import Table
+from rdf_utils.models.common import ModelBase
 from rdf_utils.uri import try_parse_n3_iterable, try_parse_n3_string
-from rdflib import Graph
+from rdflib import Graph, URIRef
 from rdflib.namespace import NamespaceManager
 from rdflib.term import Node as RDFNode
-from scene_dsl.rdf_parser.agent import AgentModel
-from scene_dsl.rdf_parser.environment import ObjectModel, WorkspaceModel
-from scene_dsl.rdf_parser.scene import SceneModel
+from scene_dsl.rdf_parser.scene import SceneModel, WorkspaceModel
+from scene_dsl.rdf_parser.scenex import SceneInstanceModel
 
 PARAM_OBJ = "obj_str"
 PARAM_WS = "ws_str"
@@ -36,13 +36,9 @@ CLAUSE_BHV_PICK = f'"{{{PARAM_AGN}}}" picks "{{{PARAM_OBJ}}}"'
 CLAUSE_BHV_PLACE = f'"{{{PARAM_AGN}}}" places "{{{PARAM_OBJ}}}" at "{{{PARAM_WS}}}"'
 
 
-def load_obj_models_from_table(
-    table: Table, graph: Graph, scene: SceneModel
-) -> Generator[ObjectModel, None, None]:
-    """
-    Load ObjectModel instances from a table of URIs in the behave Context,
-    designed for the 'Given a set of objects' clause
-    """
+def load_obj_resources_from_table(
+    table: Table, graph: Graph, scene_inst: SceneInstanceModel
+) -> Generator[tuple[URIRef, dict[URIRef, ModelBase]], None, None]:
     for row in table:
         obj_id_str = row["name"]
         try:
@@ -50,16 +46,12 @@ def load_obj_models_from_table(
         except ValueError as e:
             raise RuntimeError(f"can't parse object URI '{obj_id_str}': {e}")
 
-        yield scene.load_obj_model(obj_id=obj_uri, graph=graph)
+        yield obj_uri, scene_inst.object_models.get(obj_uri, {})
 
 
-def load_agn_models_from_table(
-    table: Table, graph: Graph, scene: SceneModel
-) -> Generator[AgentModel, None, None]:
-    """
-    Load AgentModel instances from a table of URIs in the behave Context,
-    designed for the 'Given a set of agents' clause
-    """
+def load_agn_resources_from_table(
+    table: Table, graph: Graph, scene_inst: SceneInstanceModel
+) -> Generator[tuple[URIRef, dict[URIRef, ModelBase]], None, None]:
     for row in table:
         agn_id_str = row["name"]
         try:
@@ -67,7 +59,7 @@ def load_agn_models_from_table(
         except ValueError as e:
             raise RuntimeError(f"can't parse agent URI '{agn_id_str}': {e}")
 
-        yield scene.load_agn_model(agent_id=agn_uri, graph=graph)
+        yield agn_uri, scene_inst.agent_models.get(agn_uri, {})
 
 
 def load_ws_models_from_table(
@@ -80,7 +72,9 @@ def load_ws_models_from_table(
         except ValueError as e:
             raise RuntimeError(f"can't parse workspace URI '{ws_id_str}': {e}")
 
-        yield scene.load_ws_model(ws_id=ws_uri, graph=graph)
+        if ws_uri not in scene.workspaces:
+            raise ValueError(f"workspace '{ws_uri}' is not in scene '{scene.id}'")
+        yield scene.workspaces[ws_uri]
 
 
 class ParamType(Enum):

@@ -5,9 +5,9 @@ from timeit import default_timer as timer
 from urllib.request import HTTPError
 
 import rdflib
+from rdf_utils.namespace import URL_SECORO_M
 from rdf_utils.naming import get_valid_filename
 from rdf_utils.resolver import install_resolver
-from rdf_utils.uri import URL_SECORO_M
 
 from bdd_dsl.models.frames import FR_NAME
 from bdd_dsl.models.user_story import UserStoryLoader

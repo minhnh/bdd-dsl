@@ -4,8 +4,7 @@ from typing import Any
 
 from behave.model import Scenario
 from behave.runner import Context
-from rdf_utils.models.common import ModelLoader, URIRef
-from rdf_utils.models.execution import load_attr_path
+from rdf_utils.models.common import ModelBase, URIRef
 from rdf_utils.models.python import (
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,
@@ -15,6 +14,7 @@ from rdf_utils.models.python import (
 from rdf_utils.models.vocab import URI_EXEC_PRED_PATH, URI_EXEC_TYPE_RES_PATH
 from rdf_utils.uri import NamespaceManager, try_expand_curie
 from rdflib import Graph
+from scene_dsl.rdf_parser.scenex import SceneInstanceModel
 
 from bdd_dsl.behave import (
     PARAM_AGN,
@@ -23,14 +23,14 @@ from bdd_dsl.behave import (
     PARAM_OBJ,
     PARAM_UNTIL_EVT,
     PARAM_WS,
-    load_agn_models_from_table,
-    load_obj_models_from_table,
+    load_agn_resources_from_table,
+    load_obj_resources_from_table,
     load_str_params,
     load_ws_models_from_table,
     parse_str_param,
 )
 from bdd_dsl.execution.behaviour import Behaviour
-from bdd_dsl.execution.scenario import ExecutionModel
+from bdd_dsl.execution.scenario import ScenarioExecutionModel
 from bdd_dsl.models.user_story import ScenarioVariantModel, UserStoryLoader
 
 
@@ -38,12 +38,7 @@ def before_all_mockup(context: Context):
     g = getattr(context, "model_graph", None)
     assert g is not None, "'model_graph' attribute not found in context"
 
-    exec_model = ExecutionModel(graph=g, bhv_loaders=[load_py_module_attr])
-    context.execution_model = exec_model
     context.us_loader = UserStoryLoader(graph=g)
-
-    generic_loader = ModelLoader()
-    context.ws_model_loader = generic_loader
 
 
 def before_scenario(context: Context, scenario: Scenario):
@@ -77,9 +72,40 @@ def before_scenario(context: Context, scenario: Scenario):
         f"scene '{scenario_var_model.scene.id}' has no agent"
     )
 
-    scenario_var_model.scene.element_loader.register(load_attr_path)
-    scenario_var_model.scene.element_loader.register(load_py_module_attr)
+    scenario_exec = ScenarioExecutionModel(
+        graph=model_graph,
+        scr_var=scenario_var_model,
+        bhv_loaders=[load_py_module_attr],
+    )
     context.current_scenario = scenario_var_model
+    context.current_scenario_execution = scenario_exec
+    context.current_scene_instance = SceneInstanceModel(
+        scenario_exec.scene_inst_id,
+        model_graph,
+        scene_model=scenario_var_model.scene,
+    )
+
+
+def _resources_by_type(
+    resources: dict[URIRef, ModelBase], model_type: URIRef
+) -> tuple[ModelBase, ...]:
+    return tuple(resource for resource in resources.values() if model_type in resource.types)
+
+
+def _check_resource_metadata(
+    owner: str, owner_id: URIRef, resources: dict[URIRef, ModelBase]
+) -> None:
+    for resource in _resources_by_type(resources, URI_PY_TYPE_MODULE_ATTR):
+        assert resource.has_attr(key=URI_PY_PRED_MODULE_NAME), (
+            f"Python attribute model '{resource.id}' for {owner} '{owner_id}' missing module name"
+        )
+        assert resource.has_attr(key=URI_PY_PRED_ATTR_NAME), (
+            f"Python attribute model '{resource.id}' for {owner} '{owner_id}' missing attribute name"
+        )
+    for resource in _resources_by_type(resources, URI_EXEC_TYPE_RES_PATH):
+        assert resource.has_attr(URI_EXEC_PRED_PATH), (
+            f"ResourceWithPath model '{resource.id}' for {owner} '{owner_id}' missing attr path"
+        )
 
 
 def given_objects_mockup(context: Context):
@@ -88,25 +114,12 @@ def given_objects_mockup(context: Context):
     assert context.current_scenario is not None, (
         "no 'current_scenario' in context, expected a ScenarioVariantModel"
     )
-    for obj_model in load_obj_models_from_table(
-        table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
+    scene_inst = context.current_scene_instance
+    assert isinstance(scene_inst, SceneInstanceModel)
+    for obj_id, resources in load_obj_resources_from_table(
+        table=context.table, graph=context.model_graph, scene_inst=scene_inst
     ):
-        if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
-            for py_model_uri in obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
-                py_model = obj_model.models[py_model_uri]
-                assert py_model.has_attr(key=URI_PY_PRED_MODULE_NAME), (
-                    f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
-                )
-                assert py_model.has_attr(key=URI_PY_PRED_ATTR_NAME), (
-                    f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
-                )
-
-        if URI_EXEC_TYPE_RES_PATH in obj_model.model_types:
-            for py_model_uri in obj_model.model_type_to_id[URI_EXEC_TYPE_RES_PATH]:
-                path_model = obj_model.load_first_model_by_type(model_type=URI_EXEC_TYPE_RES_PATH)
-                assert path_model.has_attr(URI_EXEC_PRED_PATH), (
-                    f"ResourceWithPath model '{path_model.id}' for object '{obj_model.id}' missing attr path"
-                )
+        _check_resource_metadata("object", obj_id, resources)
 
 
 def given_workspaces_mockup(context: Context):
@@ -118,28 +131,11 @@ def given_workspaces_mockup(context: Context):
     for ws_model in load_ws_models_from_table(
         table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
     ):
-        element_loader = context.current_scenario.scene.element_loader
-        for obj_model in element_loader.load_ws_objects(
-            graph=context.model_graph, ws_id=ws_model.id
-        ):
-            if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
-                for py_model_uri in obj_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
-                    py_model = obj_model.models[py_model_uri]
-                    assert py_model.has_attr(key=URI_PY_PRED_MODULE_NAME), (
-                        f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
-                    )
-                    assert py_model.has_attr(key=URI_PY_PRED_ATTR_NAME), (
-                        f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
-                    )
-
-            if URI_EXEC_TYPE_RES_PATH in obj_model.model_types:
-                for py_model_uri in obj_model.model_type_to_id[URI_EXEC_TYPE_RES_PATH]:
-                    path_model = obj_model.load_first_model_by_type(
-                        model_type=URI_EXEC_TYPE_RES_PATH
-                    )
-                    assert path_model.has_attr(URI_EXEC_PRED_PATH), (
-                        f"ResourceWithPath model '{path_model.id}' for object '{obj_model.id}' missing attr path"
-                    )
+        scene_inst = context.current_scene_instance
+        assert isinstance(scene_inst, SceneInstanceModel)
+        for obj_id in context.current_scenario.scene.iter_workspace_objects(ws_model.id):
+            resources = scene_inst.object_models.get(obj_id, {})
+            _check_resource_metadata("object", obj_id, resources)
 
 
 def given_agents_mockup(context: Context):
@@ -148,18 +144,12 @@ def given_agents_mockup(context: Context):
     assert context.current_scenario is not None, (
         "no 'current_scenario' in context, expected an ScenarioVariantModel"
     )
-    for agn_model in load_agn_models_from_table(
-        table=context.table, graph=context.model_graph, scene=context.current_scenario.scene
+    scene_inst = context.current_scene_instance
+    assert isinstance(scene_inst, SceneInstanceModel)
+    for agn_id, resources in load_agn_resources_from_table(
+        table=context.table, graph=context.model_graph, scene_inst=scene_inst
     ):
-        if URI_PY_TYPE_MODULE_ATTR in agn_model.model_types:
-            for py_model_uri in agn_model.model_type_to_id[URI_PY_TYPE_MODULE_ATTR]:
-                py_model = agn_model.models[py_model_uri]
-                assert py_model.has_attr(key=URI_PY_PRED_MODULE_NAME), (
-                    f"Python attribute model '{py_model.id}' for agent '{agn_model.id}' missing module name"
-                )
-                assert py_model.has_attr(key=URI_PY_PRED_ATTR_NAME), (
-                    f"Python attribute model '{py_model.id}' for agent '{agn_model.id}' missing attribute name"
-                )
+        _check_resource_metadata("agent", agn_id, resources)
 
 
 def given_scene_mockup(context: Context):
@@ -178,24 +168,19 @@ def is_located_at_mockup(context: Context, **kwargs: Any):
         param_str=params[PARAM_OBJ], ns_manager=context.model_graph.namespace_manager
     )
     for obj_uri in pick_obj_uris:
-        obj_model = context.current_scenario.scene.load_obj_model(
-            graph=context.model_graph, obj_id=obj_uri
-        )
-        assert obj_model is not None, f"can't load model for object {obj_uri}"
-        if URI_PY_TYPE_MODULE_ATTR in obj_model.model_types:
-            py_model = obj_model.load_first_model_by_type(URI_PY_TYPE_MODULE_ATTR)
-            assert py_model.has_attr(key=URI_PY_PRED_MODULE_NAME), (
-                f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing module name"
-            )
-            assert py_model.has_attr(key=URI_PY_PRED_ATTR_NAME), (
-                f"Python attribute model '{py_model.id}' for object '{obj_model.id}' missing attribute name"
-            )
+        scene_inst = context.current_scene_instance
+        assert isinstance(scene_inst, SceneInstanceModel)
+        resources = scene_inst.object_models.get(obj_uri, {})
+        _check_resource_metadata("object", obj_uri, resources)
 
     _, pick_ws_uris = parse_str_param(
         param_str=params[PARAM_WS], ns_manager=context.model_graph.namespace_manager
     )
     for ws_uri in pick_ws_uris:
-        _ = context.current_scenario.scene.load_ws_model(graph=context.model_graph, ws_id=ws_uri)
+        if ws_uri not in context.current_scenario.scene.workspaces:
+            raise ValueError(
+                f"workspace '{ws_uri}' is not in scene '{context.current_scenario.scene.id}'"
+            )
 
     evt_uri = try_expand_curie(
         curie_str=params[PARAM_EVT], ns_manager=context.model_graph.namespace_manager, quiet=False
@@ -210,14 +195,7 @@ def move_safe_mockup(context: Context, **kwargs: Any):
     )
 
     params = load_str_params(param_names=[PARAM_AGN, PARAM_FROM_EVT, PARAM_UNTIL_EVT], **kwargs)
-    _, pickplace_agn_uris = parse_str_param(
-        param_str=params[PARAM_AGN], ns_manager=context.model_graph.namespace_manager
-    )
-    for agn_uri in pickplace_agn_uris:
-        agn_model = context.current_scenario.scene.load_agn_model(
-            graph=context.model_graph, agent_id=agn_uri
-        )
-        assert agn_model is not None, f"can't load model for agent {agn_uri}"
+    parse_str_param(param_str=params[PARAM_AGN], ns_manager=context.model_graph.namespace_manager)
 
 
 class PickplaceBehaviourMockup(Behaviour):
@@ -298,9 +276,9 @@ def behaviour_mockup(context: Context, **kwargs: Any):
     behaviour_model = getattr(context, "behaviour_model", None)
 
     if behaviour_model is None:
-        exec_model = getattr(context, "execution_model", None)
-        assert isinstance(exec_model, ExecutionModel), (
-            f"no valid 'execution_model' added to the context: {exec_model}"
+        scenario_exec = getattr(context, "current_scenario_execution", None)
+        assert isinstance(scenario_exec, ScenarioExecutionModel), (
+            f"no valid 'current_scenario_execution' added to the context: {scenario_exec}"
         )
 
         model_graph = getattr(context, "model_graph", None)
@@ -308,7 +286,7 @@ def behaviour_mockup(context: Context, **kwargs: Any):
             f"no 'model_graph' of type rdflib.Graph in context: {model_graph}"
         )
 
-        behaviour_model = exec_model.load_behaviour_impl(
+        behaviour_model = scenario_exec.load_behaviour_impl(
             context=context,
             ns_manager=model_graph.namespace_manager,
         )
