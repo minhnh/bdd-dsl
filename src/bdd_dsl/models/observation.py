@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase
+from rdf_utils.models.python import (
+    URI_PY_TYPE_MODULE_ATTR,
+    import_attr_from_model,
+    load_py_module_attr,
+)
 from rdflib import Graph, URIRef
 from trinary import Trinary, Unknown
 
@@ -14,6 +19,8 @@ from bdd_dsl.models.clauses import FluentClauseModel
 from bdd_dsl.models.time_constraint import get_duration
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_CLAUSE,
+    URI_OBS_PRED_HAS_OBSERVATION,
+    URI_OBS_PRED_PROVIDER,
     URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
@@ -25,7 +32,23 @@ from bdd_dsl.models.urirefs import (
 from bdd_dsl.models.user_story import ScenarioVariantModel
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
+class ObservationStamped:
+    observation_uri: URIRef
+    provider_uri: URIRef
+    stamp: float
+    value: Any
+
+
+class TimestampedObservationProtocol(Protocol):
+    def __call__(self, observation: Any, receipt_stamp: float) -> float: ...
+
+
+class ObservationPolicyEvaluatorProtocol(Protocol):
+    def __call__(self, observations: list[ObservationStamped]) -> bool | Trinary: ...
+
+
+@dataclass(frozen=True, slots=True)
 class TrinaryStamped:
     stamp: float
     trinary: Trinary | bool
@@ -50,6 +73,9 @@ def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Tr
 
 class ObsPolicyModel(ModelBase):
     trinary_timeline: list[TrinaryStamped]
+    observation_uris: set[URIRef]
+    observation_providers: dict[URIRef, URIRef]
+    evaluator: ObservationPolicyEvaluatorProtocol | None
 
     start_time: float | None
     end_time: float | None
@@ -85,6 +111,29 @@ class ObsPolicyModel(ModelBase):
         self.horizon = horizon
 
         self.trinary_timeline = []
+        self.observation_uris = set()
+        self.observation_providers = {}
+        for observation_uri in graph.objects(subject=self.id, predicate=URI_OBS_PRED_HAS_OBSERVATION):
+            if not isinstance(observation_uri, URIRef):
+                raise TypeError(
+                    f"ObservationPolicy '{self.id}' links to non-URI observation: {observation_uri}"
+                )
+            provider_uri = graph.value(
+                subject=observation_uri, predicate=URI_OBS_PRED_PROVIDER, any=False)
+            if not isinstance(provider_uri, URIRef):
+                raise TypeError(
+                    f"Observation '{observation_uri}' has invalid provider: {provider_uri}"
+                )
+            self.observation_uris.add(observation_uri)
+            self.observation_providers[observation_uri] = provider_uri
+
+        self.evaluator = None
+        if URI_PY_TYPE_MODULE_ATTR in self.types:
+            load_py_module_attr(graph=graph, model=self, quiet=False)
+            evaluator = import_attr_from_model(model=self)
+            if not callable(evaluator):
+                raise TypeError(f"ObservationPolicy '{self.id}' Python attribute is not callable")
+            self.evaluator = evaluator
 
         self.start_time = None
         self.end_time = None
@@ -263,6 +312,8 @@ class ObservationManager:
 
     obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> ObsPolicyModel
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
+    observation_cache: dict[URIRef, ObservationStamped]
+    _observation_policy_registry: dict[URIRef, URIRef]  # observation ID -> policy ID
 
     event_timelines: dict[URIRef, list[float]]
     _fluent_event_registry: dict[URIRef, set[URIRef]]  # fluent ID -> event IDs
@@ -276,6 +327,8 @@ class ObservationManager:
 
         self.obs_policies = {}
         self._fluent_policy_registry = {}
+        self.observation_cache = {}
+        self._observation_policy_registry = {}
 
         self.event_timelines = {}
         self._fluent_event_registry = {}
@@ -324,6 +377,10 @@ class ObservationManager:
                 loader(graph=graph, model=obs_pol)
 
             self._fluent_policy_registry[fc.id].add(obs_pol.id)
+            for observation_uri in obs_pol.observation_uris:
+                if observation_uri in self._observation_policy_registry:
+                    raise ValueError(f"Observation already registered: '{observation_uri}'")
+                self._observation_policy_registry[observation_uri] = obs_pol.id
             self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
             self.obs_policies[obs_pol.id] = obs_pol
@@ -338,6 +395,38 @@ class ObservationManager:
             raise ValueError(f"ObservationPolicy not registered: '{policy_uri}'")
 
         return self.obs_policies[policy_uri].add_trinary(trin_st)
+
+    def update_observation(self, observation: ObservationStamped) -> tuple[bool, str]:
+        policy_uri = self._observation_policy_registry.get(observation.observation_uri)
+        if policy_uri is None:
+            raise ValueError(f"Observation not registered: '{observation.observation_uri}'")
+
+        policy = self.obs_policies[policy_uri]
+        provider_uri = policy.observation_providers.get(observation.observation_uri)
+        if provider_uri is None:
+            raise ValueError(
+                f"Observation '{observation.observation_uri}' is not configured for policy '{policy_uri}'"
+            )
+        if observation.provider_uri != provider_uri:
+            raise ValueError(
+                f"Observation '{observation.observation_uri}' received from '{observation.provider_uri}', "
+                f"expected '{provider_uri}'"
+            )
+
+        cached = self.observation_cache.get(observation.observation_uri)
+        if cached is not None and observation.stamp < cached.stamp:
+            return False, "(observation) older than cached sample"
+        self.observation_cache[observation.observation_uri] = observation
+        if policy.evaluator is None:
+            return False, "no evaluator"
+        if any(uri not in self.observation_cache for uri in policy.observation_uris):
+            return True, "(observation) waiting for policy inputs"
+
+        observations = [self.observation_cache[uri] for uri in policy.observation_uris]
+        result = policy.evaluator(observations)
+        return policy.add_trinary(
+            TrinaryStamped(stamp=max(sample.stamp for sample in observations), trinary=result)
+        )
 
     def on_event(self, evt_uri: URIRef, evt_t: float):
         if evt_uri not in self.event_timelines:

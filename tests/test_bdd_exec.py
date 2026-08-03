@@ -5,20 +5,31 @@ from unittest.mock import patch
 from urllib.request import HTTPError
 
 from rdf_utils.constraints import check_shacl_constraints
+from rdf_utils.models.python import (
+    URI_PY_PRED_ATTR_NAME,
+    URI_PY_PRED_MODULE_NAME,
+    URI_PY_TYPE_MODULE_ATTR,
+)
 from rdf_utils.models.vocab import URI_EXEC_PRED_RUNS_SCENE, URI_EXEC_TYPE_SCENE_INST
 from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_M
 from rdf_utils.resolver import install_resolver
-from rdflib import RDF, Dataset, Graph, URIRef
+from rdflib import RDF, Dataset, Graph, Literal, URIRef
 
 from bdd_dsl.execution.common import URL_MM_EXEC_SHACL
 from bdd_dsl.execution.scenario import ScenarioExecutionModel
+from bdd_dsl.models.observation import ObsPolicyModel, ObservationManager, ObservationStamped
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_BHV_IMPL,
     URI_BDD_PRED_OF_VARIANT,
     URI_BDD_TYPE_SCENARIO_EXEC,
     URI_BHV_PRED_OF_BHV,
+    URI_OBS_PRED_HAS_OBSERVATION,
+    URI_OBS_PRED_PROVIDER,
+    URI_OBS_TYPE_OBSERVATION,
+    URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
+    URI_TIME_TYPE_BEFORE_EVT,
 )
 from bdd_dsl.models.user_story import UserStoryLoader
 
@@ -69,6 +80,53 @@ class BDDExecTest(unittest.TestCase):
                     full_graph=self.graph, variant_id=scr_var_uri
                 )
                 self.assertTrue(scr_var.scene.objects)
+
+    def test_python_observation_policy_evaluates_cached_samples(self):
+        graph = Graph()
+        policy_uri = URIRef("urn:test:policy")
+        observation_uri = URIRef("urn:test:observation")
+        provider_uri = URIRef("urn:test:provider")
+        graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+        graph.add((policy_uri, RDF.type, URI_PY_TYPE_MODULE_ATTR))
+        graph.add((policy_uri, URI_PY_PRED_MODULE_NAME, Literal("operator")))
+        graph.add((policy_uri, URI_PY_PRED_ATTR_NAME, Literal("truth")))
+        graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
+        graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
+        graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+
+        policy = ObsPolicyModel(
+            node_id=policy_uri,
+            graph=graph,
+            fluent_id=URIRef("urn:test:fluent"),
+            fluent_types=set(),
+            duration_type=URI_TIME_TYPE_BEFORE_EVT,
+            start_event=None,
+            end_event=URIRef("urn:test:end"),
+            horizon=10.0,
+        )
+        manager = ObservationManager(scr_exec=SimpleNamespace())
+        manager.obs_policies[policy_uri] = policy
+        manager._observation_policy_registry[observation_uri] = policy_uri
+
+        accepted, _ = manager.update_observation(
+            ObservationStamped(observation_uri, provider_uri, 2.0, object())
+        )
+        self.assertTrue(accepted)
+        self.assertEqual(policy.trinary_timeline[0].stamp, 2.0)
+        self.assertTrue(policy.trinary_timeline[0].trinary)
+
+        accepted, detail = manager.update_observation(
+            ObservationStamped(observation_uri, provider_uri, 1.0, object())
+        )
+        self.assertFalse(accepted)
+        self.assertIn("older", detail)
+        self.assertEqual(manager.observation_cache[observation_uri].stamp, 2.0)
+        self.assertEqual(len(policy.trinary_timeline), 1)
+
+        with self.assertRaisesRegex(ValueError, "expected"):
+            manager.update_observation(
+                ObservationStamped(observation_uri, URIRef("urn:test:wrong-provider"), 3.0, object())
+            )
 
     def test_scenario_execution_selects_exact_scene_instance(self):
         graph = Graph()
