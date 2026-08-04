@@ -20,6 +20,7 @@ from bdd_dsl.models.time_constraint import get_duration
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_CLAUSE,
     URI_OBS_PRED_HAS_OBSERVATION,
+    URI_OBS_PRED_OBSERVES_TARGET,
     URI_OBS_PRED_PROVIDER,
     URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
@@ -42,6 +43,16 @@ class ObservationStamped:
 
 class TimestampedObservationProtocol(Protocol):
     def __call__(self, observation: Any, receipt_stamp: float) -> float: ...
+
+
+@dataclass(frozen=True, slots=True)
+class EntityObservation:
+    entity_uri: URIRef
+    value: Any
+
+
+class EntityObservationMapperProtocol(Protocol):
+    def __call__(self, observation: Any) -> list[EntityObservation]: ...
 
 
 class ObservationPolicyEvaluatorProtocol(Protocol):
@@ -75,6 +86,7 @@ class ObsPolicyModel(ModelBase):
     trinary_timeline: list[TrinaryStamped]
     observation_uris: set[URIRef]
     observation_providers: dict[URIRef, URIRef]
+    observation_targets: dict[URIRef, URIRef | None]
     evaluator: ObservationPolicyEvaluatorProtocol | None
 
     start_time: float | None
@@ -113,19 +125,27 @@ class ObsPolicyModel(ModelBase):
         self.trinary_timeline = []
         self.observation_uris = set()
         self.observation_providers = {}
-        for observation_uri in graph.objects(subject=self.id, predicate=URI_OBS_PRED_HAS_OBSERVATION):
+        self.observation_targets = {}
+        for observation_uri in graph.objects(
+            subject=self.id, predicate=URI_OBS_PRED_HAS_OBSERVATION
+        ):
             if not isinstance(observation_uri, URIRef):
                 raise TypeError(
                     f"ObservationPolicy '{self.id}' links to non-URI observation: {observation_uri}"
                 )
             provider_uri = graph.value(
-                subject=observation_uri, predicate=URI_OBS_PRED_PROVIDER, any=False)
+                subject=observation_uri, predicate=URI_OBS_PRED_PROVIDER, any=False
+            )
             if not isinstance(provider_uri, URIRef):
                 raise TypeError(
                     f"Observation '{observation_uri}' has invalid provider: {provider_uri}"
                 )
+            target_uri = graph.value(observation_uri, URI_OBS_PRED_OBSERVES_TARGET, any=False)
+            if target_uri is not None and not isinstance(target_uri, URIRef):
+                raise TypeError(f"Observation '{observation_uri}' has invalid target: {target_uri}")
             self.observation_uris.add(observation_uri)
             self.observation_providers[observation_uri] = provider_uri
+            self.observation_targets[observation_uri] = target_uri
 
         self.evaluator = None
         if URI_PY_TYPE_MODULE_ATTR in self.types:
@@ -314,6 +334,9 @@ class ObservationManager:
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
     observation_cache: dict[URIRef, ObservationStamped]
     _observation_policy_registry: dict[URIRef, URIRef]  # observation ID -> policy ID
+    _provider_registry: dict[
+        URIRef, tuple[TimestampedObservationProtocol | None, EntityObservationMapperProtocol | None]
+    ]
 
     event_timelines: dict[URIRef, list[float]]
     _fluent_event_registry: dict[URIRef, set[URIRef]]  # fluent ID -> event IDs
@@ -329,6 +352,7 @@ class ObservationManager:
         self._fluent_policy_registry = {}
         self.observation_cache = {}
         self._observation_policy_registry = {}
+        self._provider_registry = {}
 
         self.event_timelines = {}
         self._fluent_event_registry = {}
@@ -384,6 +408,59 @@ class ObservationManager:
             self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
             self.obs_policies[obs_pol.id] = obs_pol
+
+    def register_provider(
+        self,
+        provider_uri: URIRef,
+        timestamp_extractor: TimestampedObservationProtocol | None = None,
+        entity_mapper: EntityObservationMapperProtocol | None = None,
+    ) -> None:
+        self._provider_registry[provider_uri] = (timestamp_extractor, entity_mapper)
+
+    def bind_observation_targets(self, bindings: dict[URIRef, Any]) -> None:
+        """Resolve template-variable targets for this scenario context."""
+        for policy in self.obs_policies.values():
+            for observation_uri, target_uri in policy.observation_targets.items():
+                bound_target = bindings.get(target_uri)
+                if bound_target is not None:
+                    if not isinstance(bound_target, URIRef):
+                        raise TypeError(
+                            f"observation target '{target_uri}' is bound to non-URI {bound_target}"
+                        )
+                    policy.observation_targets[observation_uri] = bound_target
+
+    def update_provider_observation(
+        self, provider_uri: URIRef, raw_value: Any, receipt_stamp: float
+    ) -> list[tuple[bool, str]]:
+        timestamp_extractor, entity_mapper = self._provider_registry.get(provider_uri, (None, None))
+        stamp = (
+            receipt_stamp
+            if timestamp_extractor is None
+            else timestamp_extractor(raw_value, receipt_stamp)
+        )
+        values = [(None, raw_value)]
+        if entity_mapper is not None:
+            for entity_observation in entity_mapper(raw_value):
+                if not isinstance(entity_observation, EntityObservation):
+                    raise TypeError(
+                        f"entity mapper for {provider_uri} returned {type(entity_observation)}"
+                    )
+                values.append((entity_observation.entity_uri, entity_observation.value))
+
+        results = []
+        for observation_uri, policy_uri in self._observation_policy_registry.items():
+            policy = self.obs_policies[policy_uri]
+            if policy.observation_providers[observation_uri] != provider_uri:
+                continue
+            target_uri = policy.observation_targets[observation_uri]
+            for entity_uri, value in values:
+                if entity_uri == target_uri:
+                    results.append(
+                        self.update_observation(
+                            ObservationStamped(observation_uri, provider_uri, stamp, value)
+                        )
+                    )
+        return results
 
     def update_bhv_result(self, trin_st: TrinaryStamped):
         self.bhv_result = trin_st

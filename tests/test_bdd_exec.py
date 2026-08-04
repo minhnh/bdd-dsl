@@ -17,13 +17,19 @@ from rdflib import RDF, Dataset, Graph, Literal, URIRef
 
 from bdd_dsl.execution.common import URL_MM_EXEC_SHACL
 from bdd_dsl.execution.scenario import ScenarioExecutionModel
-from bdd_dsl.models.observation import ObsPolicyModel, ObservationManager, ObservationStamped
+from bdd_dsl.models.observation import (
+    EntityObservation,
+    ObservationManager,
+    ObservationStamped,
+    ObsPolicyModel,
+)
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_BHV_IMPL,
     URI_BDD_PRED_OF_VARIANT,
     URI_BDD_TYPE_SCENARIO_EXEC,
     URI_BHV_PRED_OF_BHV,
     URI_OBS_PRED_HAS_OBSERVATION,
+    URI_OBS_PRED_OBSERVES_TARGET,
     URI_OBS_PRED_PROVIDER,
     URI_OBS_TYPE_OBSERVATION,
     URI_OBS_TYPE_POLICY,
@@ -86,6 +92,8 @@ class BDDExecTest(unittest.TestCase):
         policy_uri = URIRef("urn:test:policy")
         observation_uri = URIRef("urn:test:observation")
         provider_uri = URIRef("urn:test:provider")
+        target_uri = URIRef("urn:test:target-variable")
+        bound_target_uri = URIRef("urn:test:target")
         graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
         graph.add((policy_uri, RDF.type, URI_PY_TYPE_MODULE_ATTR))
         graph.add((policy_uri, URI_PY_PRED_MODULE_NAME, Literal("operator")))
@@ -93,6 +101,7 @@ class BDDExecTest(unittest.TestCase):
         graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
         graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
         graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+        graph.add((observation_uri, URI_OBS_PRED_OBSERVES_TARGET, target_uri))
 
         policy = ObsPolicyModel(
             node_id=policy_uri,
@@ -104,14 +113,20 @@ class BDDExecTest(unittest.TestCase):
             end_event=URIRef("urn:test:end"),
             horizon=10.0,
         )
+        self.assertEqual(policy.observation_targets[observation_uri], target_uri)
         manager = ObservationManager(scr_exec=SimpleNamespace())
         manager.obs_policies[policy_uri] = policy
         manager._observation_policy_registry[observation_uri] = policy_uri
 
-        accepted, _ = manager.update_observation(
-            ObservationStamped(observation_uri, provider_uri, 2.0, object())
+        manager.bind_observation_targets({target_uri: bound_target_uri})
+        self.assertEqual(policy.observation_targets[observation_uri], bound_target_uri)
+        manager.register_provider(
+            provider_uri,
+            timestamp_extractor=lambda _, receipt_stamp: receipt_stamp + 1,
+            entity_mapper=lambda _: [EntityObservation(bound_target_uri, True)],
         )
-        self.assertTrue(accepted)
+        results = manager.update_provider_observation(provider_uri, object(), 1.0)
+        self.assertEqual(results, [(True, "")])
         self.assertEqual(policy.trinary_timeline[0].stamp, 2.0)
         self.assertTrue(policy.trinary_timeline[0].trinary)
 
@@ -125,7 +140,9 @@ class BDDExecTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "expected"):
             manager.update_observation(
-                ObservationStamped(observation_uri, URIRef("urn:test:wrong-provider"), 3.0, object())
+                ObservationStamped(
+                    observation_uri, URIRef("urn:test:wrong-provider"), 3.0, object()
+                )
             )
 
     def test_scenario_execution_selects_exact_scene_instance(self):
