@@ -36,6 +36,8 @@ from bdd_dsl.models.user_story import ScenarioVariantModel
 
 @dataclass(frozen=True, slots=True)
 class ObservationStamped:
+    """A normalized value for one policy-local observation input."""
+
     observation_uri: URIRef
     provider_uri: URIRef
     stamp: float
@@ -43,6 +45,8 @@ class ObservationStamped:
 
 
 class TimestampedObservationProtocol(Protocol):
+    """Extract a source timestamp, falling back to the ingress receipt timestamp."""
+
     def __call__(self, observation: Any, receipt_stamp: float) -> float: ...
 
 
@@ -53,10 +57,18 @@ class EntityObservation:
 
 
 class EntityObservationMapperProtocol(Protocol):
+    """Map a raw provider message to zero or more target-specific values."""
+
     def __call__(self, observation: Any) -> list[EntityObservation]: ...
 
 
 class ObservationPolicyEvaluatorProtocol(Protocol):
+    """Evaluate a complete policy snapshot as a trinary or boolean.
+
+    A Python policy attribute may be a function, a callable object, or a no-argument
+    callable class. Classes are instantiated once while the policy model is loaded.
+    """
+
     def __call__(self, observations: list[ObservationStamped]) -> bool | Trinary: ...
 
 
@@ -322,6 +334,15 @@ class ObsPolicyModel(ModelBase):
 
 
 class ObservationManager:
+    """Route provider values into policy-local caches and fluent timelines.
+
+    Register provider adapters after building a scenario context. Feed raw provider
+    messages through :meth:`update_provider_observation`; it extracts a timestamp,
+    maps target-specific values, and evaluates each complete policy snapshot once.
+    :meth:`update_fpolicy_assertion` remains the compatibility ingress for direct
+    ``TrinaryStamped`` topic policies.
+    """
+
     scenario_exec: ScenarioExecutionModel
     scr_start_time: float | None
     scr_end_time: float | None
@@ -380,6 +401,7 @@ class ObservationManager:
     def register_fluent_obs(
         self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol]
     ) -> None:
+        """Register execution-selected observation policies for a fluent clause."""
         if fc.id in self._fluent_policy_registry:
             # Already registered
             return
@@ -419,6 +441,7 @@ class ObservationManager:
         timestamp_extractor: TimestampedObservationProtocol | None = None,
         entity_mapper: EntityObservationMapperProtocol | None = None,
     ) -> None:
+        """Register optional timestamp and entity-mapping adapters for a provider."""
         self._provider_registry[provider_uri] = (timestamp_extractor, entity_mapper)
 
     def bind_observation_targets(self, bindings: dict[URIRef, Any]) -> None:
@@ -434,6 +457,7 @@ class ObservationManager:
                     policy.observation_targets[obs_uri] = bound_target
 
     def observation_targets_for_provider(self, provider_uri: URIRef) -> dict[URIRef, URIRef | None]:
+        """Return each configured observation and resolved target for ``provider_uri``."""
         return {
             obs_uri: policy.observation_targets[obs_uri]
             for policy in self.obs_policies.values()
@@ -444,6 +468,10 @@ class ObservationManager:
     def update_provider_observation(
         self, provider_uri: URIRef, raw_value: Any, receipt_stamp: float
     ) -> dict[URIRef, tuple[bool, str]]:
+        """Normalize one raw provider value and route it to matching observations.
+
+        Without an entity mapper, only targetless observations receive the raw value.
+        """
         timestamp_extractor, entity_mapper = self._provider_registry.get(provider_uri, (None, None))
         stamp = (
             receipt_stamp
@@ -469,11 +497,13 @@ class ObservationManager:
         return self.update_observations(observations)
 
     def update_bhv_result(self, trin_st: TrinaryStamped):
+        """Record the behaviour result that closes the active scenario context."""
         self.bhv_result = trin_st
 
     def update_fpolicy_assertion(
         self, policy_uri: URIRef, trin_st: TrinaryStamped
     ) -> tuple[bool, str]:
+        """Insert a direct trinary assertion for a legacy topic-backed policy."""
         if policy_uri not in self.obs_policies:
             raise ValueError(f"ObservationPolicy not registered: '{policy_uri}'")
 
@@ -482,7 +512,11 @@ class ObservationManager:
     def update_observations(
         self, observations: list[ObservationStamped]
     ) -> dict[URIRef, tuple[bool, str]]:
-        """Atomically cache and evaluate each policy represented in a snapshot."""
+        """Cache normalized inputs atomically and evaluate each represented policy once.
+
+        A policy waits until every linked observation has a cached value. Older input
+        snapshots are rejected; equal timestamps replace cached samples.
+        """
         results: dict[URIRef, tuple[bool, str]] = {}
         obs_by_policy: dict[URIRef, list[ObservationStamped]] = {}
         stale_policies: set[URIRef] = set()
@@ -535,6 +569,7 @@ class ObservationManager:
         return results
 
     def on_event(self, evt_uri: URIRef, evt_t: float):
+        """Record a scenario event and open or close affected fluent timelines."""
         if evt_uri not in self.event_timelines:
             self.event_timelines[evt_uri] = [evt_t]
         else:
@@ -562,6 +597,7 @@ class ObservationManager:
         bhv_loaders: list[AttrLoaderProtocol],
         obs_loaders: list[AttrLoaderProtocol],
     ) -> ObservationManager:
+        """Build a manager for a scenario variant and register its fluent policies."""
         scr_exec = ScenarioExecutionModel(
             graph=graph,
             scr_var=scr_var,
