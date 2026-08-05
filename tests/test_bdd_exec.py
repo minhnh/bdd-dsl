@@ -182,6 +182,8 @@ class BDDExecTest(unittest.TestCase):
         manager._observation_policy_registry.update(
             {observation_uri: policy_uri for observation_uri in observation_uris}
         )
+        manager.bind_observation_targets({None: URIRef("urn:test:must-not-bind")})
+        self.assertTrue(all(policy.observation_targets[uri] is None for uri in observation_uris))
 
         results = manager.update_observations(
             [

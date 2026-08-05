@@ -448,6 +448,8 @@ class ObservationManager:
         """Resolve template-variable targets for this scenario context."""
         for policy in self.obs_policies.values():
             for obs_uri, target_uri in policy.observation_targets.items():
+                if target_uri is None:
+                    continue
                 bound_target = bindings.get(target_uri)
                 if bound_target is not None:
                     if not isinstance(bound_target, URIRef):
