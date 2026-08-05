@@ -9,6 +9,7 @@ from rdf_utils.models.python import (
 )
 from rdf_utils.models.vocab import URI_EXEC_PRED_RUNS_SCENE, URI_EXEC_TYPE_SCENE_INST
 from rdflib import RDF, Graph, URIRef
+from scene_dsl.rdf_parser.scenex import SceneInstanceModel
 
 from bdd_dsl.execution.behaviour import Behaviour, BehaviourImplModel
 from bdd_dsl.models.time_constraint import get_duration
@@ -31,7 +32,7 @@ class ScenarioExecutionModel(ModelBase):
     end_event: URIRef
     bhv_impl: BehaviourImplModel
     obs_policy_uris: set[URIRef]
-    scene_inst_id: URIRef
+    scene_instance: SceneInstanceModel
 
     def __init__(
         self,
@@ -57,11 +58,16 @@ class ScenarioExecutionModel(ModelBase):
             raise ValueError(
                 f"ScenarioExecution '{self.id}' must run exactly 1 scene instance: {scene_inst_ids}"
             )
-        self.scene_inst_id = scene_inst_ids[0]
-        if (self.scene_inst_id, RDF.type, URI_EXEC_TYPE_SCENE_INST) not in graph:
+        scene_inst_id = scene_inst_ids[0]
+        if (scene_inst_id, RDF.type, URI_EXEC_TYPE_SCENE_INST) not in graph:
             raise TypeError(
-                f"ScenarioExecution '{self.id}' runs non-SceneInstance '{self.scene_inst_id}'"
+                f"ScenarioExecution '{self.id}' runs non-SceneInstance '{scene_inst_id}'"
             )
+        self.scene_instance = SceneInstanceModel(
+            scene_inst_id,
+            graph,
+            scene_model=scr_var.scene,
+        )
 
         # Boundary events
         dur = get_duration(scr_var.tmpl)

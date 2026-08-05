@@ -25,6 +25,7 @@ from bdd_dsl.models.observation import (
 )
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_BHV_IMPL,
+    URI_BDD_PRED_OF_SCENE,
     URI_BDD_PRED_OF_VARIANT,
     URI_BDD_TYPE_SCENARIO_EXEC,
     URI_BHV_PRED_OF_BHV,
@@ -126,41 +127,105 @@ class BDDExecTest(unittest.TestCase):
             entity_mapper=lambda _: [EntityObservation(bound_target_uri, True)],
         )
         results = manager.update_provider_observation(provider_uri, object(), 1.0)
-        self.assertEqual(results, [(True, "")])
+        self.assertEqual(results, {policy_uri: (True, "")})
         self.assertEqual(policy.trinary_timeline[0].stamp, 2.0)
         self.assertTrue(policy.trinary_timeline[0].trinary)
 
-        accepted, detail = manager.update_observation(
-            ObservationStamped(observation_uri, provider_uri, 1.0, object())
-        )
+        accepted, detail = manager.update_observations(
+            [ObservationStamped(observation_uri, provider_uri, 1.0, object())]
+        )[policy_uri]
         self.assertFalse(accepted)
         self.assertIn("older", detail)
         self.assertEqual(manager.observation_cache[observation_uri].stamp, 2.0)
         self.assertEqual(len(policy.trinary_timeline), 1)
 
         with self.assertRaisesRegex(ValueError, "expected"):
-            manager.update_observation(
-                ObservationStamped(
-                    observation_uri, URIRef("urn:test:wrong-provider"), 3.0, object()
-                )
+            manager.update_observations(
+                [
+                    ObservationStamped(
+                        observation_uri, URIRef("urn:test:wrong-provider"), 3.0, object()
+                    )
+                ]
             )
+
+    def test_observation_batch_evaluates_policy_once_after_caching_all_samples(self):
+        graph = Graph()
+        policy_uri = URIRef("urn:test:policy")
+        provider_uri = URIRef("urn:test:provider")
+        observation_uris = [URIRef(f"urn:test:observation-{i}") for i in range(2)]
+        graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+        for observation_uri in observation_uris:
+            graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
+            graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
+            graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+
+        policy = ObsPolicyModel(
+            node_id=policy_uri,
+            graph=graph,
+            fluent_id=URIRef("urn:test:fluent"),
+            fluent_types=set(),
+            duration_type=URI_TIME_TYPE_BEFORE_EVT,
+            start_event=None,
+            end_event=URIRef("urn:test:end"),
+            horizon=10.0,
+        )
+        calls = []
+        policy.evaluator = lambda samples: calls.append(samples) or True
+        manager = ObservationManager(scr_exec=SimpleNamespace())
+        manager.obs_policies[policy_uri] = policy
+        manager._observation_policy_registry.update(
+            {observation_uri: policy_uri for observation_uri in observation_uris}
+        )
+
+        results = manager.update_observations(
+            [
+                ObservationStamped(observation_uri, provider_uri, stamp, True)
+                for observation_uri, stamp in zip(observation_uris, (1.0, 2.0), strict=True)
+            ]
+        )
+
+        self.assertEqual(results, {policy_uri: (True, "")})
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(policy.trinary_timeline[-1].stamp, 2.0)
+
+        cached_snapshot = dict(manager.observation_cache)
+        results = manager.update_observations(
+            [
+                ObservationStamped(observation_uris[0], provider_uri, 0.0, False),
+                ObservationStamped(observation_uris[1], provider_uri, 3.0, False),
+            ]
+        )
+
+        self.assertEqual(
+            results,
+            {policy_uri: (False, "(observation) older than cached sample")},
+        )
+        self.assertEqual(manager.observation_cache, cached_snapshot)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(policy.trinary_timeline), 1)
 
     def test_scenario_execution_selects_exact_scene_instance(self):
         graph = Graph()
         variant = URIRef("urn:test:variant")
         execution = URIRef("urn:test:execution")
         scene_inst = URIRef("urn:test:scene-instance")
+        scene = URIRef("urn:test:scene")
         bhv_impl = URIRef("urn:test:behaviour-implementation")
         behaviour = URIRef("urn:test:behaviour")
         graph.add((execution, RDF.type, URI_BDD_TYPE_SCENARIO_EXEC))
         graph.add((execution, URI_BDD_PRED_OF_VARIANT, variant))
         graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, scene_inst))
         graph.add((scene_inst, RDF.type, URI_EXEC_TYPE_SCENE_INST))
+        graph.add((scene_inst, URI_BDD_PRED_OF_SCENE, scene))
         graph.add((execution, URI_BDD_PRED_HAS_BHV_IMPL, bhv_impl))
         graph.add((bhv_impl, RDF.type, URIRef("urn:test:Implementation")))
         graph.add((bhv_impl, URI_BHV_PRED_OF_BHV, behaviour))
         graph.add((behaviour, RDF.type, URIRef("urn:test:Behaviour")))
-        scr_var = SimpleNamespace(id=variant, tmpl=object())
+        scr_var = SimpleNamespace(
+            id=variant,
+            tmpl=object(),
+            scene=SimpleNamespace(id=scene),
+        )
         duration = {
             URI_TIME_PRED_AFTER_EVT: URIRef("urn:test:start"),
             URI_TIME_PRED_BEFORE_EVT: URIRef("urn:test:end"),
@@ -168,7 +233,7 @@ class BDDExecTest(unittest.TestCase):
 
         with patch("bdd_dsl.execution.scenario.get_duration", return_value=duration):
             model = ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
-            self.assertEqual(model.scene_inst_id, scene_inst)
+            self.assertEqual(model.scene_instance.id, scene_inst)
 
             other_scene = URIRef("urn:test:other-scene-instance")
             graph.add((other_scene, RDF.type, URI_EXEC_TYPE_SCENE_INST))

@@ -79,11 +79,7 @@ def before_scenario(context: Context, scenario: Scenario):
     )
     context.current_scenario = scenario_var_model
     context.current_scenario_execution = scenario_exec
-    context.current_scene_instance = SceneInstanceModel(
-        scenario_exec.scene_inst_id,
-        model_graph,
-        scene_model=scenario_var_model.scene,
-    )
+    context.current_scene_instance = scenario_exec.scene_instance
 
 
 def _resources_by_type(

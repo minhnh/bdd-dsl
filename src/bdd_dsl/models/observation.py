@@ -126,26 +126,20 @@ class ObsPolicyModel(ModelBase):
         self.observation_uris = set()
         self.observation_providers = {}
         self.observation_targets = {}
-        for observation_uri in graph.objects(
-            subject=self.id, predicate=URI_OBS_PRED_HAS_OBSERVATION
-        ):
-            if not isinstance(observation_uri, URIRef):
+        for obs_uri in graph.objects(subject=self.id, predicate=URI_OBS_PRED_HAS_OBSERVATION):
+            if not isinstance(obs_uri, URIRef):
                 raise TypeError(
-                    f"ObservationPolicy '{self.id}' links to non-URI observation: {observation_uri}"
+                    f"ObservationPolicy '{self.id}' links to non-URI observation: {obs_uri}"
                 )
-            provider_uri = graph.value(
-                subject=observation_uri, predicate=URI_OBS_PRED_PROVIDER, any=False
-            )
+            provider_uri = graph.value(subject=obs_uri, predicate=URI_OBS_PRED_PROVIDER, any=False)
             if not isinstance(provider_uri, URIRef):
-                raise TypeError(
-                    f"Observation '{observation_uri}' has invalid provider: {provider_uri}"
-                )
-            target_uri = graph.value(observation_uri, URI_OBS_PRED_OBSERVES_TARGET, any=False)
+                raise TypeError(f"Observation '{obs_uri}' has invalid provider: {provider_uri}")
+            target_uri = graph.value(obs_uri, URI_OBS_PRED_OBSERVES_TARGET, any=False)
             if target_uri is not None and not isinstance(target_uri, URIRef):
-                raise TypeError(f"Observation '{observation_uri}' has invalid target: {target_uri}")
-            self.observation_uris.add(observation_uri)
-            self.observation_providers[observation_uri] = provider_uri
-            self.observation_targets[observation_uri] = target_uri
+                raise TypeError(f"Observation '{obs_uri}' has invalid target: {target_uri}")
+            self.observation_uris.add(obs_uri)
+            self.observation_providers[obs_uri] = provider_uri
+            self.observation_targets[obs_uri] = target_uri
 
         self.evaluator = None
         if URI_PY_TYPE_MODULE_ATTR in self.types:
@@ -401,10 +395,10 @@ class ObservationManager:
                 loader(graph=graph, model=obs_pol)
 
             self._fluent_policy_registry[fc.id].add(obs_pol.id)
-            for observation_uri in obs_pol.observation_uris:
-                if observation_uri in self._observation_policy_registry:
-                    raise ValueError(f"Observation already registered: '{observation_uri}'")
-                self._observation_policy_registry[observation_uri] = obs_pol.id
+            for obs_uri in obs_pol.observation_uris:
+                if obs_uri in self._observation_policy_registry:
+                    raise ValueError(f"Observation already registered: '{obs_uri}'")
+                self._observation_policy_registry[obs_uri] = obs_pol.id
             self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
             self.obs_policies[obs_pol.id] = obs_pol
@@ -420,47 +414,41 @@ class ObservationManager:
     def bind_observation_targets(self, bindings: dict[URIRef, Any]) -> None:
         """Resolve template-variable targets for this scenario context."""
         for policy in self.obs_policies.values():
-            for observation_uri, target_uri in policy.observation_targets.items():
+            for obs_uri, target_uri in policy.observation_targets.items():
                 bound_target = bindings.get(target_uri)
                 if bound_target is not None:
                     if not isinstance(bound_target, URIRef):
                         raise TypeError(
                             f"observation target '{target_uri}' is bound to non-URI {bound_target}"
                         )
-                    policy.observation_targets[observation_uri] = bound_target
+                    policy.observation_targets[obs_uri] = bound_target
 
     def update_provider_observation(
         self, provider_uri: URIRef, raw_value: Any, receipt_stamp: float
-    ) -> list[tuple[bool, str]]:
+    ) -> dict[URIRef, tuple[bool, str]]:
         timestamp_extractor, entity_mapper = self._provider_registry.get(provider_uri, (None, None))
         stamp = (
             receipt_stamp
             if timestamp_extractor is None
             else timestamp_extractor(raw_value, receipt_stamp)
         )
-        values = [(None, raw_value)]
+        values: list[tuple[URIRef | None, Any]] = [(None, raw_value)]
         if entity_mapper is not None:
-            for entity_observation in entity_mapper(raw_value):
-                if not isinstance(entity_observation, EntityObservation):
-                    raise TypeError(
-                        f"entity mapper for {provider_uri} returned {type(entity_observation)}"
-                    )
-                values.append((entity_observation.entity_uri, entity_observation.value))
+            for entity_obs in entity_mapper(raw_value):
+                if not isinstance(entity_obs, EntityObservation):
+                    raise TypeError(f"entity mapper for {provider_uri} returned {type(entity_obs)}")
+                values.append((entity_obs.entity_uri, entity_obs.value))
 
-        results = []
-        for observation_uri, policy_uri in self._observation_policy_registry.items():
+        observations = []
+        for obs_uri, policy_uri in self._observation_policy_registry.items():
             policy = self.obs_policies[policy_uri]
-            if policy.observation_providers[observation_uri] != provider_uri:
+            if policy.observation_providers[obs_uri] != provider_uri:
                 continue
-            target_uri = policy.observation_targets[observation_uri]
+            target_uri = policy.observation_targets[obs_uri]
             for entity_uri, value in values:
                 if entity_uri == target_uri:
-                    results.append(
-                        self.update_observation(
-                            ObservationStamped(observation_uri, provider_uri, stamp, value)
-                        )
-                    )
-        return results
+                    observations.append(ObservationStamped(obs_uri, provider_uri, stamp, value))
+        return self.update_observations(observations)
 
     def update_bhv_result(self, trin_st: TrinaryStamped):
         self.bhv_result = trin_st
@@ -473,37 +461,60 @@ class ObservationManager:
 
         return self.obs_policies[policy_uri].add_trinary(trin_st)
 
-    def update_observation(self, observation: ObservationStamped) -> tuple[bool, str]:
-        policy_uri = self._observation_policy_registry.get(observation.observation_uri)
-        if policy_uri is None:
-            raise ValueError(f"Observation not registered: '{observation.observation_uri}'")
+    def update_observations(
+        self, observations: list[ObservationStamped]
+    ) -> dict[URIRef, tuple[bool, str]]:
+        """Atomically cache and evaluate each policy represented in a snapshot."""
+        results: dict[URIRef, tuple[bool, str]] = {}
+        obs_by_policy: dict[URIRef, list[ObservationStamped]] = {}
+        stale_policies: set[URIRef] = set()
+        for obs in observations:
+            policy_uri = self._observation_policy_registry.get(obs.observation_uri)
+            if policy_uri is None:
+                raise ValueError(f"Observation not registered: '{obs.observation_uri}'")
 
-        policy = self.obs_policies[policy_uri]
-        provider_uri = policy.observation_providers.get(observation.observation_uri)
-        if provider_uri is None:
-            raise ValueError(
-                f"Observation '{observation.observation_uri}' is not configured for policy '{policy_uri}'"
+            policy = self.obs_policies[policy_uri]
+            provider_uri = policy.observation_providers.get(obs.observation_uri)
+            if provider_uri is None:
+                raise ValueError(
+                    f"Observation '{obs.observation_uri}' is not configured for policy "
+                    f"'{policy_uri}'"
+                )
+            if obs.provider_uri != provider_uri:
+                raise ValueError(
+                    f"Observation '{obs.observation_uri}' received from "
+                    f"'{obs.provider_uri}', expected '{provider_uri}'"
+                )
+            obs_by_policy.setdefault(policy_uri, []).append(obs)
+            cached = self.observation_cache.get(obs.observation_uri)
+            if cached is not None and obs.stamp < cached.stamp:
+                stale_policies.add(policy_uri)
+
+        for policy_uri, policy_observations in obs_by_policy.items():
+            if policy_uri in stale_policies:
+                results[policy_uri] = (
+                    False,
+                    "(observation) older than cached sample",
+                )
+                continue
+
+            for obs in policy_observations:
+                self.observation_cache[obs.observation_uri] = obs
+
+            policy = self.obs_policies[policy_uri]
+            if policy.evaluator is None:
+                results[policy_uri] = (False, "no evaluator")
+                continue
+            if any(uri not in self.observation_cache for uri in policy.observation_uris):
+                results[policy_uri] = (True, "(observation) waiting for policy inputs")
+                continue
+
+            samples = [self.observation_cache[uri] for uri in policy.observation_uris]
+            result = policy.evaluator(samples)
+            results[policy_uri] = policy.add_trinary(
+                TrinaryStamped(stamp=max(sample.stamp for sample in samples), trinary=result)
             )
-        if observation.provider_uri != provider_uri:
-            raise ValueError(
-                f"Observation '{observation.observation_uri}' received from '{observation.provider_uri}', "
-                f"expected '{provider_uri}'"
-            )
-
-        cached = self.observation_cache.get(observation.observation_uri)
-        if cached is not None and observation.stamp < cached.stamp:
-            return False, "(observation) older than cached sample"
-        self.observation_cache[observation.observation_uri] = observation
-        if policy.evaluator is None:
-            return False, "no evaluator"
-        if any(uri not in self.observation_cache for uri in policy.observation_uris):
-            return True, "(observation) waiting for policy inputs"
-
-        observations = [self.observation_cache[uri] for uri in policy.observation_uris]
-        result = policy.evaluator(observations)
-        return policy.add_trinary(
-            TrinaryStamped(stamp=max(sample.stamp for sample in observations), trinary=result)
-        )
+        return results
 
     def on_event(self, evt_uri: URIRef, evt_t: float):
         if evt_uri not in self.event_timelines:
