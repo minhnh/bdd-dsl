@@ -210,6 +210,47 @@ class BDDExecTest(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(len(policy.trinary_timeline), 1)
 
+    def test_python_observation_policy_instantiates_callable_class_once(self):
+        class StatefulEvaluator:
+            def __init__(self):
+                self.calls = 0
+
+            def __call__(self, observations):
+                self.calls += 1
+                return bool(observations)
+
+        graph = Graph()
+        policy_uri = URIRef("urn:test:policy")
+        observation_uri = URIRef("urn:test:observation")
+        provider_uri = URIRef("urn:test:provider")
+        graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+        graph.add((policy_uri, RDF.type, URI_PY_TYPE_MODULE_ATTR))
+        graph.add((policy_uri, URI_PY_PRED_MODULE_NAME, Literal("operator")))
+        graph.add((policy_uri, URI_PY_PRED_ATTR_NAME, Literal("truth")))
+        graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
+        graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
+        graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+
+        with patch(
+            "bdd_dsl.models.observation.import_attr_from_model", return_value=StatefulEvaluator
+        ):
+            policy = ObsPolicyModel(
+                node_id=policy_uri,
+                graph=graph,
+                fluent_id=URIRef("urn:test:fluent"),
+                fluent_types=set(),
+                duration_type=URI_TIME_TYPE_BEFORE_EVT,
+                start_event=None,
+                end_event=URIRef("urn:test:end"),
+                horizon=10.0,
+            )
+
+        self.assertIsInstance(policy.evaluator, StatefulEvaluator)
+        sample = ObservationStamped(observation_uri, provider_uri, 1.0, True)
+        self.assertTrue(policy.evaluator([sample]))
+        self.assertTrue(policy.evaluator([sample]))
+        self.assertEqual(policy.evaluator.calls, 2)
+
     def test_scenario_execution_selects_exact_scene_instance(self):
         graph = Graph()
         variant = URIRef("urn:test:variant")

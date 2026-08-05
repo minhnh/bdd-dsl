@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from dataclasses import dataclass
+from inspect import isclass
 from typing import Any, Protocol
 
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase
@@ -145,6 +146,9 @@ class ObsPolicyModel(ModelBase):
         if URI_PY_TYPE_MODULE_ATTR in self.types:
             load_py_module_attr(graph=graph, model=self, quiet=False)
             evaluator = import_attr_from_model(model=self)
+            if isclass(evaluator):
+                # Stateful evaluator classes must have a no-argument constructor.
+                evaluator = evaluator()
             if not callable(evaluator):
                 raise TypeError(f"ObservationPolicy '{self.id}' Python attribute is not callable")
             self.evaluator = evaluator
