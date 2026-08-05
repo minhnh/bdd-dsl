@@ -103,6 +103,7 @@ class BDDExecTest(unittest.TestCase):
         graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
         graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
         graph.add((observation_uri, URI_OBS_PRED_OBSERVES_TARGET, target_uri))
+        graph.add((provider_uri, RDF.type, URIRef("urn:test:provider-type")))
 
         policy = ObsPolicyModel(
             node_id=policy_uri,
@@ -115,12 +116,17 @@ class BDDExecTest(unittest.TestCase):
             horizon=10.0,
         )
         self.assertEqual(policy.observation_targets[observation_uri], target_uri)
-        manager = ObservationManager(scr_exec=SimpleNamespace())
-        manager.obs_policies[policy_uri] = policy
-        manager._observation_policy_registry[observation_uri] = policy_uri
+        manager = ObservationManager(scr_exec=SimpleNamespace(obs_policy_uris={policy_uri}))
+        with patch.object(ObsPolicyModel, "policies_for_fluent_clause", return_value=[policy]):
+            manager.register_fluent_obs(graph, SimpleNamespace(id=policy.fluent_id), obs_loaders=[])
+        self.assertEqual(manager.providers[provider_uri].id, provider_uri)
 
         manager.bind_observation_targets({target_uri: bound_target_uri})
         self.assertEqual(policy.observation_targets[observation_uri], bound_target_uri)
+        self.assertEqual(
+            manager.observation_targets_for_provider(provider_uri),
+            {observation_uri: bound_target_uri},
+        )
         manager.register_provider(
             provider_uri,
             timestamp_extractor=lambda _, receipt_stamp: receipt_stamp + 1,

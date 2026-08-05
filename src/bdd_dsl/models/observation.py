@@ -325,6 +325,7 @@ class ObservationManager:
     bhv_result: TrinaryStamped | None
 
     obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> ObsPolicyModel
+    providers: dict[URIRef, ModelBase]
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
     observation_cache: dict[URIRef, ObservationStamped]
     _observation_policy_registry: dict[URIRef, URIRef]  # observation ID -> policy ID
@@ -343,6 +344,7 @@ class ObservationManager:
         self.bhv_result = None
 
         self.obs_policies = {}
+        self.providers = {}
         self._fluent_policy_registry = {}
         self.observation_cache = {}
         self._observation_policy_registry = {}
@@ -399,6 +401,10 @@ class ObservationManager:
                 if obs_uri in self._observation_policy_registry:
                     raise ValueError(f"Observation already registered: '{obs_uri}'")
                 self._observation_policy_registry[obs_uri] = obs_pol.id
+            for provider_uri in set(obs_pol.observation_providers.values()):
+                self.providers.setdefault(
+                    provider_uri, ModelBase(node_id=provider_uri, graph=graph)
+                )
             self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
             self.obs_policies[obs_pol.id] = obs_pol
@@ -422,6 +428,14 @@ class ObservationManager:
                             f"observation target '{target_uri}' is bound to non-URI {bound_target}"
                         )
                     policy.observation_targets[obs_uri] = bound_target
+
+    def observation_targets_for_provider(self, provider_uri: URIRef) -> dict[URIRef, URIRef | None]:
+        return {
+            obs_uri: policy.observation_targets[obs_uri]
+            for policy in self.obs_policies.values()
+            for obs_uri, configured_provider in policy.observation_providers.items()
+            if configured_provider == provider_uri
+        }
 
     def update_provider_observation(
         self, provider_uri: URIRef, raw_value: Any, receipt_stamp: float
