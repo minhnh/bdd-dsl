@@ -17,6 +17,8 @@ NS_MM_TASK = Namespace(URI_MM_TASK)
 NS_MM_SIM = Namespace(URI_MM_SIM)
 NS_MM_OBS = Namespace(URI_MM_OBS)
 NS_MM_ROS = Namespace(URI_MM_ROS)
+NS_MM_CSTR = Namespace("https://comp-rob2b.github.io/metamodels/task/constraint#")
+NS_MM_CSTR_EXT = Namespace("https://secorolab.github.io/metamodels/task/constraint#")
 
 # Prefixes
 PREFIX_GEOM = "geom"

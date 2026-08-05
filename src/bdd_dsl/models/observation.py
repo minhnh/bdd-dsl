@@ -3,9 +3,15 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from dataclasses import dataclass
+from inspect import isclass
 from typing import Any, Protocol
 
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase
+from rdf_utils.models.python import (
+    URI_PY_TYPE_MODULE_ATTR,
+    import_attr_from_model,
+    load_py_module_attr,
+)
 from rdflib import Graph, URIRef
 from trinary import Trinary, Unknown
 
@@ -14,6 +20,9 @@ from bdd_dsl.models.clauses import FluentClauseModel
 from bdd_dsl.models.time_constraint import get_duration
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_CLAUSE,
+    URI_OBS_PRED_HAS_OBSERVATION,
+    URI_OBS_PRED_OBSERVES_TARGET,
+    URI_OBS_PRED_PROVIDER,
     URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
@@ -25,7 +34,45 @@ from bdd_dsl.models.urirefs import (
 from bdd_dsl.models.user_story import ScenarioVariantModel
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
+class ObservationStamped:
+    """A normalized value for one policy-local observation input."""
+
+    observation_uri: URIRef
+    provider_uri: URIRef
+    stamp: float
+    value: Any
+
+
+class TimestampedObservationProtocol(Protocol):
+    """Extract a source timestamp, falling back to the ingress receipt timestamp."""
+
+    def __call__(self, observation: Any, receipt_stamp: float) -> float: ...
+
+
+@dataclass(frozen=True, slots=True)
+class EntityObservation:
+    entity_uri: URIRef
+    value: Any
+
+
+class EntityObservationMapperProtocol(Protocol):
+    """Map a raw provider message to zero or more target-specific values."""
+
+    def __call__(self, observation: Any) -> list[EntityObservation]: ...
+
+
+class ObservationPolicyEvaluatorProtocol(Protocol):
+    """Evaluate a complete policy snapshot as a trinary or boolean.
+
+    A Python policy attribute may be a function, a callable object, or a no-argument
+    callable class. Classes are instantiated once while the policy model is loaded.
+    """
+
+    def __call__(self, observations: list[ObservationStamped]) -> bool | Trinary: ...
+
+
+@dataclass(frozen=True, slots=True)
 class TrinaryStamped:
     stamp: float
     trinary: Trinary | bool
@@ -50,6 +97,10 @@ def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Tr
 
 class ObsPolicyModel(ModelBase):
     trinary_timeline: list[TrinaryStamped]
+    observation_uris: set[URIRef]
+    observation_providers: dict[URIRef, URIRef]
+    observation_targets: dict[URIRef, URIRef | None]
+    evaluator: ObservationPolicyEvaluatorProtocol | None
 
     start_time: float | None
     end_time: float | None
@@ -85,6 +136,34 @@ class ObsPolicyModel(ModelBase):
         self.horizon = horizon
 
         self.trinary_timeline = []
+        self.observation_uris = set()
+        self.observation_providers = {}
+        self.observation_targets = {}
+        for obs_uri in graph.objects(subject=self.id, predicate=URI_OBS_PRED_HAS_OBSERVATION):
+            if not isinstance(obs_uri, URIRef):
+                raise TypeError(
+                    f"ObservationPolicy '{self.id}' links to non-URI observation: {obs_uri}"
+                )
+            provider_uri = graph.value(subject=obs_uri, predicate=URI_OBS_PRED_PROVIDER, any=False)
+            if not isinstance(provider_uri, URIRef):
+                raise TypeError(f"Observation '{obs_uri}' has invalid provider: {provider_uri}")
+            target_uri = graph.value(obs_uri, URI_OBS_PRED_OBSERVES_TARGET, any=False)
+            if target_uri is not None and not isinstance(target_uri, URIRef):
+                raise TypeError(f"Observation '{obs_uri}' has invalid target: {target_uri}")
+            self.observation_uris.add(obs_uri)
+            self.observation_providers[obs_uri] = provider_uri
+            self.observation_targets[obs_uri] = target_uri
+
+        self.evaluator = None
+        if URI_PY_TYPE_MODULE_ATTR in self.types:
+            load_py_module_attr(graph=graph, model=self, quiet=False)
+            evaluator = import_attr_from_model(model=self)
+            if isclass(evaluator):
+                # Stateful evaluator classes must have a no-argument constructor.
+                evaluator = evaluator()
+            if not callable(evaluator):
+                raise TypeError(f"ObservationPolicy '{self.id}' Python attribute is not callable")
+            self.evaluator = evaluator
 
         self.start_time = None
         self.end_time = None
@@ -255,6 +334,15 @@ class ObsPolicyModel(ModelBase):
 
 
 class ObservationManager:
+    """Route provider values into policy-local caches and fluent timelines.
+
+    Register provider adapters after building a scenario context. Feed raw provider
+    messages through :meth:`update_provider_observation`; it extracts a timestamp,
+    maps target-specific values, and evaluates each complete policy snapshot once.
+    :meth:`update_fpolicy_assertion` remains the compatibility ingress for direct
+    ``TrinaryStamped`` topic policies.
+    """
+
     scenario_exec: ScenarioExecutionModel
     scr_start_time: float | None
     scr_end_time: float | None
@@ -262,7 +350,13 @@ class ObservationManager:
     bhv_result: TrinaryStamped | None
 
     obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> ObsPolicyModel
+    providers: dict[URIRef, ModelBase]
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
+    observation_cache: dict[URIRef, ObservationStamped]
+    _observation_policy_registry: dict[URIRef, URIRef]  # observation ID -> policy ID
+    _provider_registry: dict[
+        URIRef, tuple[TimestampedObservationProtocol | None, EntityObservationMapperProtocol | None]
+    ]
 
     event_timelines: dict[URIRef, list[float]]
     _fluent_event_registry: dict[URIRef, set[URIRef]]  # fluent ID -> event IDs
@@ -275,7 +369,11 @@ class ObservationManager:
         self.bhv_result = None
 
         self.obs_policies = {}
+        self.providers = {}
         self._fluent_policy_registry = {}
+        self.observation_cache = {}
+        self._observation_policy_registry = {}
+        self._provider_registry = {}
 
         self.event_timelines = {}
         self._fluent_event_registry = {}
@@ -303,6 +401,7 @@ class ObservationManager:
     def register_fluent_obs(
         self, graph: Graph, fc: FluentClauseModel, obs_loaders: list[AttrLoaderProtocol]
     ) -> None:
+        """Register execution-selected observation policies for a fluent clause."""
         if fc.id in self._fluent_policy_registry:
             # Already registered
             return
@@ -324,22 +423,155 @@ class ObservationManager:
                 loader(graph=graph, model=obs_pol)
 
             self._fluent_policy_registry[fc.id].add(obs_pol.id)
+            for obs_uri in obs_pol.observation_uris:
+                if obs_uri in self._observation_policy_registry:
+                    raise ValueError(f"Observation already registered: '{obs_uri}'")
+                self._observation_policy_registry[obs_uri] = obs_pol.id
+            for provider_uri in set(obs_pol.observation_providers.values()):
+                self.providers.setdefault(
+                    provider_uri, ModelBase(node_id=provider_uri, graph=graph)
+                )
             self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
             self.obs_policies[obs_pol.id] = obs_pol
 
+    def register_provider(
+        self,
+        provider_uri: URIRef,
+        timestamp_extractor: TimestampedObservationProtocol | None = None,
+        entity_mapper: EntityObservationMapperProtocol | None = None,
+    ) -> None:
+        """Register optional timestamp and entity-mapping adapters for a provider."""
+        self._provider_registry[provider_uri] = (timestamp_extractor, entity_mapper)
+
+    def bind_observation_targets(self, bindings: dict[URIRef, Any]) -> None:
+        """Resolve template-variable targets for this scenario context."""
+        for policy in self.obs_policies.values():
+            for obs_uri, target_uri in policy.observation_targets.items():
+                if target_uri is None:
+                    continue
+                bound_target = bindings.get(target_uri)
+                if bound_target is not None:
+                    if not isinstance(bound_target, URIRef):
+                        raise TypeError(
+                            f"observation target '{target_uri}' is bound to non-URI {bound_target}"
+                        )
+                    policy.observation_targets[obs_uri] = bound_target
+
+    def observation_targets_for_provider(self, provider_uri: URIRef) -> dict[URIRef, URIRef | None]:
+        """Return each configured observation and resolved target for ``provider_uri``."""
+        return {
+            obs_uri: policy.observation_targets[obs_uri]
+            for policy in self.obs_policies.values()
+            for obs_uri, configured_provider in policy.observation_providers.items()
+            if configured_provider == provider_uri
+        }
+
+    def update_provider_observation(
+        self, provider_uri: URIRef, raw_value: Any, receipt_stamp: float
+    ) -> dict[URIRef, tuple[bool, str]]:
+        """Normalize one raw provider value and route it to matching observations.
+
+        Without an entity mapper, only targetless observations receive the raw value.
+        """
+        timestamp_extractor, entity_mapper = self._provider_registry.get(provider_uri, (None, None))
+        stamp = (
+            receipt_stamp
+            if timestamp_extractor is None
+            else timestamp_extractor(raw_value, receipt_stamp)
+        )
+        values: list[tuple[URIRef | None, Any]] = [(None, raw_value)]
+        if entity_mapper is not None:
+            for entity_obs in entity_mapper(raw_value):
+                if not isinstance(entity_obs, EntityObservation):
+                    raise TypeError(f"entity mapper for {provider_uri} returned {type(entity_obs)}")
+                values.append((entity_obs.entity_uri, entity_obs.value))
+
+        observations = []
+        for obs_uri, policy_uri in self._observation_policy_registry.items():
+            policy = self.obs_policies[policy_uri]
+            if policy.observation_providers[obs_uri] != provider_uri:
+                continue
+            target_uri = policy.observation_targets[obs_uri]
+            for entity_uri, value in values:
+                if entity_uri == target_uri:
+                    observations.append(ObservationStamped(obs_uri, provider_uri, stamp, value))
+        return self.update_observations(observations)
+
     def update_bhv_result(self, trin_st: TrinaryStamped):
+        """Record the behaviour result that closes the active scenario context."""
         self.bhv_result = trin_st
 
     def update_fpolicy_assertion(
         self, policy_uri: URIRef, trin_st: TrinaryStamped
     ) -> tuple[bool, str]:
+        """Insert a direct trinary assertion for a legacy topic-backed policy."""
         if policy_uri not in self.obs_policies:
             raise ValueError(f"ObservationPolicy not registered: '{policy_uri}'")
 
         return self.obs_policies[policy_uri].add_trinary(trin_st)
 
+    def update_observations(
+        self, observations: list[ObservationStamped]
+    ) -> dict[URIRef, tuple[bool, str]]:
+        """Cache normalized inputs atomically and evaluate each represented policy once.
+
+        A policy waits until every linked observation has a cached value. Older input
+        snapshots are rejected; equal timestamps replace cached samples.
+        """
+        results: dict[URIRef, tuple[bool, str]] = {}
+        obs_by_policy: dict[URIRef, list[ObservationStamped]] = {}
+        stale_policies: set[URIRef] = set()
+        for obs in observations:
+            policy_uri = self._observation_policy_registry.get(obs.observation_uri)
+            if policy_uri is None:
+                raise ValueError(f"Observation not registered: '{obs.observation_uri}'")
+
+            policy = self.obs_policies[policy_uri]
+            provider_uri = policy.observation_providers.get(obs.observation_uri)
+            if provider_uri is None:
+                raise ValueError(
+                    f"Observation '{obs.observation_uri}' is not configured for policy "
+                    f"'{policy_uri}'"
+                )
+            if obs.provider_uri != provider_uri:
+                raise ValueError(
+                    f"Observation '{obs.observation_uri}' received from "
+                    f"'{obs.provider_uri}', expected '{provider_uri}'"
+                )
+            obs_by_policy.setdefault(policy_uri, []).append(obs)
+            cached = self.observation_cache.get(obs.observation_uri)
+            if cached is not None and obs.stamp < cached.stamp:
+                stale_policies.add(policy_uri)
+
+        for policy_uri, policy_observations in obs_by_policy.items():
+            if policy_uri in stale_policies:
+                results[policy_uri] = (
+                    False,
+                    "(observation) older than cached sample",
+                )
+                continue
+
+            for obs in policy_observations:
+                self.observation_cache[obs.observation_uri] = obs
+
+            policy = self.obs_policies[policy_uri]
+            if policy.evaluator is None:
+                results[policy_uri] = (False, "no evaluator")
+                continue
+            if any(uri not in self.observation_cache for uri in policy.observation_uris):
+                results[policy_uri] = (True, "(observation) waiting for policy inputs")
+                continue
+
+            samples = [self.observation_cache[uri] for uri in policy.observation_uris]
+            result = policy.evaluator(samples)
+            results[policy_uri] = policy.add_trinary(
+                TrinaryStamped(stamp=max(sample.stamp for sample in samples), trinary=result)
+            )
+        return results
+
     def on_event(self, evt_uri: URIRef, evt_t: float):
+        """Record a scenario event and open or close affected fluent timelines."""
         if evt_uri not in self.event_timelines:
             self.event_timelines[evt_uri] = [evt_t]
         else:
@@ -367,6 +599,7 @@ class ObservationManager:
         bhv_loaders: list[AttrLoaderProtocol],
         obs_loaders: list[AttrLoaderProtocol],
     ) -> ObservationManager:
+        """Build a manager for a scenario variant and register its fluent policies."""
         scr_exec = ScenarioExecutionModel(
             graph=graph,
             scr_var=scr_var,

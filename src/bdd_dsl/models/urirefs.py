@@ -34,13 +34,18 @@ URI_TASK_PRED_OF_TASK = NS_MM_TASK["of-task"]
 # Observation
 URI_OBS_TYPE_POLICY = NS_MM_OBS["ObservationPolicy"]
 URI_OBS_TYPE_PROVIDER = NS_MM_OBS["ObservationProvider"]
+URI_OBS_TYPE_OBSERVATION = NS_MM_OBS["Observation"]
+URI_OBS_TYPE_POSE_PROVIDER = NS_MM_OBS["PoseProvider"]
 URI_OBS_PRED_POLICY = NS_MM_OBS["has-policy"]
 URI_OBS_PRED_PROVIDER = NS_MM_OBS["has-provider"]
+URI_OBS_PRED_HAS_OBSERVATION = NS_MM_OBS["has-observation"]
+URI_OBS_PRED_OBSERVES_TARGET = NS_MM_OBS["observes-target"]
 
 # ROS
 URI_ROS_TYPE_TOPIC = NS_MM_ROS["Topic"]
 URI_ROS_TYPE_SERVICE = NS_MM_ROS["Service"]
 URI_ROS_TYPE_ACTION = NS_MM_ROS["Action"]
+URI_ROS_TYPE_SIM_ENTITY_STATE_PROVIDER = NS_MM_ROS["SimulationEntityStateProvider"]
 URI_ROS_PRED_CHNL_NAME = NS_MM_ROS["channel-name"]
 URI_ROS_PRED_TYPE_NAME = NS_MM_ROS["type-name"]
 
