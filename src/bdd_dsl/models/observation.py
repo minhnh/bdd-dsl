@@ -13,6 +13,7 @@ from rdf_utils.models.python import (
     load_py_module_attr,
 )
 from rdflib import Graph, URIRef
+from scene_dsl.rdf_parser.scenex import SceneInstanceModel
 from trinary import Trinary, Unknown
 
 from bdd_dsl.execution.scenario import ScenarioExecutionModel
@@ -57,9 +58,14 @@ class EntityObservation:
 
 
 class EntityObservationMapperProtocol(Protocol):
-    """Map a raw provider message to zero or more target-specific values."""
+    """Map a raw provider message using the active scenario scene."""
 
-    def __call__(self, observation: Any) -> list[EntityObservation]: ...
+    def __call__(
+        self,
+        observation: Any,
+        scene_instance: SceneInstanceModel,
+        targets: list[URIRef],
+    ) -> list[EntityObservation]: ...
 
 
 class ObservationPolicyEvaluatorProtocol(Protocol):
@@ -491,7 +497,14 @@ class ObservationManager:
         )
         values: list[tuple[URIRef | None, Any]] = [(None, raw_value)]
         if entity_mapper is not None:
-            for entity_obs in entity_mapper(raw_value):
+            targets = list(
+                dict.fromkeys(
+                    target
+                    for target in self.observation_targets_for_provider(provider_uri).values()
+                    if target is not None
+                )
+            )
+            for entity_obs in entity_mapper(raw_value, self.scenario_exec.scene_instance, targets):
                 if not isinstance(entity_obs, EntityObservation):
                     raise TypeError(f"entity mapper for {provider_uri} returned {type(entity_obs)}")
                 values.append((entity_obs.entity_uri, entity_obs.value))
