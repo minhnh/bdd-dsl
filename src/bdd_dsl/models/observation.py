@@ -63,36 +63,45 @@ class EntityObservationMapperProtocol(Protocol):
 
 
 class ObservationPolicyEvaluatorProtocol(Protocol):
-    """Evaluate a complete policy snapshot as a trinary or boolean.
+    """Evaluate a complete policy snapshot as a value and human-readable reason.
 
     A Python policy attribute may be a function, a callable object, or a no-argument
     callable class. Classes are instantiated once while the policy model is loaded.
     """
 
-    def __call__(self, observations: list[ObservationStamped]) -> bool | Trinary: ...
+    def __call__(self, observations: list[ObservationStamped]) -> tuple[bool | Trinary, str]: ...
 
 
 @dataclass(frozen=True, slots=True)
 class TrinaryStamped:
     stamp: float
     trinary: Trinary | bool
+    reason: str = ""
 
 
 class TrinariesPolicyProtocol(Protocol):
     """Protocol for functions that load model attributes."""
 
-    def __call__(self, trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary: ...
+    def __call__(
+        self, trinaries: list[TrinaryStamped], **kwargs: Any
+    ) -> tuple[bool | Trinary, str]: ...
 
 
-def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> bool | Trinary:
+def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> tuple[bool | Trinary, str]:
     if len(trinaries) == 0:
-        return Unknown
+        return Unknown, "no trinary assertions"
 
     result = True
     for trin_st in trinaries:
         result &= trin_st.trinary
 
-    return result
+    if result is False:
+        reason = "at least one assertion is false"
+    elif result is Unknown:
+        reason = "at least one assertion is unknown"
+    else:
+        reason = "all assertions are true"
+    return result, reason
 
 
 class ObsPolicyModel(ModelBase):
@@ -565,8 +574,15 @@ class ObservationManager:
 
             samples = [self.observation_cache[uri] for uri in policy.observation_uris]
             result = policy.evaluator(samples)
+            if not isinstance(result, tuple) or len(result) != 2 or not isinstance(result[1], str):
+                raise TypeError("observation evaluator must return (trinary, reason)")
+            trinary, reason = result
             results[policy_uri] = policy.add_trinary(
-                TrinaryStamped(stamp=max(sample.stamp for sample in samples), trinary=result)
+                TrinaryStamped(
+                    stamp=max(sample.stamp for sample in samples),
+                    trinary=trinary,
+                    reason=reason,
+                )
             )
         return results
 

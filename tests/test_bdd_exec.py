@@ -22,6 +22,8 @@ from bdd_dsl.models.observation import (
     ObservationManager,
     ObservationStamped,
     ObsPolicyModel,
+    TrinaryStamped,
+    trin_policy_and,
 )
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_BHV_IMPL,
@@ -48,6 +50,21 @@ SPEC_MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/templates/pickplace.tmpl.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/variations/pickplace-secorolab-isaac.var.json": "json-ld",
 }
+
+
+def test_trinary_policy_and_reports_final_result():
+    value, reason = trin_policy_and(
+        [
+            TrinaryStamped(1.0, False, "object is not at pick workspace"),
+            TrinaryStamped(2.0, False, "object collides with place workspace"),
+            TrinaryStamped(3.0, True, "ignored success"),
+        ]
+    )
+
+    assert value is False
+    assert reason == "at least one assertion is false"
+
+
 EXEC_MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/simulation/secorolab-isaac.sim.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/execution/pickplace-secorolab-isaac.exec.json": "json-ld",
@@ -115,6 +132,7 @@ class BDDExecTest(unittest.TestCase):
             end_event=URIRef("urn:test:end"),
             horizon=10.0,
         )
+        policy.evaluator = lambda samples: (bool(samples), "sample exists")
         self.assertEqual(policy.observation_targets[observation_uri], target_uri)
         manager = ObservationManager(scr_exec=SimpleNamespace(obs_policy_uris={policy_uri}))
         with patch.object(ObsPolicyModel, "policies_for_fluent_clause", return_value=[policy]):
@@ -176,7 +194,7 @@ class BDDExecTest(unittest.TestCase):
             horizon=10.0,
         )
         calls = []
-        policy.evaluator = lambda samples: calls.append(samples) or True
+        policy.evaluator = lambda samples: calls.append(samples) or (True, "batch complete")
         manager = ObservationManager(scr_exec=SimpleNamespace())
         manager.obs_policies[policy_uri] = policy
         manager._observation_policy_registry.update(
@@ -219,7 +237,7 @@ class BDDExecTest(unittest.TestCase):
 
             def __call__(self, observations):
                 self.calls += 1
-                return bool(observations)
+                return bool(observations), "stateful sample exists"
 
         graph = Graph()
         policy_uri = URIRef("urn:test:policy")
@@ -249,8 +267,8 @@ class BDDExecTest(unittest.TestCase):
 
         self.assertIsInstance(policy.evaluator, StatefulEvaluator)
         sample = ObservationStamped(observation_uri, provider_uri, 1.0, True)
-        self.assertTrue(policy.evaluator([sample]))
-        self.assertTrue(policy.evaluator([sample]))
+        self.assertTrue(policy.evaluator([sample])[0])
+        self.assertTrue(policy.evaluator([sample])[0])
         self.assertEqual(policy.evaluator.calls, 2)
 
     def test_scenario_execution_selects_exact_scene_instance(self):
