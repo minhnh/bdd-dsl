@@ -1,6 +1,7 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from collections.abc import Generator
 from dataclasses import dataclass
 from inspect import isclass
@@ -68,14 +69,27 @@ class EntityObservationMapperProtocol(Protocol):
     ) -> list[EntityObservation]: ...
 
 
-class ObservationPolicyEvaluatorProtocol(Protocol):
-    """Evaluate a complete policy snapshot as a value and human-readable reason.
+class ObservationPolicyEvaluator(ABC):
+    """Base evaluator with a result for an empty observation set."""
 
-    A Python policy attribute may be a function, a callable object, or a no-argument
-    callable class. Classes are instantiated once while the policy model is loaded.
-    """
+    def __init__(
+        self,
+        default_result: tuple[bool | Trinary, str] = (Unknown, "no observations"),
+    ) -> None:
+        self.default_result = default_result
 
-    def __call__(self, observations: list[ObservationStamped]) -> tuple[bool | Trinary, str]: ...
+    def evaluate(self, observations: list[ObservationStamped]) -> tuple[bool | Trinary, str]:
+        if not observations:
+            return self.default_result
+        result = self._evaluate_samples(observations)
+        if not isinstance(result, tuple) or len(result) != 2 or not isinstance(result[1], str):
+            raise TypeError("observation evaluator must return (trinary, reason)")
+        return result
+
+    @abstractmethod
+    def _evaluate_samples(
+        self, observations: list[ObservationStamped]
+    ) -> tuple[bool | Trinary, str]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,7 +129,7 @@ class ObsPolicyModel(ModelBase):
     observation_uris: set[URIRef]
     observation_providers: dict[URIRef, URIRef]
     observation_targets: dict[URIRef, URIRef | None]
-    evaluator: ObservationPolicyEvaluatorProtocol | None
+    evaluator: ObservationPolicyEvaluator | None
 
     start_time: float | None
     end_time: float | None
@@ -176,8 +190,11 @@ class ObsPolicyModel(ModelBase):
             if isclass(evaluator):
                 # Stateful evaluator classes must have a no-argument constructor.
                 evaluator = evaluator()
-            if not callable(evaluator):
-                raise TypeError(f"ObservationPolicy '{self.id}' Python attribute is not callable")
+            if not isinstance(evaluator, ObservationPolicyEvaluator):
+                raise TypeError(
+                    f"ObservationPolicy '{self.id}' Python attribute must be an "
+                    "ObservationPolicyEvaluator class"
+                )
             self.evaluator = evaluator
 
         self.start_time = None
@@ -261,6 +278,34 @@ class ObsPolicyModel(ModelBase):
             return True, ""
 
         return False, "no matching type"
+
+    def add_samples(self, samples: list[ObservationStamped]) -> tuple[bool, str]:
+        if self.evaluator is None:
+            return False, "no evaluator"
+        if not samples:
+            return False, "no samples"
+        result = self.evaluator.evaluate(samples)
+        trinary, reason = result
+        return self.add_trinary(
+            TrinaryStamped(
+                stamp=max(sample.stamp for sample in samples),
+                trinary=trinary,
+                reason=reason,
+            )
+        )
+
+    def get_result(
+        self,
+        stamp: float,
+        trinaries_policy: TrinariesPolicyProtocol,
+    ) -> TrinaryStamped:
+        if self.trinary_timeline:
+            trinary, reason = trinaries_policy(self.trinary_timeline)
+        elif self.evaluator is None:
+            trinary, reason = Unknown, "no evaluator"
+        else:
+            trinary, reason = self.evaluator.evaluate([])
+        return TrinaryStamped(stamp=stamp, trinary=trinary, reason=reason)
 
     def on_event(self, evt_uri: URIRef, evt_stamp: float):
         if evt_uri == self.start_event:
@@ -578,25 +623,12 @@ class ObservationManager:
                 self.observation_cache[obs.observation_uri] = obs
 
             policy = self.obs_policies[policy_uri]
-            if policy.evaluator is None:
-                results[policy_uri] = (False, "no evaluator")
-                continue
             if any(uri not in self.observation_cache for uri in policy.observation_uris):
                 results[policy_uri] = (True, "(observation) waiting for policy inputs")
                 continue
 
             samples = [self.observation_cache[uri] for uri in policy.observation_uris]
-            result = policy.evaluator(samples)
-            if not isinstance(result, tuple) or len(result) != 2 or not isinstance(result[1], str):
-                raise TypeError("observation evaluator must return (trinary, reason)")
-            trinary, reason = result
-            results[policy_uri] = policy.add_trinary(
-                TrinaryStamped(
-                    stamp=max(sample.stamp for sample in samples),
-                    trinary=trinary,
-                    reason=reason,
-                )
-            )
+            results[policy_uri] = policy.add_samples(samples)
         return results
 
     def on_event(self, evt_uri: URIRef, evt_t: float):

@@ -20,6 +20,7 @@ from bdd_dsl.execution.scenario import ScenarioExecutionModel
 from bdd_dsl.models.observation import (
     EntityObservation,
     ObservationManager,
+    ObservationPolicyEvaluator,
     ObservationStamped,
     ObsPolicyModel,
     TrinaryStamped,
@@ -63,6 +64,49 @@ def test_trinary_policy_and_reports_final_result():
 
     assert value is False
     assert reason == "at least one assertion is false"
+
+
+def test_default_observation_evaluator_handles_empty_and_non_empty_samples():
+    class Evaluator(ObservationPolicyEvaluator):
+        def _evaluate_samples(self, observations):
+            return False, f"{len(observations)} samples"
+
+    evaluator = Evaluator((True, "no collision recorded"))
+    assert evaluator.evaluate([]) == (True, "no collision recorded")
+    assert evaluator.evaluate(
+        [ObservationStamped(URIRef("urn:test:obs"), URIRef("urn:test:provider"), 1.0, True)]
+    ) == (False, "1 samples")
+
+
+def test_policy_result_uses_default_until_an_accepted_sample_exists():
+    policy_uri = URIRef("urn:test:policy-default")
+    graph = Graph()
+    graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+    policy = ObsPolicyModel(
+        node_id=policy_uri,
+        graph=graph,
+        fluent_id=URIRef("urn:test:fluent-default"),
+        fluent_types=set(),
+        duration_type=URI_TIME_TYPE_BEFORE_EVT,
+        start_event=None,
+        end_event=URIRef("urn:test:end-default"),
+        horizon=10.0,
+    )
+
+    class Evaluator(ObservationPolicyEvaluator):
+        def _evaluate_samples(self, observations):
+            return False, "collision recorded"
+
+    policy.evaluator = Evaluator((True, "no collision recorded"))
+    assert policy.get_result(1.0, trin_policy_and).trinary is True
+
+    accepted, _ = policy.add_samples(
+        [ObservationStamped(URIRef("urn:test:obs"), URIRef("urn:test:provider"), 2.0, True)]
+    )
+    assert accepted
+    result = policy.get_result(2.0, trin_policy_and)
+    assert result.trinary is False
+    assert result.reason == "at least one assertion is false"
 
 
 EXEC_MODEL_URLS = {
@@ -113,9 +157,6 @@ class BDDExecTest(unittest.TestCase):
         target_uri = URIRef("urn:test:target-variable")
         bound_target_uri = URIRef("urn:test:target")
         graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
-        graph.add((policy_uri, RDF.type, URI_PY_TYPE_MODULE_ATTR))
-        graph.add((policy_uri, URI_PY_PRED_MODULE_NAME, Literal("operator")))
-        graph.add((policy_uri, URI_PY_PRED_ATTR_NAME, Literal("truth")))
         graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
         graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
         graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
@@ -132,7 +173,12 @@ class BDDExecTest(unittest.TestCase):
             end_event=URIRef("urn:test:end"),
             horizon=10.0,
         )
-        policy.evaluator = lambda samples: (bool(samples), "sample exists")
+
+        class TruthEvaluator(ObservationPolicyEvaluator):
+            def _evaluate_samples(self, samples):
+                return bool(samples), "sample exists"
+
+        policy.evaluator = TruthEvaluator()
         self.assertEqual(policy.observation_targets[observation_uri], target_uri)
         manager = ObservationManager(
             scr_exec=SimpleNamespace(obs_policy_uris={policy_uri}, scene_instance=None)
@@ -196,7 +242,13 @@ class BDDExecTest(unittest.TestCase):
             horizon=10.0,
         )
         calls = []
-        policy.evaluator = lambda samples: calls.append(samples) or (True, "batch complete")
+
+        class BatchEvaluator(ObservationPolicyEvaluator):
+            def _evaluate_samples(self, samples):
+                calls.append(samples)
+                return True, "batch complete"
+
+        policy.evaluator = BatchEvaluator()
         manager = ObservationManager(scr_exec=SimpleNamespace())
         manager.obs_policies[policy_uri] = policy
         manager._observation_policy_registry.update(
@@ -233,11 +285,12 @@ class BDDExecTest(unittest.TestCase):
         self.assertEqual(len(policy.trinary_timeline), 1)
 
     def test_python_observation_policy_instantiates_callable_class_once(self):
-        class StatefulEvaluator:
+        class StatefulEvaluator(ObservationPolicyEvaluator):
             def __init__(self):
+                super().__init__()
                 self.calls = 0
 
-            def __call__(self, observations):
+            def _evaluate_samples(self, observations):
                 self.calls += 1
                 return bool(observations), "stateful sample exists"
 
@@ -269,8 +322,8 @@ class BDDExecTest(unittest.TestCase):
 
         self.assertIsInstance(policy.evaluator, StatefulEvaluator)
         sample = ObservationStamped(observation_uri, provider_uri, 1.0, True)
-        self.assertTrue(policy.evaluator([sample])[0])
-        self.assertTrue(policy.evaluator([sample])[0])
+        self.assertTrue(policy.evaluator.evaluate([sample])[0])
+        self.assertTrue(policy.evaluator.evaluate([sample])[0])
         self.assertEqual(policy.evaluator.calls, 2)
 
     def test_scenario_execution_selects_exact_scene_instance(self):
