@@ -134,7 +134,9 @@ class BDDExecTest(unittest.TestCase):
         )
         policy.evaluator = lambda samples: (bool(samples), "sample exists")
         self.assertEqual(policy.observation_targets[observation_uri], target_uri)
-        manager = ObservationManager(scr_exec=SimpleNamespace(obs_policy_uris={policy_uri}))
+        manager = ObservationManager(
+            scr_exec=SimpleNamespace(obs_policy_uris={policy_uri}, scene_instance=None)
+        )
         with patch.object(ObsPolicyModel, "policies_for_fluent_clause", return_value=[policy]):
             manager.register_fluent_obs(graph, SimpleNamespace(id=policy.fluent_id), obs_loaders=[])
         self.assertEqual(manager.providers[provider_uri].id, provider_uri)
@@ -148,7 +150,7 @@ class BDDExecTest(unittest.TestCase):
         manager.register_provider(
             provider_uri,
             timestamp_extractor=lambda _, receipt_stamp: receipt_stamp + 1,
-            entity_mapper=lambda _: [EntityObservation(bound_target_uri, True)],
+            entity_mapper=lambda _, __, ___: [EntityObservation(bound_target_uri, True)],
         )
         results = manager.update_provider_observation(provider_uri, object(), 1.0)
         self.assertEqual(results, {policy_uri: (True, "")})
