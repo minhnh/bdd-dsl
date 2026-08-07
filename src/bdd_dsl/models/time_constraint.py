@@ -1,4 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
+from typing import Any
+
 from rdf_utils.models.common import ModelBase
 from rdflib import Graph, Literal, URIRef
 
@@ -77,21 +79,27 @@ def get_duration(constraint: ModelBase) -> dict:
         }
 
     if URI_TIME_TYPE_AFTER_EVT in constraint.types:
-        assert isinstance(start_evt_uri, URIRef) and isinstance(hrzn_secs, float), (
-            f"AfterEvent '{constraint.id}' has invalid attrs: start={start_evt_uri}, horizon={hrzn_secs}"
+        assert isinstance(start_evt_uri, URIRef), (
+            f"AfterEvent '{constraint.id}' has invalid start event: {start_evt_uri}"
         )
-        return {
-            URI_TIME_PRED_AFTER_EVT: start_evt_uri,
-            URI_TIME_PRED_HRZN_SEC: hrzn_secs,
-        }
+        duration: dict[URIRef, Any] = {URI_TIME_PRED_AFTER_EVT: start_evt_uri}
+        if hrzn_secs is not None:
+            assert isinstance(hrzn_secs, float), (
+                f"AfterEvent '{constraint.id}' has invalid horizon: {hrzn_secs}"
+            )
+            duration[URI_TIME_PRED_HRZN_SEC] = hrzn_secs
+        return duration
 
     if URI_TIME_TYPE_BEFORE_EVT in constraint.types:
-        assert isinstance(end_evt_uri, URIRef) and isinstance(hrzn_secs, float), (
-            f"BeforeEvent '{constraint.id}' has invalid attrs: end={end_evt_uri}, horizon={hrzn_secs}"
+        assert isinstance(end_evt_uri, URIRef), (
+            f"BeforeEvent '{constraint.id}' has invalid end event: {end_evt_uri}"
         )
-        return {
-            URI_TIME_PRED_BEFORE_EVT: end_evt_uri,
-            URI_TIME_PRED_HRZN_SEC: hrzn_secs,
-        }
+        duration = {URI_TIME_PRED_BEFORE_EVT: end_evt_uri}
+        if hrzn_secs is not None:
+            assert isinstance(hrzn_secs, float), (
+                f"BeforeEvent '{constraint.id}' has invalid horizon: {hrzn_secs}"
+            )
+            duration[URI_TIME_PRED_HRZN_SEC] = hrzn_secs
+        return duration
 
     raise RuntimeError(f"unhandled types for time constraint '{constraint.id}': {constraint.types}")

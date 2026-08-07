@@ -15,6 +15,7 @@ from bdd_dsl.execution.behaviour import Behaviour, BehaviourImplModel
 from bdd_dsl.models.time_constraint import get_duration
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_BHV_IMPL,
+    URI_BDD_PRED_OF_CLAUSE,
     URI_BDD_PRED_OF_VARIANT,
     URI_BDD_TYPE_SCENARIO_EXEC,
     URI_OBS_PRED_POLICY,
@@ -31,7 +32,7 @@ class ScenarioExecutionModel(ModelBase):
     start_event: URIRef
     end_event: URIRef
     bhv_impl: BehaviourImplModel
-    obs_policy_uris: set[URIRef]
+    obs_policy_fluents: dict[URIRef, URIRef]
     scene_instance: SceneInstanceModel
 
     def __init__(
@@ -97,13 +98,22 @@ class ScenarioExecutionModel(ModelBase):
             loader(graph=graph, model=self.bhv_impl)
 
         # Observation policies
-        self.obs_policy_uris = set()
+        self.obs_policy_fluents = {}
+        selected_fluents: set[URIRef] = set()
         for obs_pol_id in graph.objects(subject=self.id, predicate=URI_OBS_PRED_POLICY):
             if not isinstance(obs_pol_id, URIRef):
                 raise TypeError(
                     f"ScenarioExecution {self.id} doesn't link to an ObservationPolicy URI: {obs_pol_id}"
                 )
-            self.obs_policy_uris.add(obs_pol_id)
+            fluent_id = graph.value(subject=obs_pol_id, predicate=URI_BDD_PRED_OF_CLAUSE, any=False)
+            if not isinstance(fluent_id, URIRef):
+                raise TypeError(f"ObservationPolicy '{obs_pol_id}' doesn't link to a fluent clause")
+            if fluent_id in selected_fluents:
+                raise ValueError(
+                    f"ScenarioExecution {self.id} selects multiple policies for fluent {fluent_id}"
+                )
+            selected_fluents.add(fluent_id)
+            self.obs_policy_fluents[obs_pol_id] = fluent_id
 
     def load_behaviour_impl(self, context: Context, **kwargs: Any) -> BehaviourImplModel:
         if self.bhv_impl.behaviour is not None:

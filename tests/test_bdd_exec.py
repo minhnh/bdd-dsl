@@ -5,6 +5,7 @@ from unittest.mock import patch
 from urllib.request import HTTPError
 
 from rdf_utils.constraints import check_shacl_constraints
+from rdf_utils.models.common import ModelBase
 from rdf_utils.models.python import (
     URI_PY_PRED_ATTR_NAME,
     URI_PY_PRED_MODULE_NAME,
@@ -26,20 +27,26 @@ from bdd_dsl.models.observation import (
     TrinaryStamped,
     trin_policy_and,
 )
+from bdd_dsl.models.time_constraint import process_time_constraint_model
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_BHV_IMPL,
+    URI_BDD_PRED_OF_CLAUSE,
     URI_BDD_PRED_OF_SCENE,
     URI_BDD_PRED_OF_VARIANT,
     URI_BDD_TYPE_SCENARIO_EXEC,
     URI_BHV_PRED_OF_BHV,
+    URI_BHV_TYPE_BHV,
     URI_OBS_PRED_HAS_OBSERVATION,
     URI_OBS_PRED_OBSERVES_TARGET,
+    URI_OBS_PRED_POLICY,
     URI_OBS_PRED_PROVIDER,
     URI_OBS_TYPE_OBSERVATION,
     URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
+    URI_TIME_PRED_HRZN_SEC,
     URI_TIME_TYPE_BEFORE_EVT,
+    URI_TIME_TYPE_DURING,
 )
 from bdd_dsl.models.user_story import UserStoryLoader
 
@@ -82,15 +89,12 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
     policy_uri = URIRef("urn:test:policy-default")
     graph = Graph()
     graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+    add_before_policy_time(graph, policy_uri, URIRef("urn:test:end-default"))
     policy = ObsPolicyModel(
         node_id=policy_uri,
         graph=graph,
         fluent_id=URIRef("urn:test:fluent-default"),
-        fluent_types=set(),
-        duration_type=URI_TIME_TYPE_BEFORE_EVT,
-        start_event=None,
-        end_event=URIRef("urn:test:end-default"),
-        horizon=10.0,
+        fluent_types={URI_TIME_TYPE_BEFORE_EVT},
     )
 
     class Evaluator(ObservationPolicyEvaluator):
@@ -117,6 +121,55 @@ SHACL_URLS = {
     URL_MM_EXEC_SHACL: "turtle",
     URL_MM_PYTHON_SHACL: "turtle",
 }
+
+
+def _create_scenario_exec_graph(
+    execution_id: URIRef | None = None,
+    variant_id: URIRef | None = None,
+    tmpl_id: URIRef | None = None,
+    scene_id: URIRef | None = None,
+    scene_inst_id: URIRef | None = None,
+    bhv_id: URIRef | None = None,
+    bhv_impl_id: URIRef | None = None,
+) -> Graph:
+    if execution_id is None:
+        execution_id = URIRef("urn:test:execution")
+    if variant_id is None:
+        variant_id = URIRef("urn:test:variant")
+    if tmpl_id is None:
+        tmpl_id = URIRef("urn:test:template")
+    if scene_id is None:
+        scene_id = URIRef("urn:test:scene")
+    if scene_inst_id is None:
+        scene_inst_id = URIRef("urn:test:scene-instance")
+    if bhv_id is None:
+        bhv_id = URIRef("urn:test:behaviour")
+    if bhv_impl_id is None:
+        bhv_impl_id = URIRef("urn:test:behaviour-implementation")
+
+    graph = Graph()
+    graph.add((execution_id, RDF.type, URI_BDD_TYPE_SCENARIO_EXEC))
+    graph.add((execution_id, URI_BDD_PRED_OF_VARIANT, variant_id))
+    graph.add((execution_id, URI_EXEC_PRED_RUNS_SCENE, scene_inst_id))
+    graph.add((scene_inst_id, RDF.type, URI_EXEC_TYPE_SCENE_INST))
+    graph.add((scene_inst_id, URI_BDD_PRED_OF_SCENE, scene_id))
+    graph.add((execution_id, URI_BDD_PRED_HAS_BHV_IMPL, bhv_impl_id))
+    graph.add((bhv_impl_id, RDF.type, URIRef("urn:test:Implementation")))
+    graph.add((bhv_impl_id, URI_BHV_PRED_OF_BHV, bhv_id))
+    graph.add((bhv_id, RDF.type, URI_BHV_TYPE_BHV))
+    graph.add((tmpl_id, RDF.type, URI_TIME_TYPE_DURING))
+    graph.add((tmpl_id, URI_TIME_PRED_AFTER_EVT, URIRef("urn:test:start")))
+    graph.add((tmpl_id, URI_TIME_PRED_BEFORE_EVT, URIRef("urn:test:end")))
+    graph.add((tmpl_id, RDF.type, URI_TIME_TYPE_DURING))
+    graph.add((tmpl_id, URI_TIME_PRED_AFTER_EVT, URIRef("urn:test:start")))
+    graph.add((tmpl_id, URI_TIME_PRED_BEFORE_EVT, URIRef("urn:test:end")))
+    return graph
+
+
+def add_before_policy_time(graph, policy_uri, end_uri):
+    graph.add((policy_uri, RDF.type, URI_TIME_TYPE_BEFORE_EVT))
+    graph.add((policy_uri, URI_TIME_PRED_BEFORE_EVT, end_uri))
+    graph.add((policy_uri, URI_TIME_PRED_HRZN_SEC, Literal(10.0)))
 
 
 class BDDExecTest(unittest.TestCase):
@@ -162,30 +215,35 @@ class BDDExecTest(unittest.TestCase):
         graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
         graph.add((observation_uri, URI_OBS_PRED_OBSERVES_TARGET, target_uri))
         graph.add((provider_uri, RDF.type, URIRef("urn:test:provider-type")))
+        fluent_id = URIRef("urn:test:fluent")
+        graph.add((policy_uri, URI_BDD_PRED_OF_CLAUSE, fluent_id))
+        add_before_policy_time(graph, policy_uri, URIRef("urn:test:end"))
 
         policy = ObsPolicyModel(
             node_id=policy_uri,
             graph=graph,
-            fluent_id=URIRef("urn:test:fluent"),
-            fluent_types=set(),
-            duration_type=URI_TIME_TYPE_BEFORE_EVT,
-            start_event=None,
-            end_event=URIRef("urn:test:end"),
-            horizon=10.0,
+            fluent_id=fluent_id,
+            fluent_types={URI_TIME_TYPE_BEFORE_EVT},
         )
 
         class TruthEvaluator(ObservationPolicyEvaluator):
-            def _evaluate_samples(self, samples):
-                return bool(samples), "sample exists"
+            def _evaluate_samples(self, observations: list[ObservationStamped]) -> tuple[bool, str]:
+                return bool(observations), "sample exists"
 
-        policy.evaluator = TruthEvaluator()
         self.assertEqual(policy.observation_targets[observation_uri], target_uri)
         manager = ObservationManager(
-            scr_exec=SimpleNamespace(obs_policy_uris={policy_uri}, scene_instance=None)
+            scr_exec=SimpleNamespace(
+                obs_policy_fluents={policy_uri: policy.fluent_id}, scene_instance=None
+            )
         )
-        with patch.object(ObsPolicyModel, "policies_for_fluent_clause", return_value=[policy]):
-            manager.register_fluent_obs(graph, SimpleNamespace(id=policy.fluent_id), obs_loaders=[])
+        manager.register_fluent_obs(
+            graph,
+            SimpleNamespace(id=policy.fluent_id, types={URI_TIME_TYPE_BEFORE_EVT}),
+            obs_loaders=[],
+        )
         self.assertEqual(manager.providers[provider_uri].id, provider_uri)
+        policy = manager.obs_policies[policy_uri]
+        policy.evaluator = TruthEvaluator()
 
         manager.bind_observation_targets({target_uri: bound_target_uri})
         self.assertEqual(policy.observation_targets[observation_uri], bound_target_uri)
@@ -230,22 +288,19 @@ class BDDExecTest(unittest.TestCase):
             graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
             graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
             graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+        add_before_policy_time(graph, policy_uri, URIRef("urn:test:end"))
 
         policy = ObsPolicyModel(
             node_id=policy_uri,
             graph=graph,
             fluent_id=URIRef("urn:test:fluent"),
-            fluent_types=set(),
-            duration_type=URI_TIME_TYPE_BEFORE_EVT,
-            start_event=None,
-            end_event=URIRef("urn:test:end"),
-            horizon=10.0,
+            fluent_types={URI_TIME_TYPE_BEFORE_EVT},
         )
         calls = []
 
         class BatchEvaluator(ObservationPolicyEvaluator):
-            def _evaluate_samples(self, samples):
-                calls.append(samples)
+            def _evaluate_samples(self, observations):
+                calls.append(observations)
                 return True, "batch complete"
 
         policy.evaluator = BatchEvaluator()
@@ -305,6 +360,7 @@ class BDDExecTest(unittest.TestCase):
         graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
         graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
         graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+        add_before_policy_time(graph, policy_uri, URIRef("urn:test:end"))
 
         with patch(
             "bdd_dsl.models.observation.import_attr_from_model", return_value=StatefulEvaluator
@@ -313,11 +369,7 @@ class BDDExecTest(unittest.TestCase):
                 node_id=policy_uri,
                 graph=graph,
                 fluent_id=URIRef("urn:test:fluent"),
-                fluent_types=set(),
-                duration_type=URI_TIME_TYPE_BEFORE_EVT,
-                start_event=None,
-                end_event=URIRef("urn:test:end"),
-                horizon=10.0,
+                fluent_types={URI_TIME_TYPE_BEFORE_EVT},
             )
 
         self.assertIsInstance(policy.evaluator, StatefulEvaluator)
@@ -326,51 +378,67 @@ class BDDExecTest(unittest.TestCase):
         self.assertTrue(policy.evaluator.evaluate([sample])[0])
         self.assertEqual(policy.evaluator.calls, 2)
 
+    def test_scenario_execution_rejects_multiple_policies_for_one_fluent(self):
+        execution_id = URIRef("urn:test:execution")
+        tmpl_id = URIRef("urn:test:template")
+        variant_id = URIRef("urn:test:variant")
+        scene_id = URIRef("urn:test:scene")
+        scene_inst_id = URIRef("urn:test:scene-instance")
+        graph = _create_scenario_exec_graph(
+            execution_id=execution_id,
+            variant_id=variant_id,
+            tmpl_id=tmpl_id,
+            scene_id=scene_id,
+            scene_inst_id=scene_inst_id,
+        )
+        tmpl = ModelBase(node_id=tmpl_id, graph=graph)
+        process_time_constraint_model(constraint=tmpl, graph=graph)
+        scr_var = SimpleNamespace(id=variant_id, tmpl=tmpl, scene=SimpleNamespace(id=scene_id))
+        fluent = URIRef("urn:test:fluent-duplicate-policy")
+        policy_a = URIRef("urn:test:policy-a")
+        policy_b = URIRef("urn:test:policy-b")
+        for policy in (policy_a, policy_b):
+            graph.add((execution_id, URI_OBS_PRED_POLICY, policy))
+            graph.add((policy, RDF.type, URI_OBS_TYPE_POLICY))
+            graph.add((policy, URI_BDD_PRED_OF_CLAUSE, fluent))
+
+        with self.assertRaisesRegex(ValueError, "multiple policies"):
+            ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+
     def test_scenario_execution_selects_exact_scene_instance(self):
-        graph = Graph()
-        variant = URIRef("urn:test:variant")
         execution = URIRef("urn:test:execution")
+        variant = URIRef("urn:test:variant")
         scene_inst = URIRef("urn:test:scene-instance")
         scene = URIRef("urn:test:scene")
-        bhv_impl = URIRef("urn:test:behaviour-implementation")
-        behaviour = URIRef("urn:test:behaviour")
-        graph.add((execution, RDF.type, URI_BDD_TYPE_SCENARIO_EXEC))
-        graph.add((execution, URI_BDD_PRED_OF_VARIANT, variant))
-        graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, scene_inst))
-        graph.add((scene_inst, RDF.type, URI_EXEC_TYPE_SCENE_INST))
-        graph.add((scene_inst, URI_BDD_PRED_OF_SCENE, scene))
-        graph.add((execution, URI_BDD_PRED_HAS_BHV_IMPL, bhv_impl))
-        graph.add((bhv_impl, RDF.type, URIRef("urn:test:Implementation")))
-        graph.add((bhv_impl, URI_BHV_PRED_OF_BHV, behaviour))
-        graph.add((behaviour, RDF.type, URIRef("urn:test:Behaviour")))
-        scr_var = SimpleNamespace(
-            id=variant,
-            tmpl=object(),
-            scene=SimpleNamespace(id=scene),
+        tmpl_id = URIRef("urn:test:template")
+        graph = _create_scenario_exec_graph(
+            execution_id=execution,
+            tmpl_id=tmpl_id,
+            variant_id=variant,
+            scene_id=scene,
+            scene_inst_id=scene_inst,
         )
-        duration = {
-            URI_TIME_PRED_AFTER_EVT: URIRef("urn:test:start"),
-            URI_TIME_PRED_BEFORE_EVT: URIRef("urn:test:end"),
-        }
+        tmpl = ModelBase(node_id=tmpl_id, graph=graph)
+        process_time_constraint_model(constraint=tmpl, graph=graph)
+        scr_var = SimpleNamespace(id=variant, tmpl=tmpl, scene=SimpleNamespace(id=scene))
 
-        with patch("bdd_dsl.execution.scenario.get_duration", return_value=duration):
-            model = ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
-            self.assertEqual(model.scene_instance.id, scene_inst)
+        model = ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+        self.assertEqual(model.scene_instance.id, scene_inst)
 
-            other_scene = URIRef("urn:test:other-scene-instance")
-            graph.add((other_scene, RDF.type, URI_EXEC_TYPE_SCENE_INST))
-            graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, other_scene))
-            with self.assertRaisesRegex(ValueError, "exactly 1 scene instance"):
-                ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
-            graph.remove((execution, URI_EXEC_PRED_RUNS_SCENE, other_scene))
+        other_scene = URIRef("urn:test:other-scene-instance")
+        graph.add((other_scene, RDF.type, URI_EXEC_TYPE_SCENE_INST))
+        graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, other_scene))
+        with self.assertRaisesRegex(ValueError, "exactly 1 scene instance"):
+            ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+        graph.remove((execution, URI_EXEC_PRED_RUNS_SCENE, other_scene))
 
-            graph.remove((execution, URI_EXEC_PRED_RUNS_SCENE, scene_inst))
-            with self.assertRaisesRegex(ValueError, "exactly 1 scene instance"):
-                ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+        graph.remove((execution, URI_EXEC_PRED_RUNS_SCENE, scene_inst))
+        with self.assertRaisesRegex(ValueError, "exactly 1 scene instance"):
+            ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
 
-            graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, URIRef("urn:test:not-scene")))
-            with self.assertRaisesRegex(TypeError, "non-SceneInstance"):
-                ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
+        graph.add((execution, URI_EXEC_PRED_RUNS_SCENE, URIRef("urn:test:not-scene")))
+        with self.assertRaisesRegex(TypeError, "non-SceneInstance"):
+            ScenarioExecutionModel(graph, scr_var, bhv_loaders=[])
 
 
 if __name__ == "__main__":

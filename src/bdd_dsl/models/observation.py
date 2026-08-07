@@ -19,7 +19,7 @@ from trinary import Trinary, Unknown
 
 from bdd_dsl.execution.scenario import ScenarioExecutionModel
 from bdd_dsl.models.clauses import FluentClauseModel
-from bdd_dsl.models.time_constraint import get_duration
+from bdd_dsl.models.time_constraint import get_duration, process_time_constraint_model
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_CLAUSE,
     URI_OBS_PRED_HAS_OBSERVATION,
@@ -147,10 +147,6 @@ class ObsPolicyModel(ModelBase):
         graph: Graph,
         fluent_id: URIRef,
         fluent_types: set[URIRef],
-        duration_type: URIRef,
-        start_event: URIRef | None,
-        end_event: URIRef | None,
-        horizon: float | None,
     ) -> None:
         super().__init__(node_id=node_id, graph=graph)
         if URI_OBS_TYPE_POLICY not in self.types:
@@ -159,10 +155,41 @@ class ObsPolicyModel(ModelBase):
             )
         self.fluent_id = fluent_id
         self.fluent_types = fluent_types
-        self.duration_type = duration_type
-        self.start_event = start_event
-        self.end_event = end_event
-        self.horizon = horizon
+        process_time_constraint_model(constraint=self, graph=graph)
+
+        if URI_TIME_TYPE_DURING in self.types:
+            self.duration_type = URI_TIME_TYPE_DURING
+        elif URI_TIME_TYPE_AFTER_EVT in self.types:
+            self.duration_type = URI_TIME_TYPE_AFTER_EVT
+        elif URI_TIME_TYPE_BEFORE_EVT in self.types:
+            self.duration_type = URI_TIME_TYPE_BEFORE_EVT
+        else:
+            raise ValueError(
+                f"ObservationPolicy '{self.id}' has no supported temporal type: {self.types}"
+            )
+
+        if self.duration_type not in fluent_types:
+            raise ValueError(
+                f"ObservationPolicy '{self.id}' temporal type does not match fluent '{fluent_id}'"
+            )
+
+        duration = get_duration(constraint=self)
+        self.start_event = duration.get(URI_TIME_PRED_AFTER_EVT)
+        self.end_event = duration.get(URI_TIME_PRED_BEFORE_EVT)
+        self.horizon = duration.get(URI_TIME_PRED_HRZN_SEC)
+
+        if self.duration_type == URI_TIME_TYPE_DURING:
+            if self.horizon is not None:
+                raise ValueError(f"'{self}' must not specify a horizon for during")
+        elif not isinstance(self.horizon, float):
+            raise TypeError(
+                f"ObservationPolicy '{self.id}' requires a horizon of type float for {self.duration_type}"
+            )
+
+        if self.duration_type == URI_TIME_TYPE_BEFORE_EVT:
+            self.start_event = None
+        elif self.duration_type == URI_TIME_TYPE_AFTER_EVT:
+            self.end_event = None
 
         self.trinary_timeline = []
         self.observation_uris = set()
@@ -346,35 +373,6 @@ class ObsPolicyModel(ModelBase):
         fc: FluentClauseModel,
     ) -> Generator[ObsPolicyModel, None, None]:
 
-        dur_spec = get_duration(constraint=fc)
-        dur_type = None
-        start_evt = None
-        end_evt = None
-        hrzn = None
-
-        if URI_TIME_TYPE_DURING in fc.types:
-            dur_type = URI_TIME_TYPE_DURING
-            start_evt = dur_spec[URI_TIME_PRED_AFTER_EVT]
-            end_evt = dur_spec[URI_TIME_PRED_BEFORE_EVT]
-            hrzn = None
-
-        elif URI_TIME_TYPE_AFTER_EVT in fc.types:
-            dur_type = URI_TIME_TYPE_AFTER_EVT
-            start_evt = dur_spec[URI_TIME_PRED_AFTER_EVT]
-            end_evt = None
-            hrzn = dur_spec[URI_TIME_PRED_HRZN_SEC]
-
-        elif URI_TIME_TYPE_BEFORE_EVT in fc.types:
-            dur_type = URI_TIME_TYPE_BEFORE_EVT
-            start_evt = None
-            end_evt = dur_spec[URI_TIME_PRED_BEFORE_EVT]
-            hrzn = dur_spec[URI_TIME_PRED_HRZN_SEC]
-
-        else:
-            raise ValueError(
-                "Unhandled duration types:\n" + "\n  ".join([uri.n3() for uri in fc.types])
-            )
-
         for obs_pol_id in graph.subjects(predicate=URI_BDD_PRED_OF_CLAUSE, object=fc.id):
             if not isinstance(obs_pol_id, URIRef):
                 raise TypeError(
@@ -386,10 +384,6 @@ class ObsPolicyModel(ModelBase):
                 graph=graph,
                 fluent_id=fc.id,
                 fluent_types=fc.types,
-                duration_type=dur_type,
-                start_event=start_evt,
-                end_event=end_evt,
-                horizon=hrzn,
             )
 
 
@@ -475,7 +469,7 @@ class ObservationManager:
             if obs_pol.id in self.obs_policies:
                 # policy already added.
                 continue
-            if obs_pol.id not in self.scenario_exec.obs_policy_uris:
+            if self.scenario_exec.obs_policy_fluents.get(obs_pol.id) != fc.id:
                 # policy not explicitly included in execution model
                 continue
 
