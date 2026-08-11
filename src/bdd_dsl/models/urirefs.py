@@ -1,9 +1,16 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
-from rdf_utils.namespace import NS_MM_TIME
+from rdf_utils.namespace import (
+    NS_MM_GEOM_COORD,
+    NS_MM_GEOM_REL,
+    NS_MM_QUDT_QTY,
+    NS_MM_TIME,
+)
 
 from bdd_dsl.models.namespace import (
     NS_MM_BDD,
     NS_MM_BHV,
+    NS_MM_CSTR,
+    NS_MM_CSTR_EXT,
     NS_MM_OBS,
     NS_MM_ROS,
     NS_MM_TASK,
@@ -40,6 +47,32 @@ URI_OBS_PRED_POLICY = NS_MM_OBS["has-policy"]
 URI_OBS_PRED_PROVIDER = NS_MM_OBS["has-provider"]
 URI_OBS_PRED_HAS_OBSERVATION = NS_MM_OBS["has-observation"]
 URI_OBS_PRED_OBSERVES_TARGET = NS_MM_OBS["observes-target"]
+URI_OBS_PRED_TIME_EXTRACTOR = NS_MM_OBS["time-extractor"]
+URI_OBS_PRED_ENTITY_MAPPER = NS_MM_OBS["entity-mapper"]
+URI_OBS_PRED_HAS_EVALUATOR = NS_MM_OBS["has-evaluator"]
+URI_OBS_TYPE_DIRECT_TRINARY_POLICY = NS_MM_OBS["DirectTrinaryPolicy"]
+URI_OBS_TYPE_EVALUATED_POLICY = NS_MM_OBS["EvaluatedObservationPolicy"]
+URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR = NS_MM_OBS["LinearDistanceEvaluator"]
+
+# Linear distance
+URI_GEOM_TYPE_LINEAR_DISTANCE = NS_MM_GEOM_REL["LinearDistance"]
+URI_GEOM_PRED_BETWEEN_ENTITIES = NS_MM_GEOM_REL["between-entities"]
+URI_GEOM_TYPE_LINEAR_DISTANCE_COORD = NS_MM_GEOM_COORD["LinearDistanceCoordinate"]
+URI_GEOM_TYPE_DISTANCE_REF = NS_MM_GEOM_COORD["DistanceReference"]
+URI_GEOM_PRED_COORD_OF = NS_MM_GEOM_COORD["of"]
+URI_QUDT_QK_DISTANCE = NS_MM_QUDT_QTY["Distance"]
+URI_CSTR_TYPE_LINEAR_DISTANCE = NS_MM_CSTR["LinearDistanceConstraint"]
+URI_CSTR_TYPE_LESS_THAN = NS_MM_CSTR["LessThanConstraint"]
+URI_CSTR_TYPE_GREATER_THAN = NS_MM_CSTR["GreaterThanConstraint"]
+URI_CSTR_TYPE_BILATERAL = NS_MM_CSTR["BilateralConstraint"]
+URI_CSTR_TYPE_EQUALITY = NS_MM_CSTR["EqualityConstraint"]
+URI_CSTR_PRED_HAS_CONSTRAINT = NS_MM_CSTR_EXT["has-constraint"]
+URI_CSTR_PRED_QUANTITY = NS_MM_CSTR["quantity"]
+URI_CSTR_PRED_THRESHOLD = NS_MM_CSTR["threshold"]
+URI_CSTR_PRED_LOWER_THRESHOLD = NS_MM_CSTR["lower-threshold"]
+URI_CSTR_PRED_UPPER_THRESHOLD = NS_MM_CSTR["upper-threshold"]
+URI_CSTR_PRED_REFERENCE_VALUE = NS_MM_CSTR["reference-value"]
+URI_CSTR_PRED_TOLERANCE = NS_MM_CSTR_EXT["tolerance"]
 
 # ROS
 URI_ROS_TYPE_TOPIC = NS_MM_ROS["Topic"]

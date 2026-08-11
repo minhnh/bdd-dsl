@@ -5,15 +5,18 @@ from abc import ABC, abstractmethod
 from collections.abc import Generator
 from dataclasses import dataclass
 from inspect import isclass
+from math import dist, isclose
 from typing import Any, Protocol
 
-from rdf_utils.models.common import AttrLoaderProtocol, ModelBase
+from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, get_node_types
+from rdf_utils.models.geom_coord import to_metres
 from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     import_attr_from_model,
     load_py_module_attr,
 )
-from rdflib import Graph, URIRef
+from rdf_utils.models.vocab import URI_QUDT_PRED_UNIT, URI_QUDT_PRED_VALUE
+from rdflib import Graph, Literal, URIRef
 from scene_dsl.rdf_parser.scenex import SceneInstanceModel
 from trinary import Trinary, Unknown
 
@@ -22,9 +25,26 @@ from bdd_dsl.models.clauses import FluentClauseModel
 from bdd_dsl.models.time_constraint import get_duration, process_time_constraint_model
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_CLAUSE,
+    URI_CSTR_PRED_HAS_CONSTRAINT,
+    URI_CSTR_PRED_LOWER_THRESHOLD,
+    URI_CSTR_PRED_REFERENCE_VALUE,
+    URI_CSTR_PRED_THRESHOLD,
+    URI_CSTR_PRED_TOLERANCE,
+    URI_CSTR_PRED_UPPER_THRESHOLD,
+    URI_CSTR_TYPE_BILATERAL,
+    URI_CSTR_TYPE_EQUALITY,
+    URI_CSTR_TYPE_GREATER_THAN,
+    URI_CSTR_TYPE_LESS_THAN,
+    URI_GEOM_PRED_BETWEEN_ENTITIES,
+    URI_OBS_PRED_ENTITY_MAPPER,
+    URI_OBS_PRED_HAS_EVALUATOR,
     URI_OBS_PRED_HAS_OBSERVATION,
     URI_OBS_PRED_OBSERVES_TARGET,
     URI_OBS_PRED_PROVIDER,
+    URI_OBS_PRED_TIME_EXTRACTOR,
+    URI_OBS_TYPE_DIRECT_TRINARY_POLICY,
+    URI_OBS_TYPE_EVALUATED_POLICY,
+    URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR,
     URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
@@ -92,6 +112,96 @@ class ObservationPolicyEvaluator(ABC):
     ) -> tuple[bool | Trinary, str]: ...
 
 
+def _distance_value(graph: Graph, constraint: URIRef, predicate: URIRef) -> float:
+    quantity = graph.value(constraint, predicate, any=False)
+    if not isinstance(quantity, URIRef):
+        raise TypeError(f"distance constraint {constraint} has invalid {predicate}: {quantity}")
+    val_node = graph.value(quantity, URI_QUDT_PRED_VALUE, any=False)
+    unit = graph.value(quantity, URI_QUDT_PRED_UNIT, any=False)
+    if not isinstance(val_node, Literal) or not isinstance(unit, URIRef):
+        raise TypeError(
+            f"distance quantity {quantity} requires a literal value and unit, found: value={val_node}, unit={unit}"
+        )
+    value = val_node.toPython()
+    if not isinstance(value, float):
+        raise TypeError(f"distance quantity {quantity} requires a float value, found: {value}")
+    return to_metres([float(value)], unit, quantity)[0]
+
+
+class LinearDistanceEvaluator(ObservationPolicyEvaluator):
+    constraint_id: URIRef
+    types: set[URIRef]
+    constraint_values: tuple[float, ...]
+
+    def __init__(self, graph: Graph, evaluator_id: URIRef, observations: set[URIRef]) -> None:
+        super().__init__()
+        between = set(graph.objects(evaluator_id, URI_GEOM_PRED_BETWEEN_ENTITIES))
+        if between != observations or len(between) != 2:
+            raise ValueError(
+                f"LinearDistanceEvaluator {evaluator_id} must reference exactly its two "
+                "policy observations"
+            )
+        cstr_id = graph.value(evaluator_id, URI_CSTR_PRED_HAS_CONSTRAINT, any=False)
+        if not isinstance(cstr_id, URIRef):
+            raise TypeError(f"LinearDistanceEvaluator {evaluator_id} has invalid constraint")
+        self.constraint_id = cstr_id
+        self.types = get_node_types(graph=graph, node_id=cstr_id)
+
+        if URI_CSTR_TYPE_LESS_THAN in self.types or URI_CSTR_TYPE_GREATER_THAN in self.types:
+            self.constraint_values = (
+                _distance_value(graph, self.constraint_id, URI_CSTR_PRED_THRESHOLD),
+            )
+        elif URI_CSTR_TYPE_BILATERAL in self.types:
+            self.constraint_values = (
+                _distance_value(graph, self.constraint_id, URI_CSTR_PRED_LOWER_THRESHOLD),
+                _distance_value(graph, self.constraint_id, URI_CSTR_PRED_UPPER_THRESHOLD),
+            )
+        elif URI_CSTR_TYPE_EQUALITY in self.types:
+            self.constraint_values = (
+                _distance_value(graph, self.constraint_id, URI_CSTR_PRED_REFERENCE_VALUE),
+                _distance_value(graph, self.constraint_id, URI_CSTR_PRED_TOLERANCE),
+            )
+        else:
+            raise ValueError(f"unsupported linear distance constraint types: {self.types}")
+
+    def _evaluate_samples(
+        self, observations: list[ObservationStamped]
+    ) -> tuple[bool | Trinary, str]:
+        if len(observations) != 2:
+            raise ValueError(f"expected two observations, got {len(observations)}")
+        try:
+            measured = dist(observations[0].value, observations[1].value)
+        except (TypeError, ValueError) as error:
+            raise TypeError("linear distance observations must be numeric sequences") from error
+
+        if URI_CSTR_TYPE_LESS_THAN in self.types:
+            result = measured < self.constraint_values[0] and not isclose(
+                measured, self.constraint_values[0]
+            )
+            expectation = f"less than {self.constraint_values[0]:g} m"
+        elif URI_CSTR_TYPE_GREATER_THAN in self.types:
+            result = measured > self.constraint_values[0] and not isclose(
+                measured, self.constraint_values[0]
+            )
+            expectation = f"greater than {self.constraint_values[0]:g} m"
+        elif URI_CSTR_TYPE_BILATERAL in self.types:
+            result = (
+                measured > self.constraint_values[0] or isclose(measured, self.constraint_values[0])
+            ) and (
+                measured < self.constraint_values[1] or isclose(measured, self.constraint_values[1])
+            )
+            expectation = f"between {self.constraint_values[0]:g} m and {self.constraint_values[1]:g} m inclusive"
+        else:
+            reference, tolerance = self.constraint_values
+            lower, upper = reference - tolerance, reference + tolerance
+            result = (measured > lower or isclose(measured, lower)) and (
+                measured < upper or isclose(measured, upper)
+            )
+            expectation = f"within {reference:g} m ± {tolerance:g} m ([{lower:g}, {upper:g}] m)"
+        comparison = "is" if result else "is not"
+        return result, f"linear distance {measured:g} m {comparison} {expectation}"
+
+
 @dataclass(frozen=True, slots=True)
 class TrinaryStamped:
     stamp: float
@@ -124,6 +234,24 @@ def trin_policy_and(trinaries: list[TrinaryStamped], **kwargs: Any) -> tuple[boo
     return result, reason
 
 
+def _uri_or_none_value(graph: Graph, subject_id: URIRef, predicate: URIRef) -> URIRef | None:
+    val_node = graph.value(subject=subject_id, predicate=predicate, any=False)
+    nm = graph.namespace_manager
+    if val_node is not None and not isinstance(val_node, URIRef):
+        raise TypeError(
+            f"'{subject_id.n3(nm)}' links to non-URI node via {predicate.n3(nm)}: {val_node}"
+        )
+    return val_node
+
+
+def _import_attr_from_graph(
+    graph: Graph, node_id: URIRef, types: set[URIRef] | None = None, quiet: bool = False
+) -> Any:
+    model = ModelBase(node_id=node_id, graph=graph, types=types)
+    load_py_module_attr(graph=graph, model=model, quiet=quiet)
+    return import_attr_from_model(model=model)
+
+
 class ObsPolicyModel(ModelBase):
     trinary_timeline: list[TrinaryStamped]
     observation_uris: set[URIRef]
@@ -140,6 +268,9 @@ class ObsPolicyModel(ModelBase):
     start_event: URIRef | None
     end_event: URIRef | None
     horizon: float | None
+    time_extractor_id: URIRef | None
+    entity_mapper_id: URIRef | None
+    evaluator_id: URIRef | None
 
     def __init__(
         self,
@@ -203,26 +334,64 @@ class ObsPolicyModel(ModelBase):
             provider_uri = graph.value(subject=obs_uri, predicate=URI_OBS_PRED_PROVIDER, any=False)
             if not isinstance(provider_uri, URIRef):
                 raise TypeError(f"Observation '{obs_uri}' has invalid provider: {provider_uri}")
-            target_uri = graph.value(obs_uri, URI_OBS_PRED_OBSERVES_TARGET, any=False)
-            if target_uri is not None and not isinstance(target_uri, URIRef):
-                raise TypeError(f"Observation '{obs_uri}' has invalid target: {target_uri}")
             self.observation_uris.add(obs_uri)
             self.observation_providers[obs_uri] = provider_uri
-            self.observation_targets[obs_uri] = target_uri
+            self.observation_targets[obs_uri] = _uri_or_none_value(
+                graph=graph, subject_id=obs_uri, predicate=URI_OBS_PRED_OBSERVES_TARGET
+            )
+
+        self.time_extractor_id = _uri_or_none_value(
+            graph=graph, subject_id=self.id, predicate=URI_OBS_PRED_TIME_EXTRACTOR
+        )
+        self.entity_mapper_id = _uri_or_none_value(
+            graph=graph, subject_id=self.id, predicate=URI_OBS_PRED_ENTITY_MAPPER
+        )
+        self.evaluator_id = _uri_or_none_value(
+            graph=graph, subject_id=self.id, predicate=URI_OBS_PRED_HAS_EVALUATOR
+        )
 
         self.evaluator = None
-        if URI_PY_TYPE_MODULE_ATTR in self.types:
-            load_py_module_attr(graph=graph, model=self, quiet=False)
-            evaluator = import_attr_from_model(model=self)
-            if isclass(evaluator):
-                # Stateful evaluator classes must have a no-argument constructor.
-                evaluator = evaluator()
-            if not isinstance(evaluator, ObservationPolicyEvaluator):
-                raise TypeError(
-                    f"ObservationPolicy '{self.id}' Python attribute must be an "
-                    "ObservationPolicyEvaluator class"
+        if URI_OBS_TYPE_DIRECT_TRINARY_POLICY in self.types:
+            if self.observation_uris or any(
+                (self.time_extractor_id, self.entity_mapper_id, self.evaluator_id)
+            ):
+                raise ValueError(
+                    f"TrinaryTopic policy '{self}' must not declare observations, adapters, or an evaluator"
                 )
-            self.evaluator = evaluator
+        elif URI_OBS_TYPE_EVALUATED_POLICY in self.types:
+            if (
+                not self.observation_uris
+                or self.time_extractor_id is None
+                or self.evaluator_id is None
+            ):
+                raise ValueError(
+                    f"Evaluated policy '{self}' requires observations, a time extractor, and an evaluator"
+                )
+
+            eval_types = get_node_types(graph=graph, node_id=self.evaluator_id)
+            if URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR in eval_types:
+                self.evaluator = LinearDistanceEvaluator(
+                    graph, self.evaluator_id, self.observation_uris
+                )
+            elif URI_PY_TYPE_MODULE_ATTR in eval_types:
+                evaluator = _import_attr_from_graph(
+                    graph=graph, node_id=self.evaluator_id, types=eval_types
+                )
+                if isclass(evaluator):
+                    evaluator = evaluator()
+                if not isinstance(evaluator, ObservationPolicyEvaluator):
+                    raise TypeError(
+                        f"ObservationPolicy '{self}' Python evaluator must be an ObservationPolicyEvaluator class"
+                    )
+                self.evaluator = evaluator
+            else:
+                raise TypeError(
+                    f"ObservationPolicy '{self}' has unsupported evaluator types: {eval_types}"
+                )
+        else:
+            raise ValueError(
+                f"ObservationPolicy '{self}' has unsupported policy types: {self.types}"
+            )
 
         self.start_time = None
         self.end_time = None
@@ -390,9 +559,9 @@ class ObsPolicyModel(ModelBase):
 class ObservationManager:
     """Route provider values into policy-local caches and fluent timelines.
 
-    Register provider adapters after building a scenario context. Feed raw provider
-    messages through :meth:`update_provider_observation`; it extracts a timestamp,
-    maps target-specific values, and evaluates each complete policy snapshot once.
+    Provider adapters are loaded from policy RDF when building a scenario context. Feed
+    raw provider messages through :meth:`update_provider_observation`; it extracts a
+    timestamp, maps target-specific values, and evaluates each complete policy snapshot once.
     :meth:`update_fpolicy_assertion` remains the compatibility ingress for direct
     ``TrinaryStamped`` topic policies.
     """
@@ -489,14 +658,28 @@ class ObservationManager:
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
             self.obs_policies[obs_pol.id] = obs_pol
 
-    def register_provider(
-        self,
-        provider_uri: URIRef,
-        timestamp_extractor: TimestampedObservationProtocol | None = None,
-        entity_mapper: EntityObservationMapperProtocol | None = None,
-    ) -> None:
-        """Register optional timestamp and entity-mapping adapters for a provider."""
-        self._provider_registry[provider_uri] = (timestamp_extractor, entity_mapper)
+    def load_provider_adapters(self, graph: Graph) -> None:
+        """Load policy-declared provider adapters from RDF."""
+        declarations = {}
+        for policy in self.obs_policies.values():
+            declaration = (policy.time_extractor_id, policy.entity_mapper_id)
+            for provider_uri in policy.observation_providers.values():
+                previous = declarations.setdefault(provider_uri, declaration)
+                if previous != declaration:
+                    raise ValueError(
+                        f"conflicting adapters declared for observation provider '{provider_uri}'"
+                    )
+
+        for provider_uri, (time_extractor_id, entity_mapper_id) in declarations.items():
+            time_extractor = None
+            if time_extractor_id is not None:
+                time_extractor = _import_attr_from_graph(graph=graph, node_id=time_extractor_id)
+
+            entity_mapper = None
+            if entity_mapper_id is not None:
+                entity_mapper = _import_attr_from_graph(graph=graph, node_id=entity_mapper_id)
+
+            self._provider_registry[provider_uri] = (time_extractor, entity_mapper)
 
     def bind_observation_targets(self, bindings: dict[URIRef, Any]) -> None:
         """Resolve template-variable targets for this scenario context."""
@@ -506,6 +689,10 @@ class ObservationManager:
                     continue
                 bound_target = bindings.get(target_uri)
                 if bound_target is not None:
+                    if policy.entity_mapper_id is None:
+                        raise ValueError(
+                            f"variable observation target '{target_uri}' requires an entity mapper"
+                        )
                     if not isinstance(bound_target, URIRef):
                         raise TypeError(
                             f"observation target '{target_uri}' is bound to non-URI {bound_target}"
@@ -667,4 +854,5 @@ class ObservationManager:
                 fc=fc,
                 obs_loaders=obs_loaders,
             )
+        obs_manager.load_provider_adapters(graph)
         return obs_manager
