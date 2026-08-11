@@ -406,21 +406,21 @@ class ObsPolicyModel(ModelBase):
         # Insert at beginning if smallest
         self.trinary_timeline.insert(0, trin_st)
 
-    def _discard_out_of_horizon_trin(self):
+    def _discard_out_of_horizon_trin(self, reference_stamp: float | None = None):
         """Clean up trinary queue for BeforeEvent type.
 
-        Discard TrinaryStamped objects outside of the time horizon, calculated either
-        from the end event or the latest TrinaryStamped instance.
+        Discard TrinaryStamped objects outside of the time horizon relative to an
+        explicit reference, the end event, or the latest TrinaryStamped instance.
         """
-        if len(self.trinary_timeline) < 1 or self.end_time is not None:
-            # if no trinary registered or timeline finished
+        if not self.trinary_timeline:
+            # if no trinary registered
             return
 
         assert self.horizon is not None, (
             f"{self.fluent_id}: _discard_out_of_horizon_trin called with no horizon specified for type: {self.duration_type}"
         )
 
-        end_t = self.end_time
+        end_t = reference_stamp if reference_stamp is not None else self.end_time
         if end_t is None:
             end_t = self.trinary_timeline[-1].stamp
 
@@ -495,6 +495,9 @@ class ObsPolicyModel(ModelBase):
         stamp: float,
         trinaries_policy: TrinariesPolicyProtocol,
     ) -> TrinaryStamped:
+        if self.duration_type == URI_TIME_TYPE_BEFORE_EVT and self.end_time is None:
+            self._discard_out_of_horizon_trin(stamp)
+
         if self.trinary_timeline:
             trinary, reason = trinaries_policy(self.trinary_timeline)
         elif self.evaluator is None:
@@ -766,6 +769,9 @@ class ObservationManager:
 
         A policy waits until every linked observation has a cached value. Older input
         snapshots are rejected; equal timestamps replace cached samples.
+        The returned dictionary maps each represented policy URI to an
+        (accepted, reason) update outcome. The accepted flag reports whether the
+        update was handled; it is not the policy's fluent trinary value.
         """
         results: dict[URIRef, tuple[bool, str]] = {}
         obs_by_policy: dict[URIRef, list[ObservationStamped]] = {}
@@ -794,10 +800,7 @@ class ObservationManager:
 
         for policy_uri, policy_observations in obs_by_policy.items():
             if policy_uri in stale_policies:
-                results[policy_uri] = (
-                    False,
-                    "(observation) older than cached sample",
-                )
+                results[policy_uri] = (False, "(observation) older than cached sample")
                 continue
 
             for obs in policy_observations:
@@ -805,10 +808,23 @@ class ObservationManager:
 
             policy = self.obs_policies[policy_uri]
             if any(uri not in self.observation_cache for uri in policy.observation_uris):
+                # The policy has never had a complete cached snapshot.
                 results[policy_uri] = (True, "(observation) waiting for policy inputs")
                 continue
 
             samples = [self.observation_cache[uri] for uri in policy.observation_uris]
+            # Existing cache entries prove availability, not freshness. A complete
+            # evaluation requires every sample to lie within the current horizon.
+            if policy.horizon is not None:
+                reference_stamp = max(obs.stamp for obs in policy_observations)
+                samples = [
+                    sample for sample in samples if sample.stamp > reference_stamp - policy.horizon
+                ]
+                if len(samples) != len(policy.observation_uris):
+                    # Ignore batch in case of an incomplete snapshot.
+                    results[policy_uri] = (True, "(observation) waiting for fresh policy inputs")
+                    continue
+
             results[policy_uri] = policy.add_samples(samples)
         return results
 
