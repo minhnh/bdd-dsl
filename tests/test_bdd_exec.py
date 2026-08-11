@@ -15,6 +15,7 @@ from rdf_utils.models.vocab import URI_EXEC_PRED_RUNS_SCENE, URI_EXEC_TYPE_SCENE
 from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_M
 from rdf_utils.resolver import install_resolver
 from rdflib import RDF, Dataset, Graph, Literal, URIRef
+from trinary import Unknown
 
 from bdd_dsl.execution.common import URL_MM_EXEC_SHACL
 from bdd_dsl.execution.scenario import ScenarioExecutionModel
@@ -109,16 +110,56 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
 
     class Evaluator(ObservationPolicyEvaluator):
         def _evaluate_samples(self, observations):
-            return False, "collision recorded"
+            return observations[0].value, "observation value"
 
     policy.evaluator = Evaluator((True, "no collision recorded"))
     assert policy.get_result(1.0, trin_policy_and).trinary is True
 
-    accepted, _ = policy.add_samples([ObservationStamped(observation_uri, provider_uri, 2.0, True)])
+    accepted, _ = policy.add_samples(
+        [ObservationStamped(observation_uri, provider_uri, 2.0, False)]
+    )
     assert accepted
     result = policy.get_result(2.0, trin_policy_and)
     assert result.trinary is False
     assert result.reason == "at least one assertion is false"
+
+    result = policy.get_result(12.0, trin_policy_and)
+    assert result.trinary is True
+    assert result.reason == "no collision recorded"
+
+
+def test_before_policy_closes_on_the_final_event_relative_window():
+    policy_uri = URIRef("urn:test:policy-close")
+    observation_uri = URIRef("urn:test:obs-close")
+    provider_uri = URIRef("urn:test:provider-close")
+    end_uri = URIRef("urn:test:end-close")
+    graph = Graph()
+    graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+    graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
+    graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
+    graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+    add_python_role(graph, policy_uri, URI_OBS_PRED_HAS_EVALUATOR, "evaluator")
+    add_before_policy_time(graph, policy_uri, end_uri)
+    policy = ObsPolicyModel(
+        node_id=policy_uri,
+        graph=graph,
+        fluent_id=URIRef("urn:test:fluent-close"),
+        fluent_types={URI_TIME_TYPE_BEFORE_EVT},
+    )
+
+    class Evaluator(ObservationPolicyEvaluator):
+        def _evaluate_samples(self, observations):
+            return observations[0].value, "observation value"
+
+    policy.evaluator = Evaluator()
+    assert policy.add_samples([ObservationStamped(observation_uri, provider_uri, 9.0, False)])[0]
+    assert policy.add_samples([ObservationStamped(observation_uri, provider_uri, 14.0, True)])[0]
+    assert policy.get_result(14.0, trin_policy_and).trinary is False
+
+    policy.on_event(end_uri, 20.0)
+
+    result = policy.get_result(100.0, trin_policy_and)
+    assert result.trinary is True
 
 
 EXEC_MODEL_URLS = {
@@ -380,6 +421,13 @@ class BDDExecTest(unittest.TestCase):
         self.assertTrue(all(policy.observation_targets[uri] is None for uri in observation_uris))
 
         results = manager.update_observations(
+            [ObservationStamped(observation_uris[0], provider_uri, 1.0, True)]
+        )
+        self.assertTrue(results[policy_uri][0])
+        self.assertEqual(calls, [])
+        self.assertIs(policy.get_result(1.0, trin_policy_and).trinary, Unknown)
+
+        results = manager.update_observations(
             [
                 ObservationStamped(observation_uri, provider_uri, stamp, True)
                 for observation_uri, stamp in zip(observation_uris, (1.0, 2.0), strict=True)
@@ -405,6 +453,22 @@ class BDDExecTest(unittest.TestCase):
         self.assertEqual(manager.observation_cache, cached_snapshot)
         self.assertEqual(len(calls), 1)
         self.assertEqual(len(policy.trinary_timeline), 1)
+
+        results = manager.update_observations(
+            [ObservationStamped(observation_uris[0], provider_uri, 13.0, False)]
+        )
+
+        self.assertTrue(results[policy_uri][0])
+        self.assertEqual(len(calls), 1)
+        self.assertIs(policy.get_result(13.0, trin_policy_and).trinary, Unknown)
+
+        results = manager.update_observations(
+            [ObservationStamped(observation_uris[1], provider_uri, 14.0, True)]
+        )
+
+        self.assertTrue(results[policy_uri][0])
+        self.assertEqual(len(calls), 2)
+        self.assertIs(policy.get_result(14.0, trin_policy_and).trinary, True)
 
     def test_python_observation_policy_instantiates_callable_class_once(self):
         class StatefulEvaluator(ObservationPolicyEvaluator):
