@@ -36,10 +36,14 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_SCENARIO_EXEC,
     URI_BHV_PRED_OF_BHV,
     URI_BHV_TYPE_BHV,
+    URI_OBS_PRED_ENTITY_MAPPER,
+    URI_OBS_PRED_HAS_EVALUATOR,
     URI_OBS_PRED_HAS_OBSERVATION,
     URI_OBS_PRED_OBSERVES_TARGET,
     URI_OBS_PRED_POLICY,
     URI_OBS_PRED_PROVIDER,
+    URI_OBS_PRED_TIME_EXTRACTOR,
+    URI_OBS_TYPE_EVALUATED_POLICY,
     URI_OBS_TYPE_OBSERVATION,
     URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
@@ -87,8 +91,14 @@ def test_default_observation_evaluator_handles_empty_and_non_empty_samples():
 
 def test_policy_result_uses_default_until_an_accepted_sample_exists():
     policy_uri = URIRef("urn:test:policy-default")
+    observation_uri = URIRef("urn:test:obs")
+    provider_uri = URIRef("urn:test:provider")
     graph = Graph()
     graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+    graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
+    graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
+    graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+    add_python_role(graph, policy_uri, URI_OBS_PRED_HAS_EVALUATOR, "evaluator")
     add_before_policy_time(graph, policy_uri, URIRef("urn:test:end-default"))
     policy = ObsPolicyModel(
         node_id=policy_uri,
@@ -104,9 +114,7 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
     policy.evaluator = Evaluator((True, "no collision recorded"))
     assert policy.get_result(1.0, trin_policy_and).trinary is True
 
-    accepted, _ = policy.add_samples(
-        [ObservationStamped(URIRef("urn:test:obs"), URIRef("urn:test:provider"), 2.0, True)]
-    )
+    accepted, _ = policy.add_samples([ObservationStamped(observation_uri, provider_uri, 2.0, True)])
     assert accepted
     result = policy.get_result(2.0, trin_policy_and)
     assert result.trinary is False
@@ -172,6 +180,37 @@ def add_before_policy_time(graph, policy_uri, end_uri):
     graph.add((policy_uri, URI_TIME_PRED_HRZN_SEC, Literal(10.0)))
 
 
+class FixtureEvaluator(ObservationPolicyEvaluator):
+    def _evaluate_samples(self, observations):
+        return bool(observations), "fixture"
+
+
+def fixture_timestamp(_, receipt_stamp):
+    return receipt_stamp + 1
+
+
+def fixture_entity_mapper(observation, _, targets):
+    return [EntityObservation(targets[0], observation)]
+
+
+def add_python_role(graph, policy_uri, predicate, name, attr_name="FixtureEvaluator"):
+    role_uri = URIRef(f"{policy_uri}/{name}")
+    if predicate == URI_OBS_PRED_HAS_EVALUATOR:
+        graph.add((policy_uri, RDF.type, URI_OBS_TYPE_EVALUATED_POLICY))
+        add_python_role(
+            graph,
+            policy_uri,
+            URI_OBS_PRED_TIME_EXTRACTOR,
+            "time-extractor",
+            "fixture_timestamp",
+        )
+    graph.add((policy_uri, predicate, role_uri))
+    graph.add((role_uri, RDF.type, URI_PY_TYPE_MODULE_ATTR))
+    graph.add((role_uri, URI_PY_PRED_MODULE_NAME, Literal("test_bdd_exec")))
+    graph.add((role_uri, URI_PY_PRED_ATTR_NAME, Literal(attr_name)))
+    return role_uri
+
+
 class BDDExecTest(unittest.TestCase):
     def setUp(self):
         install_resolver()
@@ -215,6 +254,14 @@ class BDDExecTest(unittest.TestCase):
         graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
         graph.add((observation_uri, URI_OBS_PRED_OBSERVES_TARGET, target_uri))
         graph.add((provider_uri, RDF.type, URIRef("urn:test:provider-type")))
+        add_python_role(graph, policy_uri, URI_OBS_PRED_HAS_EVALUATOR, "evaluator")
+        add_python_role(
+            graph,
+            policy_uri,
+            URI_OBS_PRED_ENTITY_MAPPER,
+            "entity-mapper",
+            "fixture_entity_mapper",
+        )
         fluent_id = URIRef("urn:test:fluent")
         graph.add((policy_uri, URI_BDD_PRED_OF_CLAUSE, fluent_id))
         add_before_policy_time(graph, policy_uri, URIRef("urn:test:end"))
@@ -251,11 +298,10 @@ class BDDExecTest(unittest.TestCase):
             manager.observation_targets_for_provider(provider_uri),
             {observation_uri: bound_target_uri},
         )
-        manager.register_provider(
-            provider_uri,
-            timestamp_extractor=lambda _, receipt_stamp: receipt_stamp + 1,
-            entity_mapper=lambda _, __, ___: [EntityObservation(bound_target_uri, True)],
-        )
+        self.assertEqual(manager.update_provider_observation(provider_uri, object(), 1.0), {})
+        self.assertNotIn(observation_uri, manager.observation_cache)
+
+        manager.load_provider_adapters(graph)
         results = manager.update_provider_observation(provider_uri, object(), 1.0)
         self.assertEqual(results, {policy_uri: (True, "")})
         self.assertEqual(policy.trinary_timeline[0].stamp, 2.0)
@@ -278,6 +324,26 @@ class BDDExecTest(unittest.TestCase):
                 ]
             )
 
+    def test_shared_provider_rejects_conflicting_adapters(self):
+        provider_uri = URIRef("urn:test:provider")
+        manager = ObservationManager(scr_exec=SimpleNamespace())
+        manager.providers[provider_uri] = SimpleNamespace()
+        manager.obs_policies = {
+            URIRef("urn:test:first-policy"): SimpleNamespace(
+                observation_providers={URIRef("urn:test:first-observation"): provider_uri},
+                time_extractor_id=URIRef("urn:test:first-extractor"),
+                entity_mapper_id=None,
+            ),
+            URIRef("urn:test:second-policy"): SimpleNamespace(
+                observation_providers={URIRef("urn:test:second-observation"): provider_uri},
+                time_extractor_id=URIRef("urn:test:second-extractor"),
+                entity_mapper_id=None,
+            ),
+        }
+
+        with self.assertRaisesRegex(ValueError, "conflicting adapters"):
+            manager.load_provider_adapters(Graph())
+
     def test_observation_batch_evaluates_policy_once_after_caching_all_samples(self):
         graph = Graph()
         policy_uri = URIRef("urn:test:policy")
@@ -288,6 +354,7 @@ class BDDExecTest(unittest.TestCase):
             graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
             graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
             graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
+        add_python_role(graph, policy_uri, URI_OBS_PRED_HAS_EVALUATOR, "evaluator")
         add_before_policy_time(graph, policy_uri, URIRef("urn:test:end"))
 
         policy = ObsPolicyModel(
@@ -354,9 +421,7 @@ class BDDExecTest(unittest.TestCase):
         observation_uri = URIRef("urn:test:observation")
         provider_uri = URIRef("urn:test:provider")
         graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
-        graph.add((policy_uri, RDF.type, URI_PY_TYPE_MODULE_ATTR))
-        graph.add((policy_uri, URI_PY_PRED_MODULE_NAME, Literal("operator")))
-        graph.add((policy_uri, URI_PY_PRED_ATTR_NAME, Literal("truth")))
+        add_python_role(graph, policy_uri, URI_OBS_PRED_HAS_EVALUATOR, "evaluator")
         graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
         graph.add((observation_uri, RDF.type, URI_OBS_TYPE_OBSERVATION))
         graph.add((observation_uri, URI_OBS_PRED_PROVIDER, provider_uri))
