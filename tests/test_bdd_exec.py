@@ -234,18 +234,11 @@ def fixture_entity_mapper(observation, _, targets):
     return [EntityObservation(targets[0], observation)]
 
 
-def add_python_role(graph, policy_uri, predicate, name, attr_name="FixtureEvaluator"):
-    role_uri = URIRef(f"{policy_uri}/{name}")
+def add_python_role(graph, node_uri, predicate, name, attr_name="FixtureEvaluator"):
+    role_uri = URIRef(f"{node_uri}/{name}")
     if predicate == URI_OBS_PRED_HAS_EVALUATOR:
-        graph.add((policy_uri, RDF.type, URI_OBS_TYPE_EVALUATED_POLICY))
-        add_python_role(
-            graph,
-            policy_uri,
-            URI_OBS_PRED_TIME_EXTRACTOR,
-            "time-extractor",
-            "fixture_timestamp",
-        )
-    graph.add((policy_uri, predicate, role_uri))
+        graph.add((node_uri, RDF.type, URI_OBS_TYPE_EVALUATED_POLICY))
+    graph.add((node_uri, predicate, role_uri))
     graph.add((role_uri, RDF.type, URI_PY_TYPE_MODULE_ATTR))
     graph.add((role_uri, URI_PY_PRED_MODULE_NAME, Literal("test_bdd_exec")))
     graph.add((role_uri, URI_PY_PRED_ATTR_NAME, Literal(attr_name)))
@@ -298,7 +291,14 @@ class BDDExecTest(unittest.TestCase):
         add_python_role(graph, policy_uri, URI_OBS_PRED_HAS_EVALUATOR, "evaluator")
         add_python_role(
             graph,
-            policy_uri,
+            observation_uri,
+            URI_OBS_PRED_TIME_EXTRACTOR,
+            "time-extractor",
+            "fixture_timestamp",
+        )
+        add_python_role(
+            graph,
+            observation_uri,
             URI_OBS_PRED_ENTITY_MAPPER,
             "entity-mapper",
             "fixture_entity_mapper",
@@ -318,7 +318,6 @@ class BDDExecTest(unittest.TestCase):
             def _evaluate_samples(self, observations: list[ObservationStamped]) -> tuple[bool, str]:
                 return bool(observations), "sample exists"
 
-        self.assertEqual(policy.observation_targets[observation_uri], target_uri)
         manager = ObservationManager(
             scr_exec=SimpleNamespace(
                 obs_policy_fluents={policy_uri: policy.fluent_id}, scene_instance=None
@@ -334,15 +333,11 @@ class BDDExecTest(unittest.TestCase):
         policy.evaluator = TruthEvaluator()
 
         manager.bind_observation_targets({target_uri: bound_target_uri})
-        self.assertEqual(policy.observation_targets[observation_uri], bound_target_uri)
+        self.assertEqual(manager.observations[observation_uri].target_id, bound_target_uri)
         self.assertEqual(
             manager.observation_targets_for_provider(provider_uri),
             {observation_uri: bound_target_uri},
         )
-        self.assertEqual(manager.update_provider_observation(provider_uri, object(), 1.0), {})
-        self.assertNotIn(observation_uri, manager.observation_cache)
-
-        manager.load_provider_adapters(graph)
         results = manager.update_provider_observation(provider_uri, object(), 1.0)
         self.assertEqual(results, {policy_uri: (True, "")})
         self.assertEqual(policy.trinary_timeline[0].stamp, 2.0)
@@ -365,25 +360,30 @@ class BDDExecTest(unittest.TestCase):
                 ]
             )
 
-    def test_shared_provider_rejects_conflicting_adapters(self):
+    def test_shared_provider_accepts_observation_owned_adapters(self):
         provider_uri = URIRef("urn:test:provider")
         manager = ObservationManager(scr_exec=SimpleNamespace())
-        manager.providers[provider_uri] = SimpleNamespace()
-        manager.obs_policies = {
-            URIRef("urn:test:first-policy"): SimpleNamespace(
-                observation_providers={URIRef("urn:test:first-observation"): provider_uri},
-                time_extractor_id=URIRef("urn:test:first-extractor"),
-                entity_mapper_id=None,
-            ),
-            URIRef("urn:test:second-policy"): SimpleNamespace(
-                observation_providers={URIRef("urn:test:second-observation"): provider_uri},
-                time_extractor_id=URIRef("urn:test:second-extractor"),
-                entity_mapper_id=None,
-            ),
+        first = URIRef("urn:test:first-observation")
+        second = URIRef("urn:test:second-observation")
+        manager._provider_observation_registry[provider_uri] = {first, second}
+        manager.observations[first] = SimpleNamespace(
+            provider_id=provider_uri,
+            target_id=None,
+            time_extractor=lambda _, stamp: stamp,
+        )
+        manager.observations[second] = SimpleNamespace(
+            provider_id=provider_uri,
+            target_id=None,
+            time_extractor=lambda _, stamp: stamp + 1,
+        )
+        manager._observation_policy_registry = {
+            first: {URIRef("urn:test:first-policy")},
+            second: {URIRef("urn:test:second-policy")},
         }
-
-        with self.assertRaisesRegex(ValueError, "conflicting adapters"):
-            manager.load_provider_adapters(Graph())
+        self.assertEqual(
+            manager.observation_targets_for_provider(provider_uri),
+            {first: None, second: None},
+        )
 
     def test_observation_batch_evaluates_policy_once_after_caching_all_samples(self):
         graph = Graph()
@@ -415,10 +415,21 @@ class BDDExecTest(unittest.TestCase):
         manager = ObservationManager(scr_exec=SimpleNamespace())
         manager.obs_policies[policy_uri] = policy
         manager._observation_policy_registry.update(
-            {observation_uri: policy_uri for observation_uri in observation_uris}
+            {observation_uri: {policy_uri} for observation_uri in observation_uris}
+        )
+        manager.observations.update(
+            {
+                observation_uri: SimpleNamespace(
+                    provider_id=provider_uri,
+                    target_id=None,
+                )
+                for observation_uri in observation_uris
+            }
         )
         manager.bind_observation_targets({None: URIRef("urn:test:must-not-bind")})
-        self.assertTrue(all(policy.observation_targets[uri] is None for uri in observation_uris))
+        self.assertTrue(
+            all(manager.observations[uri].target_id is None for uri in observation_uris)
+        )
 
         results = manager.update_observations(
             [ObservationStamped(observation_uris[0], provider_uri, 1.0, True)]
