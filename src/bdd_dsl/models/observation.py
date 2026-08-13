@@ -45,6 +45,7 @@ from bdd_dsl.models.urirefs import (
     URI_OBS_TYPE_DIRECT_TRINARY_POLICY,
     URI_OBS_TYPE_EVALUATED_POLICY,
     URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR,
+    URI_OBS_TYPE_OBSERVATION,
     URI_OBS_TYPE_POLICY,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
@@ -87,6 +88,44 @@ class EntityObservationMapperProtocol(Protocol):
         scene_instance: SceneInstanceModel,
         targets: list[URIRef],
     ) -> list[EntityObservation]: ...
+
+
+class ObservationModel(ModelBase):
+    provider_id: URIRef
+    time_extractor_id: URIRef
+    # Manager-local target: starts as the RDF target and is replaced by its
+    # scenario-variant binding before being passed to the entity mapper.
+    target_id: URIRef | None
+    entity_mapper_id: URIRef | None
+    time_extractor: TimestampedObservationProtocol
+    entity_mapper: EntityObservationMapperProtocol | None
+
+    def __init__(self, obs_id: URIRef, graph: Graph) -> None:
+        super().__init__(node_id=obs_id, graph=graph)
+        if URI_OBS_TYPE_OBSERVATION not in self.types:
+            raise ValueError(f"Observation '{self.id}' has incorrect types: {self.types}")
+
+        provider_node = graph.value(self.id, URI_OBS_PRED_PROVIDER, any=False)
+        if not isinstance(provider_node, URIRef):
+            raise TypeError(f"Observation '{self.id}' has invalid provider: {provider_node}")
+        self.provider_id = provider_node
+
+        te_node = graph.value(self.id, URI_OBS_PRED_TIME_EXTRACTOR, any=False)
+        if not isinstance(te_node, URIRef):
+            raise TypeError(f"'{self}' has invalid time extractor: {te_node}")
+        self.time_extractor_id = te_node
+
+        self.target_id = _uri_or_none_value(graph, self.id, URI_OBS_PRED_OBSERVES_TARGET)
+        self.entity_mapper_id = _uri_or_none_value(graph, self.id, URI_OBS_PRED_ENTITY_MAPPER)
+        if self.target_id is not None and self.entity_mapper_id is None:
+            raise ValueError(f"targeted '{self}' requires an entity mapper")
+
+        self.time_extractor = _import_attr_from_graph(graph, self.time_extractor_id)
+        self.entity_mapper = (
+            None
+            if self.entity_mapper_id is None
+            else _import_attr_from_graph(graph, self.entity_mapper_id)
+        )
 
 
 class ObservationPolicyEvaluator(ABC):
@@ -255,8 +294,6 @@ def _import_attr_from_graph(
 class ObsPolicyModel(ModelBase):
     trinary_timeline: list[TrinaryStamped]
     observation_uris: set[URIRef]
-    observation_providers: dict[URIRef, URIRef]
-    observation_targets: dict[URIRef, URIRef | None]
     evaluator: ObservationPolicyEvaluator | None
 
     start_time: float | None
@@ -268,8 +305,6 @@ class ObsPolicyModel(ModelBase):
     start_event: URIRef | None
     end_event: URIRef | None
     horizon: float | None
-    time_extractor_id: URIRef | None
-    entity_mapper_id: URIRef | None
     evaluator_id: URIRef | None
 
     def __init__(
@@ -324,48 +359,32 @@ class ObsPolicyModel(ModelBase):
 
         self.trinary_timeline = []
         self.observation_uris = set()
-        self.observation_providers = {}
-        self.observation_targets = {}
         for obs_uri in graph.objects(subject=self.id, predicate=URI_OBS_PRED_HAS_OBSERVATION):
             if not isinstance(obs_uri, URIRef):
                 raise TypeError(
                     f"ObservationPolicy '{self.id}' links to non-URI observation: {obs_uri}"
                 )
-            provider_uri = graph.value(subject=obs_uri, predicate=URI_OBS_PRED_PROVIDER, any=False)
-            if not isinstance(provider_uri, URIRef):
-                raise TypeError(f"Observation '{obs_uri}' has invalid provider: {provider_uri}")
             self.observation_uris.add(obs_uri)
-            self.observation_providers[obs_uri] = provider_uri
-            self.observation_targets[obs_uri] = _uri_or_none_value(
-                graph=graph, subject_id=obs_uri, predicate=URI_OBS_PRED_OBSERVES_TARGET
-            )
-
-        self.time_extractor_id = _uri_or_none_value(
-            graph=graph, subject_id=self.id, predicate=URI_OBS_PRED_TIME_EXTRACTOR
-        )
-        self.entity_mapper_id = _uri_or_none_value(
-            graph=graph, subject_id=self.id, predicate=URI_OBS_PRED_ENTITY_MAPPER
-        )
         self.evaluator_id = _uri_or_none_value(
             graph=graph, subject_id=self.id, predicate=URI_OBS_PRED_HAS_EVALUATOR
+        )
+        policy_adapters = (
+            _uri_or_none_value(graph, self.id, URI_OBS_PRED_TIME_EXTRACTOR),
+            _uri_or_none_value(graph, self.id, URI_OBS_PRED_ENTITY_MAPPER),
         )
 
         self.evaluator = None
         if URI_OBS_TYPE_DIRECT_TRINARY_POLICY in self.types:
-            if self.observation_uris or any(
-                (self.time_extractor_id, self.entity_mapper_id, self.evaluator_id)
-            ):
+            if self.observation_uris or any((*policy_adapters, self.evaluator_id)):
                 raise ValueError(
                     f"TrinaryTopic policy '{self}' must not declare observations, adapters, or an evaluator"
                 )
         elif URI_OBS_TYPE_EVALUATED_POLICY in self.types:
-            if (
-                not self.observation_uris
-                or self.time_extractor_id is None
-                or self.evaluator_id is None
-            ):
+            if policy_adapters != (None, None):
+                raise ValueError(f"Evaluated policy '{self}' must not declare adapters")
+            if not self.observation_uris or self.evaluator_id is None:
                 raise ValueError(
-                    f"Evaluated policy '{self}' requires observations, a time extractor, and an evaluator"
+                    f"Evaluated policy '{self}' requires observations and an evaluator"
                 )
 
             eval_types = get_node_types(graph=graph, node_id=self.evaluator_id)
@@ -562,7 +581,7 @@ class ObsPolicyModel(ModelBase):
 class ObservationManager:
     """Route provider values into policy-local caches and fluent timelines.
 
-    Provider adapters are loaded from policy RDF when building a scenario context. Feed
+    Observation adapters are loaded from observation RDF when building a scenario context. Feed
     raw provider messages through :meth:`update_provider_observation`; it extracts a
     timestamp, maps target-specific values, and evaluates each complete policy snapshot once.
     :meth:`update_fpolicy_assertion` remains the compatibility ingress for direct
@@ -579,10 +598,9 @@ class ObservationManager:
     providers: dict[URIRef, ModelBase]
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
     observation_cache: dict[URIRef, ObservationStamped]
-    _observation_policy_registry: dict[URIRef, URIRef]  # observation ID -> policy ID
-    _provider_registry: dict[
-        URIRef, tuple[TimestampedObservationProtocol | None, EntityObservationMapperProtocol | None]
-    ]
+    observations: dict[URIRef, ObservationModel]
+    _observation_policy_registry: dict[URIRef, set[URIRef]]
+    _provider_observation_registry: dict[URIRef, set[URIRef]]
 
     event_timelines: dict[URIRef, list[float]]
     _fluent_event_registry: dict[URIRef, set[URIRef]]  # fluent ID -> event IDs
@@ -598,8 +616,9 @@ class ObservationManager:
         self.providers = {}
         self._fluent_policy_registry = {}
         self.observation_cache = {}
+        self.observations = {}
         self._observation_policy_registry = {}
-        self._provider_registry = {}
+        self._provider_observation_registry = {}
 
         self.event_timelines = {}
         self._fluent_event_registry = {}
@@ -650,65 +669,41 @@ class ObservationManager:
 
             self._fluent_policy_registry[fc.id].add(obs_pol.id)
             for obs_uri in obs_pol.observation_uris:
-                if obs_uri in self._observation_policy_registry:
-                    raise ValueError(f"Observation already registered: '{obs_uri}'")
-                self._observation_policy_registry[obs_uri] = obs_pol.id
-            for provider_uri in set(obs_pol.observation_providers.values()):
+                observation = self.observations.get(obs_uri)
+                if observation is None:
+                    observation = ObservationModel(obs_id=obs_uri, graph=graph)
+                    self.observations[obs_uri] = observation
+                    self._provider_observation_registry.setdefault(
+                        observation.provider_id, set()
+                    ).add(obs_uri)
+                self._observation_policy_registry.setdefault(obs_uri, set()).add(obs_pol.id)
                 self.providers.setdefault(
-                    provider_uri, ModelBase(node_id=provider_uri, graph=graph)
+                    observation.provider_id,
+                    ModelBase(node_id=observation.provider_id, graph=graph),
                 )
             self._register_fluent_event(evt_uri=obs_pol.start_event, fc_id=fc.id)
             self._register_fluent_event(evt_uri=obs_pol.end_event, fc_id=fc.id)
             self.obs_policies[obs_pol.id] = obs_pol
 
-    def load_provider_adapters(self, graph: Graph) -> None:
-        """Load policy-declared provider adapters from RDF."""
-        declarations = {}
-        for policy in self.obs_policies.values():
-            declaration = (policy.time_extractor_id, policy.entity_mapper_id)
-            for provider_uri in policy.observation_providers.values():
-                previous = declarations.setdefault(provider_uri, declaration)
-                if previous != declaration:
-                    raise ValueError(
-                        f"conflicting adapters declared for observation provider '{provider_uri}'"
-                    )
-
-        for provider_uri, (time_extractor_id, entity_mapper_id) in declarations.items():
-            time_extractor = None
-            if time_extractor_id is not None:
-                time_extractor = _import_attr_from_graph(graph=graph, node_id=time_extractor_id)
-
-            entity_mapper = None
-            if entity_mapper_id is not None:
-                entity_mapper = _import_attr_from_graph(graph=graph, node_id=entity_mapper_id)
-
-            self._provider_registry[provider_uri] = (time_extractor, entity_mapper)
-
     def bind_observation_targets(self, bindings: dict[URIRef, Any]) -> None:
         """Resolve template-variable targets for this scenario context."""
-        for policy in self.obs_policies.values():
-            for obs_uri, target_uri in policy.observation_targets.items():
-                if target_uri is None:
-                    continue
-                bound_target = bindings.get(target_uri)
-                if bound_target is not None:
-                    if policy.entity_mapper_id is None:
-                        raise ValueError(
-                            f"variable observation target '{target_uri}' requires an entity mapper"
-                        )
-                    if not isinstance(bound_target, URIRef):
-                        raise TypeError(
-                            f"observation target '{target_uri}' is bound to non-URI {bound_target}"
-                        )
-                    policy.observation_targets[obs_uri] = bound_target
+        for observation in self.observations.values():
+            if observation.target_id is None:
+                continue
+            bound_target = bindings.get(observation.target_id)
+            if bound_target is not None:
+                if not isinstance(bound_target, URIRef):
+                    raise TypeError(
+                        f"observation target '{observation.target_id}' is bound to non-URI "
+                        f"{bound_target}"
+                    )
+                observation.target_id = bound_target
 
     def observation_targets_for_provider(self, provider_uri: URIRef) -> dict[URIRef, URIRef | None]:
         """Return each configured observation and resolved target for ``provider_uri``."""
         return {
-            obs_uri: policy.observation_targets[obs_uri]
-            for policy in self.obs_policies.values()
-            for obs_uri, configured_provider in policy.observation_providers.items()
-            if configured_provider == provider_uri
+            obs_uri: self.observations[obs_uri].target_id
+            for obs_uri in self._provider_observation_registry.get(provider_uri, ())
         }
 
     def update_provider_observation(
@@ -718,35 +713,28 @@ class ObservationManager:
 
         Without an entity mapper, only targetless observations receive the raw value.
         """
-        timestamp_extractor, entity_mapper = self._provider_registry.get(provider_uri, (None, None))
-        stamp = (
-            receipt_stamp
-            if timestamp_extractor is None
-            else timestamp_extractor(raw_value, receipt_stamp)
-        )
-        values: list[tuple[URIRef | None, Any]] = [(None, raw_value)]
-        if entity_mapper is not None:
-            targets = list(
-                dict.fromkeys(
-                    target
-                    for target in self.observation_targets_for_provider(provider_uri).values()
-                    if target is not None
-                )
-            )
-            for entity_obs in entity_mapper(raw_value, self.scenario_exec.scene_instance, targets):
-                if not isinstance(entity_obs, EntityObservation):
-                    raise TypeError(f"entity mapper for {provider_uri} returned {type(entity_obs)}")
-                values.append((entity_obs.entity_uri, entity_obs.value))
-
         observations = []
-        for obs_uri, policy_uri in self._observation_policy_registry.items():
-            policy = self.obs_policies[policy_uri]
-            if policy.observation_providers[obs_uri] != provider_uri:
+        for obs_uri in self._provider_observation_registry.get(provider_uri, ()):
+            observation = self.observations[obs_uri]
+            stamp = observation.time_extractor(raw_value, receipt_stamp)
+            if observation.target_id is None:
+                observations.append(ObservationStamped(obs_uri, provider_uri, stamp, raw_value))
                 continue
-            target_uri = policy.observation_targets[obs_uri]
-            for entity_uri, value in values:
-                if entity_uri == target_uri:
-                    observations.append(ObservationStamped(obs_uri, provider_uri, stamp, value))
+            if observation.entity_mapper is None:
+                raise ValueError(f"targeted observation '{obs_uri}' requires an entity mapper")
+            for entity_obs in observation.entity_mapper(
+                raw_value,
+                self.scenario_exec.scene_instance,
+                [observation.target_id],
+            ):
+                if not isinstance(entity_obs, EntityObservation):
+                    raise TypeError(
+                        f"entity mapper for observation '{obs_uri}' returned {type(entity_obs)}"
+                    )
+                if entity_obs.entity_uri == observation.target_id:
+                    observations.append(
+                        ObservationStamped(obs_uri, provider_uri, stamp, entity_obs.value)
+                    )
         return self.update_observations(observations)
 
     def update_bhv_result(self, trin_st: TrinaryStamped):
@@ -777,34 +765,30 @@ class ObservationManager:
         obs_by_policy: dict[URIRef, list[ObservationStamped]] = {}
         stale_policies: set[URIRef] = set()
         for obs in observations:
-            policy_uri = self._observation_policy_registry.get(obs.observation_uri)
-            if policy_uri is None:
+            policy_uris = self._observation_policy_registry.get(obs.observation_uri)
+            if not policy_uris:
                 raise ValueError(f"Observation not registered: '{obs.observation_uri}'")
 
-            policy = self.obs_policies[policy_uri]
-            provider_uri = policy.observation_providers.get(obs.observation_uri)
-            if provider_uri is None:
-                raise ValueError(
-                    f"Observation '{obs.observation_uri}' is not configured for policy "
-                    f"'{policy_uri}'"
-                )
+            provider_uri = self.observations[obs.observation_uri].provider_id
             if obs.provider_uri != provider_uri:
                 raise ValueError(
                     f"Observation '{obs.observation_uri}' received from "
                     f"'{obs.provider_uri}', expected '{provider_uri}'"
                 )
-            obs_by_policy.setdefault(policy_uri, []).append(obs)
+            for policy_uri in policy_uris:
+                obs_by_policy.setdefault(policy_uri, []).append(obs)
             cached = self.observation_cache.get(obs.observation_uri)
             if cached is not None and obs.stamp < cached.stamp:
-                stale_policies.add(policy_uri)
+                stale_policies.update(policy_uris)
+
+        for obs in observations:
+            if self._observation_policy_registry[obs.observation_uri].isdisjoint(stale_policies):
+                self.observation_cache[obs.observation_uri] = obs
 
         for policy_uri, policy_observations in obs_by_policy.items():
             if policy_uri in stale_policies:
                 results[policy_uri] = (False, "(observation) older than cached sample")
                 continue
-
-            for obs in policy_observations:
-                self.observation_cache[obs.observation_uri] = obs
 
             policy = self.obs_policies[policy_uri]
             if any(uri not in self.observation_cache for uri in policy.observation_uris):
@@ -870,5 +854,4 @@ class ObservationManager:
                 fc=fc,
                 obs_loaders=obs_loaders,
             )
-        obs_manager.load_provider_adapters(graph)
         return obs_manager
