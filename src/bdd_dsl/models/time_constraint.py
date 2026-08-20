@@ -2,9 +2,7 @@
 from typing import Any
 
 from rdf_utils.models.common import ModelBase
-from rdflib import Graph, Literal, URIRef
-
-from bdd_dsl.models.urirefs import (
+from rdf_utils.models.vocab import (
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
     URI_TIME_PRED_HRZN_SEC,
@@ -12,6 +10,7 @@ from bdd_dsl.models.urirefs import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
+from rdflib import Graph, Literal, URIRef
 
 
 def process_time_constraint_model(constraint: ModelBase, graph: Graph) -> None:

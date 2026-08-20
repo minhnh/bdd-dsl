@@ -4,6 +4,13 @@ from numbers import Number
 from typing import Any, Protocol
 
 from rdf_utils.models.common import ModelBase
+from rdf_utils.models.vocab import (
+    URI_TIME_PRED_AFTER_EVT,
+    URI_TIME_PRED_BEFORE_EVT,
+    URI_TIME_TYPE_AFTER_EVT,
+    URI_TIME_TYPE_BEFORE_EVT,
+    URI_TIME_TYPE_DURING,
+)
 from rdflib import URIRef
 from rdflib.namespace import NamespaceManager
 
@@ -27,11 +34,6 @@ from bdd_dsl.models.urirefs import (
     URI_BHV_PRED_TARGET_WS,
     URI_BHV_TYPE_PICK,
     URI_BHV_TYPE_PLACE,
-    URI_TIME_PRED_AFTER_EVT,
-    URI_TIME_PRED_BEFORE_EVT,
-    URI_TIME_TYPE_AFTER_EVT,
-    URI_TIME_TYPE_BEFORE_EVT,
-    URI_TIME_TYPE_DURING,
 )
 from bdd_dsl.models.user_story import ScenarioModel, ScenarioVariantModel
 
