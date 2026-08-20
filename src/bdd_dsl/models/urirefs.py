@@ -3,7 +3,6 @@ from rdf_utils.namespace import (
     NS_MM_GEOM_COORD,
     NS_MM_GEOM_REL,
     NS_MM_QUDT_QTY,
-    NS_MM_TIME,
 )
 
 from bdd_dsl.models.namespace import (
@@ -11,7 +10,6 @@ from bdd_dsl.models.namespace import (
     NS_MM_BHV,
     NS_MM_CSTR,
     NS_MM_CSTR_EXT,
-    NS_MM_OBS,
     NS_MM_ROS,
     NS_MM_TASK,
 )
@@ -25,34 +23,9 @@ URI_BHV_PRED_TARGET_OBJ = NS_MM_BHV["target-object"]
 URI_BHV_PRED_TARGET_WS = NS_MM_BHV["target-workspace"]
 URI_BHV_PRED_TARGET_AGN = NS_MM_BHV["target-agent"]
 
-# Time
-URI_TIME_TYPE_TC = NS_MM_TIME["TimeConstraint"]
-URI_TIME_TYPE_BEFORE_EVT = NS_MM_TIME["BeforeEventConstraint"]
-URI_TIME_TYPE_AFTER_EVT = NS_MM_TIME["AfterEventConstraint"]
-URI_TIME_TYPE_DURING = NS_MM_TIME["DuringEventsConstraint"]
-URI_TIME_PRED_BEFORE_EVT = NS_MM_TIME["before-event"]
-URI_TIME_PRED_AFTER_EVT = NS_MM_TIME["after-event"]
-URI_TIME_PRED_HRZN_SEC = NS_MM_TIME["horizon-seconds"]
-
 # Task
 URI_TASK_TYPE_TASK = NS_MM_TASK["Task"]
 URI_TASK_PRED_OF_TASK = NS_MM_TASK["of-task"]
-
-# Observation
-URI_OBS_TYPE_POLICY = NS_MM_OBS["ObservationPolicy"]
-URI_OBS_TYPE_PROVIDER = NS_MM_OBS["ObservationProvider"]
-URI_OBS_TYPE_OBSERVATION = NS_MM_OBS["Observation"]
-URI_OBS_TYPE_POSE_PROVIDER = NS_MM_OBS["PoseProvider"]
-URI_OBS_PRED_POLICY = NS_MM_OBS["has-policy"]
-URI_OBS_PRED_PROVIDER = NS_MM_OBS["has-provider"]
-URI_OBS_PRED_HAS_OBSERVATION = NS_MM_OBS["has-observation"]
-URI_OBS_PRED_OBSERVES_TARGET = NS_MM_OBS["observes-target"]
-URI_OBS_PRED_TIME_EXTRACTOR = NS_MM_OBS["time-extractor"]
-URI_OBS_PRED_ENTITY_MAPPER = NS_MM_OBS["entity-mapper"]
-URI_OBS_PRED_HAS_EVALUATOR = NS_MM_OBS["has-evaluator"]
-URI_OBS_TYPE_DIRECT_TRINARY_POLICY = NS_MM_OBS["DirectTrinaryPolicy"]
-URI_OBS_TYPE_EVALUATED_POLICY = NS_MM_OBS["EvaluatedObservationPolicy"]
-URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR = NS_MM_OBS["LinearDistanceEvaluator"]
 
 # Linear distance
 URI_GEOM_TYPE_LINEAR_DISTANCE = NS_MM_GEOM_REL["LinearDistance"]

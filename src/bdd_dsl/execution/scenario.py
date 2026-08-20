@@ -7,7 +7,13 @@ from rdf_utils.models.python import (
     URI_PY_TYPE_MODULE_ATTR,
     import_attr_from_model,
 )
-from rdf_utils.models.vocab import URI_EXEC_PRED_RUNS_SCENE, URI_EXEC_TYPE_SCENE_INST
+from rdf_utils.models.vocab import (
+    URI_EXEC_PRED_RUNS_SCENE,
+    URI_EXEC_TYPE_SCENE_INST,
+    URI_OBS_PRED_POLICY,
+    URI_TIME_PRED_AFTER_EVT,
+    URI_TIME_PRED_BEFORE_EVT,
+)
 from rdflib import RDF, Graph, URIRef
 from scene_dsl.rdf_parser.scenex import SceneInstanceModel
 
@@ -18,9 +24,6 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_OF_CLAUSE,
     URI_BDD_PRED_OF_VARIANT,
     URI_BDD_TYPE_SCENARIO_EXEC,
-    URI_OBS_PRED_POLICY,
-    URI_TIME_PRED_AFTER_EVT,
-    URI_TIME_PRED_BEFORE_EVT,
 )
 from bdd_dsl.models.user_story import (
     ScenarioVariantModel,

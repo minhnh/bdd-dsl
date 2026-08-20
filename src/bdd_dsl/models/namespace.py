@@ -1,10 +1,9 @@
-from rdf_utils.namespace import NS_MM_ENV, NS_MM_GEOM, NS_MM_GEOM_COORD, NS_MM_GEOM_REL
+from rdf_utils.namespace import NS_MM_ENV, NS_MM_GEOM, NS_MM_GEOM_COORD, NS_MM_GEOM_REL, NS_MM_OBS
 from rdflib import Graph, Namespace
 
 from bdd_dsl.models.uri import (
     URI_MM_BDD,
     URI_MM_BHV,
-    URI_MM_OBS,
     URI_MM_ROS,
     URI_MM_SIM,
     URI_MM_TASK,
@@ -15,7 +14,6 @@ NS_MM_BDD = Namespace(URI_MM_BDD)
 NS_MM_BHV = Namespace(URI_MM_BHV)
 NS_MM_TASK = Namespace(URI_MM_TASK)
 NS_MM_SIM = Namespace(URI_MM_SIM)
-NS_MM_OBS = Namespace(URI_MM_OBS)
 NS_MM_ROS = Namespace(URI_MM_ROS)
 NS_MM_CSTR = Namespace("https://comp-rob2b.github.io/metamodels/task/constraint#")
 NS_MM_CSTR_EXT = Namespace("https://secorolab.github.io/metamodels/task/constraint#")

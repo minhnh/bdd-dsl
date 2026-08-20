@@ -3,6 +3,7 @@ from typing import Protocol
 
 from rdf_utils.collection import load_list_re
 from rdf_utils.models.common import ModelBase
+from rdf_utils.models.vocab import URI_TIME_TYPE_TC
 from rdflib import BNode, Graph, Literal, URIRef
 
 from bdd_dsl.exception import BDDConstraintViolation
@@ -30,7 +31,6 @@ from bdd_dsl.models.urirefs import (
     URI_BHV_PRED_TARGET_WS,
     URI_BHV_TYPE_PICK,
     URI_BHV_TYPE_PLACE,
-    URI_TIME_TYPE_TC,
 )
 
 

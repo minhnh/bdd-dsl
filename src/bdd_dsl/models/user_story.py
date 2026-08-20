@@ -3,7 +3,12 @@ from collections.abc import Generator, Iterable
 
 from rdf_utils.constraints import check_shacl_constraints
 from rdf_utils.models.common import ModelBase, get_node_types
-from rdf_utils.namespace import URL_MM_PYTHON_SHACL, URL_SECORO_MM
+from rdf_utils.namespace import (
+    URL_MM_OBS_SHACL,
+    URL_MM_PYTHON_SHACL,
+    URL_MM_TC_SHACL,
+    URL_SECORO_MM,
+)
 from rdflib import BNode, Graph, URIRef
 from rdflib.query import ResultRow
 from scene_dsl.rdf_parser import scene as scene_models
@@ -47,11 +52,11 @@ from bdd_dsl.models.variation import TaskVariationModel
 
 BDD_SHACL_URLS = {
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/bdd.shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/time.shacl.ttl": "turtle",
+    URL_MM_TC_SHACL: "turtle",
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/environment.shacl.ttl": "turtle",
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/agent.shacl.ttl": "turtle",
     f"{URL_SECORO_MM}/acceptance-criteria/bdd/execution-context.shacl.ttl": "turtle",
-    f"{URL_SECORO_MM}/acceptance-criteria/bdd/observation.shacl.ttl": "turtle",
+    URL_MM_OBS_SHACL: "turtle",
     URL_MM_PYTHON_SHACL: "turtle",
 }
 Q_US_VAR = f"""

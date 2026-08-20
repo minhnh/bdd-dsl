@@ -4,6 +4,11 @@ from typing import Any, Protocol
 
 from jinja2 import Environment, FileSystemLoader, Template
 from rdf_utils.caching import read_file_and_cache, read_url_and_cache
+from rdf_utils.models.vocab import (
+    URI_TIME_TYPE_AFTER_EVT,
+    URI_TIME_TYPE_BEFORE_EVT,
+    URI_TIME_TYPE_DURING,
+)
 from rdflib import Graph, URIRef
 from rdflib.namespace import NamespaceManager
 
@@ -29,9 +34,6 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_MOVE_SAFE,
     URI_BDD_TYPE_SORTED,
     URI_BDD_TYPE_STR_TMPL,
-    URI_TIME_TYPE_AFTER_EVT,
-    URI_TIME_TYPE_BEFORE_EVT,
-    URI_TIME_TYPE_DURING,
 )
 from bdd_dsl.models.user_story import (
     ForAllModel,
