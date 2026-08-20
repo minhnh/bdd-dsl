@@ -2,7 +2,6 @@
 from rdf_utils.namespace import (
     NS_MM_GEOM_COORD,
     NS_MM_GEOM_REL,
-    NS_MM_QUDT_QTY,
 )
 
 from bdd_dsl.models.namespace import (
@@ -10,7 +9,6 @@ from bdd_dsl.models.namespace import (
     NS_MM_BHV,
     NS_MM_CSTR,
     NS_MM_CSTR_EXT,
-    NS_MM_ROS,
     NS_MM_TASK,
 )
 
@@ -33,7 +31,6 @@ URI_GEOM_PRED_BETWEEN_ENTITIES = NS_MM_GEOM_REL["between-entities"]
 URI_GEOM_TYPE_LINEAR_DISTANCE_COORD = NS_MM_GEOM_COORD["LinearDistanceCoordinate"]
 URI_GEOM_TYPE_DISTANCE_REF = NS_MM_GEOM_COORD["DistanceReference"]
 URI_GEOM_PRED_COORD_OF = NS_MM_GEOM_COORD["of"]
-URI_QUDT_QK_DISTANCE = NS_MM_QUDT_QTY["Distance"]
 URI_CSTR_TYPE_LINEAR_DISTANCE = NS_MM_CSTR["LinearDistanceConstraint"]
 URI_CSTR_TYPE_LESS_THAN = NS_MM_CSTR["LessThanConstraint"]
 URI_CSTR_TYPE_GREATER_THAN = NS_MM_CSTR["GreaterThanConstraint"]
@@ -46,14 +43,6 @@ URI_CSTR_PRED_LOWER_THRESHOLD = NS_MM_CSTR["lower-threshold"]
 URI_CSTR_PRED_UPPER_THRESHOLD = NS_MM_CSTR["upper-threshold"]
 URI_CSTR_PRED_REFERENCE_VALUE = NS_MM_CSTR["reference-value"]
 URI_CSTR_PRED_TOLERANCE = NS_MM_CSTR_EXT["tolerance"]
-
-# ROS
-URI_ROS_TYPE_TOPIC = NS_MM_ROS["Topic"]
-URI_ROS_TYPE_SERVICE = NS_MM_ROS["Service"]
-URI_ROS_TYPE_ACTION = NS_MM_ROS["Action"]
-URI_ROS_TYPE_SIM_ENTITY_STATE_PROVIDER = NS_MM_ROS["SimulationEntityStateProvider"]
-URI_ROS_PRED_CHNL_NAME = NS_MM_ROS["channel-name"]
-URI_ROS_PRED_TYPE_NAME = NS_MM_ROS["type-name"]
 
 # BDD
 URI_BDD_TYPE_US = NS_MM_BDD["UserStory"]

@@ -13,8 +13,6 @@ URI_MM_BDD = f"{URL_SECORO_MM}/acceptance-criteria/bdd#"
 URI_MM_EVENT = f"{URL_SESAME}/metamodels/coordination/event#"
 URI_MM_BT = f"{URL_SESAME}/metamodels/coordination/behaviour-tree#"
 URI_MM_PY = f"{URL_SESAME}/metamodels/languages/python#"
-URI_MM_ROS = "https://index.ros.org/p/"
-
 URI_M_CRDN = f"{URL_SESAME}/models/coordination/"
 
 # URL to SHACL constraints
