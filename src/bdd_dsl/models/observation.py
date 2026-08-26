@@ -548,7 +548,8 @@ class ObsPolicyModel(ModelBase):
             if self.duration_type == URI_TIME_TYPE_BEFORE_EVT:
                 self.end_time = evt_stamp
                 assert self.horizon is not None
-                self.start_time = self.end_time - self.horizon
+                # Time starts at 0 in simulation, so this avoids negative time
+                self.start_time = max(0.0, self.end_time - self.horizon)
                 self._discard_out_of_horizon_trin()
                 return
 
