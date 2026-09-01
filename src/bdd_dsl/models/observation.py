@@ -449,59 +449,61 @@ class ObsPolicyModel(ModelBase):
         while len(self.trinary_timeline) > 0:
             first_trin_t = self.trinary_timeline[0].stamp
             start_t = end_t - self.horizon
-            if first_trin_t > start_t:
+            if first_trin_t >= start_t:
                 break
             self.trinary_timeline.pop(0)
 
-    def add_trinary(self, trin_st: TrinaryStamped) -> tuple[bool, str]:
+    def _check_time_constraint(self, stamp: float) -> tuple[bool, str]:
+        """Check ``stamp`` against the closed interval of this time constraint."""
         if self.duration_type == URI_TIME_TYPE_BEFORE_EVT:
-            # If end time is available then clause timeline should have finished
-            if self.end_time is not None:
-                # (Unlikely) add to record if trinary within time horizon
-                assert self.start_time is not None
-                if trin_st.stamp > self.start_time and trin_st.stamp < self.end_time:
-                    self._insert_trin_stamped_in_order(trin_st)
-                    return True, ""
+            if self.end_time is None:
+                return True, ""
+            assert self.start_time is not None
+            if stamp < self.start_time or stamp > self.end_time:
                 return False, "(before) finished and out of horizon"
-
-            self._insert_trin_stamped_in_order(trin_st)
-
-            self._discard_out_of_horizon_trin()
             return True, ""
 
         if self.duration_type == URI_TIME_TYPE_AFTER_EVT:
-            # Not started
             if self.start_time is None:
                 return False, "(after) not started"
-
             assert self.end_time is not None
-
-            # Out of horizon
-            if trin_st.stamp > self.end_time:
-                return False, f"(after) out of horizon - {trin_st.stamp} > {self.end_time}"
-
-            self._insert_trin_stamped_in_order(trin_st)
+            if stamp < self.start_time or stamp > self.end_time:
+                return False, (
+                    f"(after) out of horizon - {stamp} not in [{self.start_time}, {self.end_time}]"
+                )
             return True, ""
 
         if self.duration_type == URI_TIME_TYPE_DURING:
-            # Not started
             if self.start_time is None:
                 return False, "(during) not started"
-
-            # Out of horizon
-            if self.end_time is not None and trin_st.stamp > self.end_time:
-                return False, f"(during) out of horizon - {trin_st.stamp} > {self.end_time}"
-
-            self._insert_trin_stamped_in_order(trin_st)
+            if stamp < self.start_time or (self.end_time is not None and stamp > self.end_time):
+                end = self.end_time if self.end_time is not None else "open"
+                return False, (
+                    f"(during) out of horizon - {stamp} not in [{self.start_time}, {end}]"
+                )
             return True, ""
 
         return False, "no matching type"
+
+    def add_trinary(self, trin_st: TrinaryStamped) -> tuple[bool, str]:
+        accepted, reason = self._check_time_constraint(trin_st.stamp)
+        if not accepted:
+            return accepted, reason
+
+        self._insert_trin_stamped_in_order(trin_st)
+        if self.duration_type == URI_TIME_TYPE_BEFORE_EVT:
+            self._discard_out_of_horizon_trin()
+        return True, ""
 
     def add_samples(self, samples: list[ObservationStamped]) -> tuple[bool, str]:
         if self.evaluator is None:
             return False, "no evaluator"
         if not samples:
             return False, "no samples"
+        for sample in samples:
+            accepted, reason = self._check_time_constraint(sample.stamp)
+            if not accepted:
+                return accepted, reason
         result = self.evaluator.evaluate(samples)
         trinary, reason = result
         return self.add_trinary(
