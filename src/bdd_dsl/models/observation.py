@@ -460,7 +460,9 @@ class ObsPolicyModel(ModelBase):
                 return True, ""
             assert self.start_time is not None
             if stamp < self.start_time or stamp > self.end_time:
-                return False, "(before) finished and out of horizon"
+                return False, (
+                    f"(before) out of horizon - {stamp} not in [{self.start_time}, {self.end_time}]"
+                )
             return True, ""
 
         if self.duration_type == URI_TIME_TYPE_AFTER_EVT:
@@ -808,7 +810,7 @@ class ObservationManager:
             if policy.horizon is not None:
                 reference_stamp = max(obs.stamp for obs in policy_observations)
                 samples = [
-                    sample for sample in samples if sample.stamp > reference_stamp - policy.horizon
+                    sample for sample in samples if sample.stamp >= reference_stamp - policy.horizon
                 ]
                 if len(samples) != len(policy.observation_uris):
                     # Ignore batch in case of an incomplete snapshot.
