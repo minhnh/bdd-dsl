@@ -21,6 +21,7 @@ from rdf_utils.models.vocab import (
     URI_OBS_PRED_POLICY,
     URI_OBS_PRED_PROVIDER,
     URI_OBS_PRED_TIME_EXTRACTOR,
+    URI_OBS_TYPE_DIRECT_TRINARY_POLICY,
     URI_OBS_TYPE_EVALUATED_POLICY,
     URI_OBS_TYPE_OBSERVATION,
     URI_OBS_TYPE_POLICY,
@@ -93,6 +94,95 @@ def test_default_observation_evaluator_handles_empty_and_non_empty_samples():
     ) == (False, "1 samples")
 
 
+def test_policy_rejects_out_of_interval_samples_before_evaluation():
+    start = URIRef("urn:test:start")
+    end = URIRef("urn:test:end")
+    policy_uri = URIRef("urn:test:policy")
+    observation_uris = (URIRef("urn:test:first"), URIRef("urn:test:second"))
+    provider = URIRef("urn:test:provider")
+    graph = Graph()
+    graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+    graph.add((policy_uri, RDF.type, URI_TIME_TYPE_DURING))
+    graph.add((policy_uri, URI_TIME_PRED_AFTER_EVT, start))
+    graph.add((policy_uri, URI_TIME_PRED_BEFORE_EVT, end))
+    for observation_uri in observation_uris:
+        graph.add((policy_uri, URI_OBS_PRED_HAS_OBSERVATION, observation_uri))
+    add_python_role(graph, policy_uri, URI_OBS_PRED_HAS_EVALUATOR, "evaluator")
+    policy = ObsPolicyModel(
+        node_id=policy_uri,
+        graph=graph,
+        fluent_id=URIRef("urn:test:fluent"),
+        fluent_types={URI_TIME_TYPE_DURING},
+    )
+    calls = []
+
+    class StatefulEvaluator(ObservationPolicyEvaluator):
+        def _evaluate_samples(self, observations):
+            calls.append(observations)
+            return True, "evaluated"
+
+    policy.evaluator = StatefulEvaluator()
+    current = [
+        ObservationStamped(observation_uri, provider, 2.0, True)
+        for observation_uri in observation_uris
+    ]
+
+    assert not policy.add_samples(current)[0]
+    assert calls == []
+
+    policy.on_event(start, 2.0)
+    stale_batch = [
+        ObservationStamped(observation_uris[0], provider, 1.0, True),
+        ObservationStamped(observation_uris[1], provider, 3.0, True),
+    ]
+    assert not policy.add_samples(stale_batch)[0]
+    assert calls == []
+
+    assert policy.add_samples(current)[0]
+    assert len(calls) == 1
+
+    policy.on_event(end, 4.0)
+    boundary = [
+        ObservationStamped(observation_uri, provider, 4.0, True)
+        for observation_uri in observation_uris
+    ]
+    assert policy.add_samples(boundary)[0]
+    assert len(calls) == 2
+    after = [
+        ObservationStamped(observation_uri, provider, 4.1, True)
+        for observation_uri in observation_uris
+    ]
+    assert not policy.add_samples(after)[0]
+    assert len(calls) == 2
+
+
+def test_direct_trinary_policy_keeps_temporal_rejection():
+    policy_uri = URIRef("urn:test:direct-policy")
+    start = URIRef("urn:test:direct-start")
+    end = URIRef("urn:test:direct-end")
+    graph = Graph()
+    graph.add((policy_uri, RDF.type, URI_OBS_TYPE_POLICY))
+    graph.add((policy_uri, RDF.type, URI_OBS_TYPE_DIRECT_TRINARY_POLICY))
+    graph.add((policy_uri, RDF.type, URI_TIME_TYPE_DURING))
+    graph.add((policy_uri, URI_TIME_PRED_AFTER_EVT, start))
+    graph.add((policy_uri, URI_TIME_PRED_BEFORE_EVT, end))
+    policy = ObsPolicyModel(
+        node_id=policy_uri,
+        graph=graph,
+        fluent_id=URIRef("urn:test:direct-fluent"),
+        fluent_types={URI_TIME_TYPE_DURING},
+    )
+
+    assert not policy.add_trinary(TrinaryStamped(1.0, True))[0]
+    policy.on_event(start, 2.0)
+    assert not policy.add_trinary(TrinaryStamped(1.0, True))[0]
+    assert policy.add_trinary(TrinaryStamped(2.0, True))[0]
+    policy.on_event(end, 4.0)
+    assert policy.add_trinary(TrinaryStamped(4.0, True))[0]
+    assert not policy.add_trinary(TrinaryStamped(4.1, True))[0]
+    assert [item.stamp for item in policy.trinary_timeline] == [2.0, 4.0]
+
+
 def test_policy_result_uses_default_until_an_accepted_sample_exists():
     policy_uri = URIRef("urn:test:policy-default")
     observation_uri = URIRef("urn:test:obs")
@@ -126,7 +216,7 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
     assert result.trinary is False
     assert result.reason == "at least one assertion is false"
 
-    result = policy.get_result(12.0, trin_policy_and)
+    result = policy.get_result(12.1, trin_policy_and)
     assert result.trinary is True
     assert result.reason == "no collision recorded"
 
