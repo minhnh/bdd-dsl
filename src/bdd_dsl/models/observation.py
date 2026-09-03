@@ -754,6 +754,21 @@ class ObservationManager:
         """Record the behaviour result that closes the active scenario context."""
         self.bhv_result = trin_st
 
+    @property
+    def pending_end_deadline(self) -> float | None:
+        """Return when the scenario may end, or None while it must remain active."""
+        if self.scr_end_time is not None or self.bhv_result is None:
+            return None
+
+        deadline = self.bhv_result.stamp
+        for policy in self.obs_policies.values():
+            if policy.horizon is None:
+                continue
+            if policy.end_time is None:
+                return None
+            deadline = max(deadline, policy.end_time)
+        return deadline
+
     def update_fpolicy_assertion(
         self, policy_uri: URIRef, trin_st: TrinaryStamped
     ) -> tuple[bool, str]:
