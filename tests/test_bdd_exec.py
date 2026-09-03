@@ -82,6 +82,23 @@ def test_trinary_policy_and_reports_final_result():
     assert reason == "at least one assertion is false"
 
 
+def test_pending_end_deadline_waits_for_every_horizon_and_scenario_end():
+    manager = ObservationManager(scr_exec=SimpleNamespace())
+    policy = SimpleNamespace(horizon=2.0, end_time=None)
+
+    assert manager.pending_end_deadline is None
+
+    manager.bhv_result = TrinaryStamped(4.0, True, "")
+    manager.obs_policies[URIRef("urn:test:policy")] = policy
+    assert manager.pending_end_deadline is None
+
+    policy.end_time = 6.0
+    assert manager.pending_end_deadline == 6.0
+
+    manager.scr_end_time = 6.0
+    assert manager.pending_end_deadline is None
+
+
 def test_default_observation_evaluator_handles_empty_and_non_empty_samples():
     class Evaluator(ObservationPolicyEvaluator):
         def _evaluate_samples(self, observations):
