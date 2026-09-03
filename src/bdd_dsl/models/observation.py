@@ -136,11 +136,14 @@ class ObservationPolicyEvaluator(ABC):
 
     def __init__(
         self,
-        default_result: tuple[bool | Trinary, str] = (Unknown, "no observations"),
+        default_result: tuple[bool | Trinary | None, str] = (
+            Unknown,
+            "no observations",
+        ),
     ) -> None:
         self.default_result = default_result
 
-    def evaluate(self, observations: list[ObservationStamped]) -> tuple[bool | Trinary, str]:
+    def evaluate(self, observations: list[ObservationStamped]) -> tuple[bool | Trinary | None, str]:
         if not observations:
             return self.default_result
         result = self._evaluate_samples(observations)
@@ -151,7 +154,7 @@ class ObservationPolicyEvaluator(ABC):
     @abstractmethod
     def _evaluate_samples(
         self, observations: list[ObservationStamped]
-    ) -> tuple[bool | Trinary, str]: ...
+    ) -> tuple[bool | Trinary | None, str]: ...
 
 
 def _distance_value(graph: Graph, constraint: URIRef, predicate: URIRef) -> float:
@@ -506,8 +509,9 @@ class ObsPolicyModel(ModelBase):
             accepted, reason = self._check_time_constraint(sample.stamp)
             if not accepted:
                 return accepted, reason
-        result = self.evaluator.evaluate(samples)
-        trinary, reason = result
+        trinary, reason = self.evaluator.evaluate(samples)
+        if trinary is None:
+            return True, reason
         return self.add_trinary(
             TrinaryStamped(
                 stamp=max(sample.stamp for sample in samples),
@@ -530,6 +534,7 @@ class ObsPolicyModel(ModelBase):
             trinary, reason = Unknown, "no evaluator"
         else:
             trinary, reason = self.evaluator.evaluate([])
+            trinary = Unknown if trinary is None else trinary
         return TrinaryStamped(stamp=stamp, trinary=trinary, reason=reason)
 
     def on_event(self, evt_uri: URIRef, evt_stamp: float):

@@ -208,6 +208,17 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
     policy.evaluator = Evaluator((True, "no collision recorded"))
     assert policy.get_result(1.0, trin_policy_and).trinary is True
 
+    accepted, reason = policy.add_samples(
+        [ObservationStamped(observation_uri, provider_uri, 1.5, None)]
+    )
+    assert accepted and reason == "observation value"
+    assert policy.trinary_timeline == []
+    policy.evaluator.default_result = (None, "waiting for evaluator")
+    result = policy.get_result(1.5, trin_policy_and)
+    assert result.trinary is Unknown
+    assert result.reason == "waiting for evaluator"
+    policy.evaluator.default_result = (True, "no collision recorded")
+
     accepted, _ = policy.add_samples(
         [ObservationStamped(observation_uri, provider_uri, 2.0, False)]
     )
