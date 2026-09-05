@@ -282,7 +282,7 @@ class LinearDistanceEvaluator(ObservationPolicyEvaluator):
         observations: set[URIRef],
         position_extractor: PositionXYZExtractorProtocol | None = None,
     ) -> None:
-        super().__init__()
+        super().__init__((Unknown, "linear distance expected 2 inputs, received 0"))
 
         if position_extractor is None:
             self.position_extractor = _extract_position_xyz
@@ -322,7 +322,10 @@ class LinearDistanceEvaluator(ObservationPolicyEvaluator):
         self, observations: list[ObservationStamped]
     ) -> tuple[bool | Trinary, str]:
         if len(observations) != 2:
-            raise ValueError(f"expected two observations, got {len(observations)}")
+            return (
+                Unknown,
+                f"linear distance expected 2 inputs, received {len(observations)}",
+            )
         positions = []
         for i in range(2):
             position_obs = observations[i].value
@@ -613,10 +616,14 @@ class ObsPolicyModel(ModelBase):
             self._discard_out_of_horizon_trin()
         return True, ""
 
-    def add_samples(self, samples: list[ObservationStamped]) -> tuple[bool, str]:
+    def add_samples(
+        self,
+        samples: list[ObservationStamped],
+        evaluation_stamp: float | None = None,
+    ) -> tuple[bool, str]:
         if self.evaluator is None:
             return False, "no evaluator"
-        if not samples:
+        if not samples and evaluation_stamp is None:
             return False, "no samples"
         for sample in samples:
             accepted, reason = self._check_time_constraint(sample.stamp)
@@ -627,7 +634,11 @@ class ObsPolicyModel(ModelBase):
             return True, reason
         return self.add_trinary(
             TrinaryStamped(
-                stamp=max(sample.stamp for sample in samples),
+                stamp=(
+                    evaluation_stamp
+                    if evaluation_stamp is not None
+                    else max(sample.stamp for sample in samples)
+                ),
                 trinary=trinary,
                 reason=reason,
             )
@@ -705,11 +716,11 @@ class ObsPolicyModel(ModelBase):
 
 
 class ObservationManager:
-    """Route provider values into policy-local caches and fluent timelines.
+    """Route each provider snapshot into policy evaluators and fluent timelines.
 
     Observation adapters are loaded from observation RDF when building a scenario context. Feed
     raw provider messages through :meth:`update_provider_observation`; it extracts a
-    timestamp, maps target-specific values, and evaluates each complete policy snapshot once.
+    timestamp, maps target-specific values, and evaluates each affected policy once.
     :meth:`update_fpolicy_assertion` remains the compatibility ingress for direct
     ``TrinaryStamped`` topic policies.
     """
@@ -723,7 +734,6 @@ class ObservationManager:
     obs_policies: dict[URIRef, ObsPolicyModel]  # policy ID -> ObsPolicyModel
     providers: dict[URIRef, ModelBase]
     _fluent_policy_registry: dict[URIRef, set[URIRef]]  # fluent ID -> policy IDs
-    observation_cache: dict[URIRef, ObservationStamped]
     observations: dict[URIRef, ObservationModel]
     _observation_policy_registry: dict[URIRef, set[URIRef]]
     _provider_observation_registry: dict[URIRef, set[URIRef]]
@@ -741,7 +751,6 @@ class ObservationManager:
         self.obs_policies = {}
         self.providers = {}
         self._fluent_policy_registry = {}
-        self.observation_cache = {}
         self.observations = {}
         self._observation_policy_registry = {}
         self._provider_observation_registry = {}
@@ -835,16 +844,21 @@ class ObservationManager:
         }
 
     def update_provider_observation(
-        self, provider_uri: URIRef, raw_value: Any, receipt_stamp: float
+        self,
+        provider_uri: URIRef,
+        raw_value: Any,
+        receipt_stamp: float,
     ) -> dict[URIRef, tuple[bool, str]]:
         """Normalize one raw provider value and route it to matching observations.
 
         Without an entity mapper, only targetless observations receive the raw value.
         """
         observations = []
+        snapshot_stamps = []
         for obs_uri in self._provider_observation_registry.get(provider_uri, ()):
             observation = self.observations[obs_uri]
             stamp = observation.time_extractor(raw_value, receipt_stamp)
+            snapshot_stamps.append(stamp)
             if observation.target_id is None:
                 observations.append(ObservationStamped(obs_uri, provider_uri, stamp, raw_value))
                 continue
@@ -863,7 +877,16 @@ class ObservationManager:
                     observations.append(
                         ObservationStamped(obs_uri, provider_uri, stamp, entity_obs.value)
                     )
-        return self.update_observations(observations)
+        affected_policy_uris = {
+            policy_uri
+            for obs_uri in self._provider_observation_registry.get(provider_uri, ())
+            for policy_uri in self._observation_policy_registry.get(obs_uri, ())
+        }
+        return self.update_observations(
+            observations,
+            affected_policy_uris=affected_policy_uris,
+            evaluation_stamp=max(snapshot_stamps, default=receipt_stamp),
+        )
 
     def update_bhv_result(self, trin_st: TrinaryStamped):
         """Record the behaviour result that closes the active scenario context."""
@@ -894,19 +917,22 @@ class ObservationManager:
         return self.obs_policies[policy_uri].add_trinary(trin_st)
 
     def update_observations(
-        self, observations: list[ObservationStamped]
+        self,
+        observations: list[ObservationStamped],
+        *,
+        affected_policy_uris: set[URIRef] | None = None,
+        evaluation_stamp: float | None = None,
     ) -> dict[URIRef, tuple[bool, str]]:
-        """Cache normalized inputs atomically and evaluate each represented policy once.
+        """Evaluate each represented policy from one observation snapshot.
 
-        A policy waits until every linked observation has a cached value. Older input
-        snapshots are rejected; equal timestamps replace cached samples.
         The returned dictionary maps each represented policy URI to an
         (accepted, reason) update outcome. The accepted flag reports whether the
         update was handled; it is not the policy's fluent trinary value.
         """
         results: dict[URIRef, tuple[bool, str]] = {}
-        obs_by_policy: dict[URIRef, list[ObservationStamped]] = {}
-        stale_policies: set[URIRef] = set()
+        obs_by_policy: dict[URIRef, list[ObservationStamped]] = {
+            policy_uri: [] for policy_uri in affected_policy_uris or ()
+        }
         for obs in observations:
             policy_uris = self._observation_policy_registry.get(obs.observation_uri)
             if not policy_uris:
@@ -920,39 +946,13 @@ class ObservationManager:
                 )
             for policy_uri in policy_uris:
                 obs_by_policy.setdefault(policy_uri, []).append(obs)
-            cached = self.observation_cache.get(obs.observation_uri)
-            if cached is not None and obs.stamp < cached.stamp:
-                stale_policies.update(policy_uris)
-
-        for obs in observations:
-            if self._observation_policy_registry[obs.observation_uri].isdisjoint(stale_policies):
-                self.observation_cache[obs.observation_uri] = obs
 
         for policy_uri, policy_observations in obs_by_policy.items():
-            if policy_uri in stale_policies:
-                results[policy_uri] = (False, "(observation) older than cached sample")
-                continue
-
             policy = self.obs_policies[policy_uri]
-            if any(uri not in self.observation_cache for uri in policy.observation_uris):
-                # The policy has never had a complete cached snapshot.
-                results[policy_uri] = (True, "(observation) waiting for policy inputs")
-                continue
-
-            samples = [self.observation_cache[uri] for uri in policy.observation_uris]
-            # Existing cache entries prove availability, not freshness. A complete
-            # evaluation requires every sample to lie within the current horizon.
-            if policy.horizon is not None:
-                reference_stamp = max(obs.stamp for obs in policy_observations)
-                samples = [
-                    sample for sample in samples if sample.stamp >= reference_stamp - policy.horizon
-                ]
-                if len(samples) != len(policy.observation_uris):
-                    # Ignore batch in case of an incomplete snapshot.
-                    results[policy_uri] = (True, "(observation) waiting for fresh policy inputs")
-                    continue
-
-            results[policy_uri] = policy.add_samples(samples)
+            results[policy_uri] = policy.add_samples(
+                policy_observations,
+                evaluation_stamp=evaluation_stamp if not policy_observations else None,
+            )
         return results
 
     def on_event(self, evt_uri: URIRef, evt_t: float):
