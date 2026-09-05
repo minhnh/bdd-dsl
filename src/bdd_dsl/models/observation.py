@@ -20,6 +20,7 @@ from rdf_utils.models.vocab import (
     URI_OBS_PRED_ENTITY_MAPPER,
     URI_OBS_PRED_HAS_EVALUATOR,
     URI_OBS_PRED_HAS_OBSERVATION,
+    URI_OBS_PRED_MAX_TIME_OFFSET,
     URI_OBS_PRED_OBSERVES_TARGET,
     URI_OBS_PRED_PROVIDER,
     URI_OBS_PRED_TIME_EXTRACTOR,
@@ -28,8 +29,12 @@ from rdf_utils.models.vocab import (
     URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR,
     URI_OBS_TYPE_OBSERVATION,
     URI_OBS_TYPE_POLICY,
+    URI_QUDT_PRED_QUANTITY_KIND,
     URI_QUDT_PRED_UNIT,
     URI_QUDT_PRED_VALUE,
+    URI_QUDT_QK_TIME,
+    URI_QUDT_TYPE_QUANTITY,
+    URI_QUDT_UNIT_SEC,
     URI_TIME_PRED_AFTER_EVT,
     URI_TIME_PRED_BEFORE_EVT,
     URI_TIME_PRED_HRZN_SEC,
@@ -269,11 +274,12 @@ def _extract_position_xyz(observation: Any) -> tuple[float, ...] | None:
     return tuple(float(value) for value in values)
 
 
-class LinearDistanceEvaluator(ObservationPolicyEvaluator):
+class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
     constraint_id: URIRef
-    types: set[URIRef]
+    constraint_types: set[URIRef]
     constraint_values: tuple[float, ...]
     position_extractor: PositionXYZExtractorProtocol
+    max_time_offset: float | None
 
     def __init__(
         self,
@@ -282,7 +288,37 @@ class LinearDistanceEvaluator(ObservationPolicyEvaluator):
         observations: set[URIRef],
         position_extractor: PositionXYZExtractorProtocol | None = None,
     ) -> None:
-        super().__init__((Unknown, "linear distance expected 2 inputs, received 0"))
+        ModelBase.__init__(self, node_id=evaluator_id, graph=graph)
+        ObservationPolicyEvaluator.__init__(
+            self, (Unknown, "linear distance expected 2 inputs, received 0")
+        )
+        if URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR not in self.types:
+            raise ValueError(f"LinearDistanceEvaluator {self.id} has incorrect types: {self.types}")
+
+        offset_id = graph.value(self.id, URI_OBS_PRED_MAX_TIME_OFFSET, any=False)
+        if offset_id is None:
+            self.max_time_offset = None
+        else:
+            if not isinstance(offset_id, URIRef):
+                raise TypeError(f"LinearDistanceEvaluator {self.id} has invalid max time offset")
+            value = graph.value(offset_id, URI_QUDT_PRED_VALUE, any=False)
+            unit = graph.value(offset_id, URI_QUDT_PRED_UNIT, any=False)
+            quantity_kind = graph.value(offset_id, URI_QUDT_PRED_QUANTITY_KIND, any=False)
+            if (
+                (offset_id, RDF.type, URI_QUDT_TYPE_QUANTITY) not in graph
+                or not isinstance(value, Literal)
+                or unit != URI_QUDT_UNIT_SEC
+                or quantity_kind != URI_QUDT_QK_TIME
+            ):
+                raise ValueError(f"max time offset {offset_id} must be a time quantity in seconds")
+            offset = value.toPython()
+            if not isinstance(offset, float) or offset < 0:
+                raise ValueError(
+                    f"max time offset {offset_id} must have a non-negative float value"
+                )
+            self.max_time_offset = offset
+        self.observation_uris = frozenset(observations)
+        self._latest_samples: dict[URIRef, ObservationStamped] = {}
 
         if position_extractor is None:
             self.position_extractor = _extract_position_xyz
@@ -299,32 +335,57 @@ class LinearDistanceEvaluator(ObservationPolicyEvaluator):
         if not isinstance(cstr_id, URIRef):
             raise TypeError(f"LinearDistanceEvaluator {evaluator_id} has invalid constraint")
         self.constraint_id = cstr_id
-        self.types = get_node_types(graph=graph, node_id=cstr_id)
+        self.constraint_types = get_node_types(graph=graph, node_id=cstr_id)
 
-        if URI_CSTR_TYPE_LESS_THAN in self.types or URI_CSTR_TYPE_GREATER_THAN in self.types:
+        if (
+            URI_CSTR_TYPE_LESS_THAN in self.constraint_types
+            or URI_CSTR_TYPE_GREATER_THAN in self.constraint_types
+        ):
             self.constraint_values = (
                 _distance_value(graph, self.constraint_id, URI_CSTR_PRED_THRESHOLD),
             )
-        elif URI_CSTR_TYPE_BILATERAL in self.types:
+        elif URI_CSTR_TYPE_BILATERAL in self.constraint_types:
             self.constraint_values = (
                 _distance_value(graph, self.constraint_id, URI_CSTR_PRED_LOWER_THRESHOLD),
                 _distance_value(graph, self.constraint_id, URI_CSTR_PRED_UPPER_THRESHOLD),
             )
-        elif URI_CSTR_TYPE_EQUALITY in self.types:
+        elif URI_CSTR_TYPE_EQUALITY in self.constraint_types:
             self.constraint_values = (
                 _distance_value(graph, self.constraint_id, URI_CSTR_PRED_REFERENCE_VALUE),
                 _distance_value(graph, self.constraint_id, URI_CSTR_PRED_TOLERANCE),
             )
         else:
-            raise ValueError(f"unsupported linear distance constraint types: {self.types}")
+            raise ValueError(
+                f"unsupported linear distance constraint types: {self.constraint_types}"
+            )
 
     def _evaluate_samples(
         self, observations: list[ObservationStamped]
     ) -> tuple[bool | Trinary, str]:
+        if self.max_time_offset is not None:
+            for observation in observations:
+                if observation.observation_uri not in self.observation_uris:
+                    raise ValueError(
+                        f"unexpected linear distance observation: {observation.observation_uri}"
+                    )
+                self._latest_samples[observation.observation_uri] = observation
+            observations = list(self._latest_samples.values())
+            if (
+                len(observations) == 2
+                and max(observation.stamp for observation in observations)
+                - min(observation.stamp for observation in observations)
+                > self.max_time_offset
+            ):
+                observations = []
+
         if len(observations) != 2:
             return (
                 Unknown,
-                f"linear distance expected 2 inputs, received {len(observations)}",
+                (
+                    f"linear distance inputs differ by more than {self.max_time_offset:g} s"
+                    if self.max_time_offset is not None and len(self._latest_samples) == 2
+                    else f"linear distance expected 2 inputs, received {len(observations)}"
+                ),
             )
         positions = []
         for i in range(2):
@@ -335,17 +396,17 @@ class LinearDistanceEvaluator(ObservationPolicyEvaluator):
             positions.append(position)
         measured = dist(*positions)
 
-        if URI_CSTR_TYPE_LESS_THAN in self.types:
+        if URI_CSTR_TYPE_LESS_THAN in self.constraint_types:
             result = measured < self.constraint_values[0] and not isclose(
                 measured, self.constraint_values[0]
             )
             expectation = f"less than {self.constraint_values[0]:g} m"
-        elif URI_CSTR_TYPE_GREATER_THAN in self.types:
+        elif URI_CSTR_TYPE_GREATER_THAN in self.constraint_types:
             result = measured > self.constraint_values[0] and not isclose(
                 measured, self.constraint_values[0]
             )
             expectation = f"greater than {self.constraint_values[0]:g} m"
-        elif URI_CSTR_TYPE_BILATERAL in self.types:
+        elif URI_CSTR_TYPE_BILATERAL in self.constraint_types:
             result = (
                 measured > self.constraint_values[0] or isclose(measured, self.constraint_values[0])
             ) and (
@@ -857,9 +918,12 @@ class ObservationManager:
         snapshot_stamps = []
         for obs_uri in self._provider_observation_registry.get(provider_uri, ()):
             observation = self.observations[obs_uri]
-            stamp = observation.time_extractor(raw_value, receipt_stamp)
-            snapshot_stamps.append(stamp)
+            stamp = None
+            if not isinstance(observation.entity_mapper, StringEntityMapper):
+                stamp = observation.time_extractor(raw_value, receipt_stamp)
+                snapshot_stamps.append(stamp)
             if observation.target_id is None:
+                assert stamp is not None
                 observations.append(ObservationStamped(obs_uri, provider_uri, stamp, raw_value))
                 continue
             if observation.entity_mapper is None:
@@ -874,6 +938,10 @@ class ObservationManager:
                         f"entity mapper for observation '{obs_uri}' returned {type(entity_obs)}"
                     )
                 if entity_obs.entity_uri == observation.target_id:
+                    if isinstance(observation.entity_mapper, StringEntityMapper):
+                        stamp = observation.time_extractor(entity_obs.value, receipt_stamp)
+                        snapshot_stamps.append(stamp)
+                    assert stamp is not None
                     observations.append(
                         ObservationStamped(obs_uri, provider_uri, stamp, entity_obs.value)
                     )
