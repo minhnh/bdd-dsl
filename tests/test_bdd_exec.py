@@ -64,6 +64,7 @@ from bdd_dsl.models.urirefs import (
     URI_BDD_TYPE_VARIABLE,
     URI_BHV_PRED_OF_BHV,
     URI_BHV_TYPE_BHV,
+    URI_CSTR_TYPE_LESS_THAN,
 )
 from bdd_dsl.models.user_story import UserStoryLoader
 
@@ -288,6 +289,7 @@ def test_linear_distance_reports_missing_observation_as_unknown():
         evaluator,
         (Unknown, "linear distance expected 2 inputs, received 0"),
     )
+    evaluator.max_time_offset = None
     for count in (0, 1, 3, 4, 5):
         observations = [
             ObservationStamped(
@@ -302,6 +304,43 @@ def test_linear_distance_reports_missing_observation_as_unknown():
 
         assert result is Unknown
         assert reason == f"linear distance expected 2 inputs, received {count}"
+
+
+def test_linear_distance_uses_latest_samples_within_configured_time_offset():
+    first_uri = URIRef("urn:test:first-observation")
+    second_uri = URIRef("urn:test:second-observation")
+    provider_uri = URIRef("urn:test:provider")
+    evaluator = LinearDistanceEvaluator.__new__(LinearDistanceEvaluator)
+    ObservationPolicyEvaluator.__init__(evaluator)
+    evaluator.max_time_offset = 0.1
+    evaluator.observation_uris = frozenset((first_uri, second_uri))
+    evaluator._latest_samples = {}
+    evaluator.position_extractor = lambda value: value
+    evaluator.constraint_types = {URI_CSTR_TYPE_LESS_THAN}
+    evaluator.constraint_values = (0.12,)
+
+    result, _ = evaluator.evaluate(
+        [ObservationStamped(first_uri, provider_uri, 1.0, (0.0, 0.0, 0.0))]
+    )
+    assert result is Unknown
+
+    result, reason = evaluator.evaluate(
+        [ObservationStamped(second_uri, provider_uri, 1.01, (0.06, 0.0, 0.0))]
+    )
+    assert result is True
+    assert "0.06 m" in reason
+
+    result, reason = evaluator.evaluate(
+        [ObservationStamped(second_uri, provider_uri, 1.08, (0.17, 0.0, 0.0))]
+    )
+    assert result is False
+    assert "0.17 m" in reason
+
+    result, reason = evaluator.evaluate(
+        [ObservationStamped(second_uri, provider_uri, 1.11, (0.17, 0.0, 0.0))]
+    )
+    assert result is Unknown
+    assert "more than 0.1 s" in reason
 
 
 def test_provider_snapshot_evaluates_only_current_mapped_observations():
@@ -360,6 +399,42 @@ def test_provider_snapshot_evaluates_only_current_mapped_observations():
     manager.update_provider_observation(provider_uri, {}, 3.0)
 
     policy.add_samples.assert_called_once_with([], evaluation_stamp=3.0)
+
+
+def test_string_mapped_observations_keep_individual_source_stamps():
+    provider_uri = URIRef("urn:test:provider")
+    policy_uri = URIRef("urn:test:policy")
+    observation_uri = URIRef("urn:test:observation")
+    target_uri = URIRef("urn:test:target")
+    mapper = StringEntityMapper.__new__(StringEntityMapper)
+    mapper._entity_by_string = {"target": target_uri}
+
+    def extract_stamp(value, _):
+        return value.stamp
+
+    manager = ObservationManager.__new__(ObservationManager)
+    manager.scenario_exec = SimpleNamespace(scene_instance=None)
+    manager._provider_observation_registry = {provider_uri: {observation_uri}}
+    manager._observation_policy_registry = {observation_uri: {policy_uri}}
+    manager.observations = {
+        observation_uri: SimpleNamespace(
+            target_id=target_uri,
+            time_extractor=extract_stamp,
+            entity_mapper=mapper,
+            provider_id=provider_uri,
+        )
+    }
+    policy = unittest.mock.Mock(observation_uris={observation_uri})
+    manager.obs_policies = {policy_uri: policy}
+
+    manager.update_provider_observation(
+        provider_uri,
+        {"target": SimpleNamespace(stamp=1.0), "newest": SimpleNamespace(stamp=2.0)},
+        3.0,
+    )
+
+    [sample] = policy.add_samples.call_args.args[0]
+    assert sample.stamp == 1.0
 
 
 def test_before_policy_closes_on_the_final_event_relative_window():
