@@ -40,6 +40,7 @@ from bdd_dsl.execution.common import URL_MM_EXEC_SHACL
 from bdd_dsl.execution.scenario import ScenarioExecutionModel
 from bdd_dsl.models.observation import (
     EntityObservation,
+    LinearDistanceEvaluator,
     ObservationManager,
     ObservationPolicyEvaluator,
     ObservationStamped,
@@ -281,6 +282,86 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
     assert result.reason == "no collision recorded"
 
 
+def test_linear_distance_reports_missing_observation_as_unknown():
+    evaluator = LinearDistanceEvaluator.__new__(LinearDistanceEvaluator)
+    ObservationPolicyEvaluator.__init__(
+        evaluator,
+        (Unknown, "linear distance expected 2 inputs, received 0"),
+    )
+    for count in (0, 1, 3, 4, 5):
+        observations = [
+            ObservationStamped(
+                URIRef(f"urn:test:obs-{index}"),
+                URIRef("urn:test:provider"),
+                1.0,
+                (0, 0, 0),
+            )
+            for index in range(count)
+        ]
+        result, reason = evaluator.evaluate(observations)
+
+        assert result is Unknown
+        assert reason == f"linear distance expected 2 inputs, received {count}"
+
+
+def test_provider_snapshot_evaluates_only_current_mapped_observations():
+    provider_uri = URIRef("urn:test:provider")
+    policy_uri = URIRef("urn:test:policy")
+    first_uri = URIRef("urn:test:first-observation")
+    second_uri = URIRef("urn:test:second-observation")
+    first_target = URIRef("urn:test:first-target")
+    second_target = URIRef("urn:test:second-target")
+    target_by_name = {"first": first_target, "second": second_target}
+
+    def mapper(raw_value, scene_instance, targets):
+        del scene_instance
+        return [
+            EntityObservation(target_by_name[name], value)
+            for name, value in raw_value.items()
+            if target_by_name[name] in targets
+        ]
+
+    manager = ObservationManager.__new__(ObservationManager)
+    manager.scenario_exec = SimpleNamespace(scene_instance=None)
+    manager._provider_observation_registry = {provider_uri: {first_uri, second_uri}}
+    manager._observation_policy_registry = {
+        first_uri: {policy_uri},
+        second_uri: {policy_uri},
+    }
+    manager.observations = {
+        first_uri: SimpleNamespace(
+            target_id=first_target,
+            time_extractor=lambda raw, receipt: receipt,
+            entity_mapper=mapper,
+            provider_id=provider_uri,
+        ),
+        second_uri: SimpleNamespace(
+            target_id=second_target,
+            time_extractor=lambda raw, receipt: receipt,
+            entity_mapper=mapper,
+            provider_id=provider_uri,
+        ),
+    }
+    policy = unittest.mock.Mock(observation_uris={first_uri, second_uri})
+    manager.obs_policies = {policy_uri: policy}
+
+    manager.update_provider_observation(
+        provider_uri,
+        {"first": (0, 0, 0)},
+        2.0,
+    )
+
+    policy.add_samples.assert_called_once()
+    samples = policy.add_samples.call_args.args[0]
+    assert [sample.observation_uri for sample in samples] == [first_uri]
+    assert policy.add_samples.call_args.kwargs == {"evaluation_stamp": None}
+
+    policy.reset_mock()
+    manager.update_provider_observation(provider_uri, {}, 3.0)
+
+    policy.add_samples.assert_called_once_with([], evaluation_stamp=3.0)
+
+
 def test_before_policy_closes_on_the_final_event_relative_window():
     policy_uri = URIRef("urn:test:policy-close")
     observation_uri = URIRef("urn:test:obs-close")
@@ -499,10 +580,9 @@ class BDDExecTest(unittest.TestCase):
         accepted, detail = manager.update_observations(
             [ObservationStamped(observation_uri, provider_uri, 1.0, object())]
         )[policy_uri]
-        self.assertFalse(accepted)
-        self.assertIn("older", detail)
-        self.assertEqual(manager.observation_cache[observation_uri].stamp, 2.0)
-        self.assertEqual(len(policy.trinary_timeline), 1)
+        self.assertTrue(accepted)
+        self.assertEqual(detail, "")
+        self.assertEqual(len(policy.trinary_timeline), 2)
 
         with self.assertRaisesRegex(ValueError, "expected"):
             manager.update_observations(
@@ -538,7 +618,7 @@ class BDDExecTest(unittest.TestCase):
             {first: None, second: None},
         )
 
-    def test_observation_batch_evaluates_policy_once_after_caching_all_samples(self):
+    def test_each_observation_batch_evaluates_without_cross_batch_caching(self):
         graph = Graph()
         policy_uri = URIRef("urn:test:policy")
         provider_uri = URIRef("urn:test:provider")
@@ -562,7 +642,7 @@ class BDDExecTest(unittest.TestCase):
         class BatchEvaluator(ObservationPolicyEvaluator):
             def _evaluate_samples(self, observations):
                 calls.append(observations)
-                return True, "batch complete"
+                return len(observations) == 2, f"received {len(observations)}"
 
         policy.evaluator = BatchEvaluator()
         manager = ObservationManager(scr_exec=SimpleNamespace())
@@ -588,8 +668,8 @@ class BDDExecTest(unittest.TestCase):
             [ObservationStamped(observation_uris[0], provider_uri, 1.0, True)]
         )
         self.assertTrue(results[policy_uri][0])
-        self.assertEqual(calls, [])
-        self.assertIs(policy.get_result(1.0, trin_policy_and).trinary, Unknown)
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(policy.trinary_timeline[-1].trinary)
 
         results = manager.update_observations(
             [
@@ -599,40 +679,8 @@ class BDDExecTest(unittest.TestCase):
         )
 
         self.assertEqual(results, {policy_uri: (True, "")})
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(policy.trinary_timeline[-1].stamp, 2.0)
-
-        cached_snapshot = dict(manager.observation_cache)
-        results = manager.update_observations(
-            [
-                ObservationStamped(observation_uris[0], provider_uri, 0.0, False),
-                ObservationStamped(observation_uris[1], provider_uri, 3.0, False),
-            ]
-        )
-
-        self.assertEqual(
-            results,
-            {policy_uri: (False, "(observation) older than cached sample")},
-        )
-        self.assertEqual(manager.observation_cache, cached_snapshot)
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(len(policy.trinary_timeline), 1)
-
-        results = manager.update_observations(
-            [ObservationStamped(observation_uris[0], provider_uri, 13.0, False)]
-        )
-
-        self.assertTrue(results[policy_uri][0])
-        self.assertEqual(len(calls), 1)
-        self.assertIs(policy.get_result(13.0, trin_policy_and).trinary, Unknown)
-
-        results = manager.update_observations(
-            [ObservationStamped(observation_uris[1], provider_uri, 14.0, True)]
-        )
-
-        self.assertTrue(results[policy_uri][0])
         self.assertEqual(len(calls), 2)
-        self.assertIs(policy.get_result(14.0, trin_policy_and).trinary, True)
+        self.assertEqual(policy.trinary_timeline[-1].stamp, 2.0)
 
     def test_python_observation_policy_instantiates_callable_class_once(self):
         class StatefulEvaluator(ObservationPolicyEvaluator):
