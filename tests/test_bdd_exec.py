@@ -44,16 +44,23 @@ from bdd_dsl.models.observation import (
     ObservationPolicyEvaluator,
     ObservationStamped,
     ObsPolicyModel,
+    StringEntityMapper,
     TrinaryStamped,
     trin_policy_and,
 )
 from bdd_dsl.models.time_constraint import process_time_constraint_model
 from bdd_dsl.models.urirefs import (
     URI_BDD_PRED_HAS_BHV_IMPL,
+    URI_BDD_PRED_HAS_STRING_ENTITY_MAPPING,
+    URI_BDD_PRED_MAPPED_ENTITY,
     URI_BDD_PRED_OF_CLAUSE,
     URI_BDD_PRED_OF_SCENE,
     URI_BDD_PRED_OF_VARIANT,
+    URI_BDD_PRED_STRING_VALUE,
     URI_BDD_TYPE_SCENARIO_EXEC,
+    URI_BDD_TYPE_STRING_ENTITY_MAPPER,
+    URI_BDD_TYPE_STRING_ENTITY_MAPPING,
+    URI_BDD_TYPE_VARIABLE,
     URI_BHV_PRED_OF_BHV,
     URI_BHV_TYPE_BHV,
 )
@@ -67,6 +74,31 @@ SPEC_MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/templates/pickplace.tmpl.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/variations/pickplace-secorolab-isaac.var.json": "json-ld",
 }
+
+
+def test_string_entity_mapper_only_maps_identifiers():
+    graph = Graph()
+    mapper_uri = URIRef("urn:test:mapper")
+    variable_uri = URIRef("urn:test:variable")
+    entity_uri = URIRef("urn:test:entity")
+    mapping_uri = URIRef("urn:test:mapping")
+    graph.add((mapper_uri, RDF.type, URI_BDD_TYPE_STRING_ENTITY_MAPPER))
+    graph.add((mapper_uri, URI_BDD_PRED_HAS_STRING_ENTITY_MAPPING, mapping_uri))
+    graph.add((mapping_uri, RDF.type, URI_BDD_TYPE_STRING_ENTITY_MAPPING))
+    graph.add((mapping_uri, URI_BDD_PRED_STRING_VALUE, Literal("frame")))
+    graph.add((mapping_uri, URI_BDD_PRED_MAPPED_ENTITY, variable_uri))
+    graph.add((variable_uri, RDF.type, URI_BDD_TYPE_VARIABLE))
+
+    mapper = StringEntityMapper(mapper_uri, graph)
+    mapper.bind_variable_values({variable_uri: entity_uri})
+    value = object()
+    observation = {"frame": value, "ignored": object()}
+
+    mapped = mapper(observation, None, [entity_uri])
+
+    assert observation["frame"] is value
+    assert mapped == [EntityObservation(entity_uri, value)]
+    assert mapped[0].value is value
 
 
 def test_trinary_policy_and_reports_final_result():
