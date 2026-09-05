@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from dataclasses import dataclass
 from inspect import isclass
 from math import dist, isclose
+from numbers import Real
 from typing import Any, Protocol
 
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, get_node_types
@@ -36,7 +37,7 @@ from rdf_utils.models.vocab import (
     URI_TIME_TYPE_BEFORE_EVT,
     URI_TIME_TYPE_DURING,
 )
-from rdflib import Graph, Literal, URIRef
+from rdflib import RDF, Graph, Literal, URIRef
 from scene_dsl.rdf_parser.scenex import SceneInstanceModel
 from trinary import Trinary, Unknown
 
@@ -44,7 +45,13 @@ from bdd_dsl.execution.scenario import ScenarioExecutionModel
 from bdd_dsl.models.clauses import FluentClauseModel
 from bdd_dsl.models.time_constraint import get_duration, process_time_constraint_model
 from bdd_dsl.models.urirefs import (
+    URI_BDD_PRED_HAS_STRING_ENTITY_MAPPING,
+    URI_BDD_PRED_MAPPED_ENTITY,
     URI_BDD_PRED_OF_CLAUSE,
+    URI_BDD_PRED_STRING_VALUE,
+    URI_BDD_TYPE_STRING_ENTITY_MAPPER,
+    URI_BDD_TYPE_STRING_ENTITY_MAPPING,
+    URI_BDD_TYPE_VARIABLE,
     URI_CSTR_PRED_HAS_CONSTRAINT,
     URI_CSTR_PRED_LOWER_THRESHOLD,
     URI_CSTR_PRED_REFERENCE_VALUE,
@@ -93,6 +100,71 @@ class EntityObservationMapperProtocol(Protocol):
     ) -> list[EntityObservation]: ...
 
 
+def read_string_entity_mappings(
+    graph: Graph,
+    owner_uri: URIRef,
+    variable_values: Mapping[URIRef, Any] | None = None,
+) -> list[tuple[str, URIRef]]:
+    mappings = []
+    for mapping_uri in graph.objects(owner_uri, URI_BDD_PRED_HAS_STRING_ENTITY_MAPPING):
+        string = graph.value(mapping_uri, URI_BDD_PRED_STRING_VALUE, any=False)
+        entity = graph.value(mapping_uri, URI_BDD_PRED_MAPPED_ENTITY, any=False)
+        if (
+            (mapping_uri, RDF.type, URI_BDD_TYPE_STRING_ENTITY_MAPPING) not in graph
+            or string is None
+            or not isinstance(entity, URIRef)
+        ):
+            raise ValueError(f"StringEntityMapping {mapping_uri!r} is invalid")
+        is_variable = (entity, RDF.type, URI_BDD_TYPE_VARIABLE) in graph
+        if variable_values is not None:
+            if is_variable and entity not in variable_values:
+                raise ValueError(f"StringEntityMapping {mapping_uri!r} has an unbound variable")
+            entity = variable_values.get(entity, entity)
+            if not isinstance(entity, URIRef):
+                raise TypeError(
+                    f"StringEntityMapping {mapping_uri!r} resolved to non-URI {entity!r}"
+                )
+        mappings.append((str(string), entity))
+    return mappings
+
+
+class StringEntityMapper(ModelBase, EntityObservationMapperProtocol):
+    def __init__(self, mapper_id: URIRef, graph: Graph) -> None:
+        super().__init__(node_id=mapper_id, graph=graph)
+
+        if URI_BDD_TYPE_STRING_ENTITY_MAPPER not in self.types:
+            raise TypeError(f"StringEntityMapper '{self.id}' has incorrect types: {self.types}")
+        self._graph = graph
+        self._entity_by_string = dict(read_string_entity_mappings(graph, self.id))
+
+    def bind_variable_values(self, variable_values: Mapping[URIRef, Any]) -> None:
+        self._entity_by_string = dict(
+            read_string_entity_mappings(self._graph, self.id, variable_values)
+        )
+
+    def __call__(
+        self,
+        observation: Any,
+        scene_instance: SceneInstanceModel,
+        targets: list[URIRef],
+    ) -> list[EntityObservation]:
+        del scene_instance
+        if not isinstance(observation, Mapping):
+            raise TypeError("StringEntityMapper requires a string-keyed mapping")
+        target_set = set(targets)
+        mapped = []
+        for identifier, value in observation.items():
+            if not isinstance(identifier, str):
+                continue
+            entity_uri = self._entity_by_string.get(identifier)
+            if entity_uri in target_set:
+                # set check already ensured that this is not None,
+                # this is only for type check
+                assert entity_uri is not None
+                mapped.append(EntityObservation(entity_uri, value))
+        return mapped
+
+
 class ObservationModel(ModelBase):
     provider_id: URIRef
     time_extractor_id: URIRef
@@ -124,11 +196,14 @@ class ObservationModel(ModelBase):
             raise ValueError(f"targeted '{self}' requires an entity mapper")
 
         self.time_extractor = _import_attr_from_graph(graph, self.time_extractor_id)
-        self.entity_mapper = (
-            None
-            if self.entity_mapper_id is None
-            else _import_attr_from_graph(graph, self.entity_mapper_id)
-        )
+        if self.entity_mapper_id is None:
+            self.entity_mapper = None
+        elif URI_BDD_TYPE_STRING_ENTITY_MAPPER in get_node_types(
+            graph=graph, node_id=self.entity_mapper_id
+        ):
+            self.entity_mapper = StringEntityMapper(self.entity_mapper_id, graph)
+        else:
+            self.entity_mapper = _import_attr_from_graph(graph, self.entity_mapper_id)
 
 
 class ObservationPolicyEvaluator(ABC):
@@ -173,13 +248,47 @@ def _distance_value(graph: Graph, constraint: URIRef, predicate: URIRef) -> floa
     return to_metres([float(value)], unit, quantity)[0]
 
 
+class PositionXYZExtractorProtocol(Protocol):
+    def __call__(self, observation: Any) -> tuple[float, ...] | None: ...
+
+
+def _extract_position_xyz(observation: Any) -> tuple[float, ...] | None:
+    if isinstance(observation, tuple):
+        values = observation
+    else:
+        pose = getattr(observation, "pose", None)
+        position = getattr(pose, "position", None)
+        if position is None:
+            return None
+        values = (position.x, position.y, position.z)
+
+    if len(values) != 3 or not all(
+        isinstance(value, Real) and not isinstance(value, bool) for value in values
+    ):
+        return None
+    return tuple(float(value) for value in values)
+
+
 class LinearDistanceEvaluator(ObservationPolicyEvaluator):
     constraint_id: URIRef
     types: set[URIRef]
     constraint_values: tuple[float, ...]
+    position_extractor: PositionXYZExtractorProtocol
 
-    def __init__(self, graph: Graph, evaluator_id: URIRef, observations: set[URIRef]) -> None:
+    def __init__(
+        self,
+        graph: Graph,
+        evaluator_id: URIRef,
+        observations: set[URIRef],
+        position_extractor: PositionXYZExtractorProtocol | None = None,
+    ) -> None:
         super().__init__()
+
+        if position_extractor is None:
+            self.position_extractor = _extract_position_xyz
+        else:
+            self.position_extractor = position_extractor
+
         between = set(graph.objects(evaluator_id, URI_GEOM_PRED_BETWEEN_ENTITIES))
         if between != observations or len(between) != 2:
             raise ValueError(
@@ -214,10 +323,14 @@ class LinearDistanceEvaluator(ObservationPolicyEvaluator):
     ) -> tuple[bool | Trinary, str]:
         if len(observations) != 2:
             raise ValueError(f"expected two observations, got {len(observations)}")
-        try:
-            measured = dist(observations[0].value, observations[1].value)
-        except (TypeError, ValueError) as error:
-            raise TypeError("linear distance observations must be numeric sequences") from error
+        positions = []
+        for i in range(2):
+            position_obs = observations[i].value
+            position = self.position_extractor(position_obs)
+            if position is None:
+                raise ValueError(f"can't extract position tuple from: {position_obs}")
+            positions.append(position)
+        measured = dist(*positions)
 
         if URI_CSTR_TYPE_LESS_THAN in self.types:
             result = measured < self.constraint_values[0] and not isclose(
@@ -711,6 +824,8 @@ class ObservationManager:
                         f"{bound_target}"
                     )
                 observation.target_id = bound_target
+            if isinstance(observation.entity_mapper, StringEntityMapper):
+                observation.entity_mapper.bind_variable_values(bindings)
 
     def observation_targets_for_provider(self, provider_uri: URIRef) -> dict[URIRef, URIRef | None]:
         """Return each configured observation and resolved target for ``provider_uri``."""
