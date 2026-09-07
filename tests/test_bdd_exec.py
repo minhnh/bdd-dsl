@@ -283,13 +283,14 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
     assert result.reason == "no collision recorded"
 
 
-def test_linear_distance_reports_missing_observation_as_unknown():
+def test_linear_distance_can_suppress_missing_observations():
     evaluator = LinearDistanceEvaluator.__new__(LinearDistanceEvaluator)
     ObservationPolicyEvaluator.__init__(
         evaluator,
         (Unknown, "linear distance expected 2 inputs, received 0"),
     )
     evaluator.max_time_offset = None
+    evaluator.report_missing = True
     for count in (0, 1, 3, 4, 5):
         observations = [
             ObservationStamped(
@@ -305,8 +306,25 @@ def test_linear_distance_reports_missing_observation_as_unknown():
         assert result is Unknown
         assert reason == f"linear distance expected 2 inputs, received {count}"
 
+    evaluator.report_missing = False
+    evaluator.default_result = (None, "linear distance expected 2 inputs, received 0")
+    for count in (0, 1):
+        observations = [
+            ObservationStamped(
+                URIRef(f"urn:test:obs-{index}"),
+                URIRef("urn:test:provider"),
+                1.0,
+                (0, 0, 0),
+            )
+            for index in range(count)
+        ]
+        result, reason = evaluator.evaluate(observations)
 
-def test_linear_distance_uses_latest_samples_within_configured_time_offset():
+        assert result is None
+        assert reason == f"linear distance expected 2 inputs, received {count}"
+
+
+def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
     first_uri = URIRef("urn:test:first-observation")
     second_uri = URIRef("urn:test:second-observation")
     provider_uri = URIRef("urn:test:provider")
@@ -329,13 +347,23 @@ def test_linear_distance_uses_latest_samples_within_configured_time_offset():
     )
     assert result is True
     assert "0.06 m" in reason
+    assert "input time offset 0.01 s" in reason
 
     result, reason = evaluator.evaluate(
         [ObservationStamped(second_uri, provider_uri, 1.08, (0.17, 0.0, 0.0))]
     )
     assert result is False
     assert "0.17 m" in reason
+    assert "input time offset 0.08 s" in reason
 
+    result, reason = evaluator.evaluate(
+        [ObservationStamped(second_uri, provider_uri, 1.11, (0.17, 0.0, 0.0))]
+    )
+    assert result is None
+    assert "input time offset 0.11 s" in reason
+    assert "more than 0.1 s" in reason
+
+    evaluator.report_mismatched_time = True
     result, reason = evaluator.evaluate(
         [ObservationStamped(second_uri, provider_uri, 1.11, (0.17, 0.0, 0.0))]
     )

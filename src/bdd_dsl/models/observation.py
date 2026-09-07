@@ -280,6 +280,8 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
     constraint_values: tuple[float, ...]
     position_extractor: PositionXYZExtractorProtocol
     max_time_offset: float | None
+    report_missing: bool = True
+    report_mismatched_time: bool = False
 
     def __init__(
         self,
@@ -287,10 +289,16 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
         evaluator_id: URIRef,
         observations: set[URIRef],
         position_extractor: PositionXYZExtractorProtocol | None = None,
+        report_missing: bool = True,
+        report_mismatched_time: bool = False,
     ) -> None:
         ModelBase.__init__(self, node_id=evaluator_id, graph=graph)
         ObservationPolicyEvaluator.__init__(
-            self, (Unknown, "linear distance expected 2 inputs, received 0")
+            self,
+            (
+                Unknown if report_missing else None,
+                "linear distance expected 2 inputs, received 0",
+            ),
         )
         if URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR not in self.types:
             raise ValueError(f"LinearDistanceEvaluator {self.id} has incorrect types: {self.types}")
@@ -319,6 +327,8 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
             self.max_time_offset = offset
         self.observation_uris = frozenset(observations)
         self._latest_samples: dict[URIRef, ObservationStamped] = {}
+        self.report_missing = report_missing
+        self.report_mismatched_time = report_mismatched_time
 
         if position_extractor is None:
             self.position_extractor = _extract_position_xyz
@@ -361,7 +371,8 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
 
     def _evaluate_samples(
         self, observations: list[ObservationStamped]
-    ) -> tuple[bool | Trinary, str]:
+    ) -> tuple[bool | Trinary | None, str]:
+        time_offset = None
         if self.max_time_offset is not None:
             for observation in observations:
                 if observation.observation_uri not in self.observation_uris:
@@ -370,22 +381,20 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
                     )
                 self._latest_samples[observation.observation_uri] = observation
             observations = list(self._latest_samples.values())
-            if (
-                len(observations) == 2
-                and max(observation.stamp for observation in observations)
-                - min(observation.stamp for observation in observations)
-                > self.max_time_offset
-            ):
-                observations = []
+            if len(observations) == 2:
+                time_offset = max(observation.stamp for observation in observations) - min(
+                    observation.stamp for observation in observations
+                )
+            if time_offset is not None and time_offset > self.max_time_offset:
+                return (
+                    Unknown if self.report_mismatched_time else None,
+                    f"linear distance input time offset {time_offset:g} s is more than {self.max_time_offset:g} s",
+                )
 
         if len(observations) != 2:
             return (
-                Unknown,
-                (
-                    f"linear distance inputs differ by more than {self.max_time_offset:g} s"
-                    if self.max_time_offset is not None and len(self._latest_samples) == 2
-                    else f"linear distance expected 2 inputs, received {len(observations)}"
-                ),
+                Unknown if self.report_missing or len(observations) > 2 else None,
+                f"linear distance expected 2 inputs, received {len(observations)}",
             )
         positions = []
         for i in range(2):
@@ -421,7 +430,10 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
             )
             expectation = f"within {reference:g} m ± {tolerance:g} m ([{lower:g}, {upper:g}] m)"
         comparison = "is" if result else "is not"
-        return result, f"linear distance {measured:g} m {comparison} {expectation}"
+        reason = f"linear distance {measured:g} m {comparison} {expectation}"
+        if time_offset is not None:
+            reason += f"; input time offset {time_offset:g} s"
+        return result, reason
 
 
 @dataclass(frozen=True, slots=True)
