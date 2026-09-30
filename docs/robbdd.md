@@ -1,10 +1,14 @@
-# Tutorial: Modeling pick & place applications using RobBDD
+# RobBDD Specification Tutorial
 
 This tutorial shows how to use the [RobBDD](https://github.com/minhnh/robbdd)
 Domain-Specific-Language (DSL) to model robotics acceptance criteria and generate
 [Gherkin](https://cucumber.io/docs/gherkin/reference/) feature files for acceptance test
 execution of pick & place scenarios. The following model examples can also be found under
 the `examples/models` folder in the RobBDD repository.
+
+For an end-to-end walkthrough from requirements elicitation through test
+execution and analysis, see the [Acceptance Testing Tutorials](at-tutorial-scenarios.md),
+beginning with scenarios and variations.
 
 > [!TIP]
 > A [plugin](https://github.com/minhnh/robbdd-nvim/) is available for
