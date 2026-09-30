@@ -64,10 +64,10 @@ variation:
     set var <sorting-template.target-objects>:
         select 1 combinations from <pickplace_objects>
     var <sorting-template.pick-workspace>: {
-        <pickplace_workspaces.table-workspace>
+        <pickplace_workspaces.table-ws>
     }
     set var <sorting-template.place-workspaces>: {
-        { <pickplace_workspaces.container-workspace> }
+        { <pickplace_workspaces.bin-ws> }
     }
     var <sorting-template.robot>: agn set <pickplace_agents>
 ~~~

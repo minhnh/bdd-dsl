@@ -27,14 +27,14 @@ treating a test verdict as the end of the process.
 
 We start with a typical robotic object-transport task. Its textual requirement might be:
 
-> The robot shall move one object from a designated area on a table into a designated container.
+> The robot shall move one object from a designated area on a table into a designated bin.
 
 Acceptable object-transport behavior may include the following criteria:
 
 1. The target object is present in the table pick area before picking begins.
 2. The requested behavior completes without error.
-3. The object is not dropped while being transported from the table to the container.
-4. The object is inside the container after placing completes.
+3. The object is not dropped while being transported from the table to the bin.
+4. The object is inside the bin after placing completes.
 
 ### Describe desired test variations
 
@@ -43,7 +43,7 @@ across relevant variations of the setup. Typical object-transport variations inc
 
 - different target objects;
 - different source and destination workspaces, including transport from the
-  container back to the table; and
+  bin back to the table; and
 - different manipulators.
 
 ## 2. Scenario Specification with RobBDD
@@ -152,7 +152,8 @@ See the
 ## 3. Describe the scene
 
 The scene defines the abstract entities that variations may bind, independent of an execution context,
-e.g. in simulation or on a physical robot:
+e.g. in simulation or on a physical robot. Consider a scenario where the robot should pick up household objects,
+such as those in the [YCB dataset](https://www.ycbbenchmarks.com/), from a table and put them in a bin.
 
 ~~~text
 obj set (ns=pps_env) pickplace_objects {
@@ -164,12 +165,12 @@ obj set (ns=pps_env) pickplace_objects {
 
 obj set (ns=pps_env) ws_objects {
     object table,
-    object container
+    object bin
 }
 
 ws set (ns=pps_env) pickplace_workspaces {
-    workspace table-workspace,
-    workspace container-workspace
+    workspace table-ws,
+    workspace bin-ws
 }
 
 agn set (ns=pps_agn) pickplace_agents {
@@ -177,17 +178,17 @@ agn set (ns=pps_agn) pickplace_agents {
     agent gripper1
 }
 
-comp (ns=pps_env) container-composition
-    of ws <pickplace_workspaces.container-workspace>
+comp (ns=pps_env) bin-composition
+    of ws <pickplace_workspaces.bin-ws>
 {
-    obj <ws_objects.container>
+    obj <ws_objects.bin>
 }
 
 comp (ns=pps_env) table-composition
-    of ws <pickplace_workspaces.table-workspace>
+    of ws <pickplace_workspaces.table-ws>
 {
     obj <ws_objects.table>
-    ws comp <container-composition>
+    ws comp <bin-composition>
 }
 
 scene (ns=pps_scene) pick_place_scene {
@@ -198,10 +199,10 @@ scene (ns=pps_scene) pick_place_scene {
 ~~~
 
 Workspace compositions describe abstract relationships between workspaces.
-In the scene above, the container workspace is associated with the table
-workspace to represent that the container sits on the table.
+In the scene above, the bin workspace is associated with the table workspace
+to represent that the bin sits on the table.
 This association allows a robot behavior expressed relative to one workspace to be related to the other.
-For example, approaching the table can also be understood as approaching the container, and vice versa.
+For example, approaching the table can also be understood as approaching the bin, and vice versa.
 
 See the
 [complete Scene model](https://github.com/minhnh/robbdd_tutorials/blob/main/robbdd_tutorials/models/pick_place/common/pick_place_single.scene).
@@ -218,7 +219,7 @@ Scenario nominal-pick-place {
     variation:
     | <pick-place-template.target-object> | <pick-place-template.pick-workspace> | <pick-place-template.place-workspace> | <pick-place-template.robot> |
     |---|
-    | <pickplace_objects.cube> | <pickplace_workspaces.table-workspace> | <pickplace_workspaces.container-workspace> | <pickplace_agents.arm1> |
+    | <pickplace_objects.cube> | <pickplace_workspaces.table-ws> | <pickplace_workspaces.bin-ws> | <pickplace_agents.arm1> |
 }
 ~~~
 
