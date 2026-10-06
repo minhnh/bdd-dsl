@@ -147,7 +147,7 @@ E_PICK_START -> E_PICK_END -> E_PLACE_START -> E_PLACE_END
 ~~~
 
 See the
-[complete BDD model](https://github.com/minhnh/robbdd_tutorials/blob/main/robbdd_tutorials/models/pick_place/common/pick_place.bdd).
+[complete BDD model](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/common/pick_place.bdd).
 
 ## 3. Describe the scene
 
@@ -205,7 +205,7 @@ This association allows a robot behavior expressed relative to one workspace to 
 For example, approaching the table can also be understood as approaching the bin, and vice versa.
 
 See the
-[complete Scene model](https://github.com/minhnh/robbdd_tutorials/blob/main/robbdd_tutorials/models/pick_place/common/pick_place_single.scene).
+[complete Scene model](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/common/pick_place_single.scene).
 
 ## 4. Bind a scenario variant
 

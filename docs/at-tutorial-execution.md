@@ -6,7 +6,7 @@ one destination. Set-valued sorting remains a specification-only extension in
 [Tutorial 3](at-tutorial-sorting.md).
 
 The complete MuJoCo-specific model is
-[pick_place.bddx](https://github.com/minhnh/robbdd_tutorials/blob/main/robbdd_tutorials/models/pick_place/mujoco_motion_spec/pick_place.bddx).
+[pick_place.bddx](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/mujoco_motion_spec/pick_place.bddx).
 
 In the [end-to-end test workflow](at-tutorial-scenarios.md#the-end-to-end-test-workflow),
 this tutorial first binds the behavior and scenario execution, then continues
@@ -28,9 +28,9 @@ The scenario has three fluent clauses:
 
 | Fluent | Evidence | Evaluation |
 | --- | --- | --- |
-| `object-at-pick` | object pose and pick-workspace pose | pass when their linear distance is below 5 cm before picking |
+| `object-at-pick` | object pose and table-top pose | pass when their linear distance is below 30 cm before picking |
 | `object-held` | object and end-effector poses | pass while their linear distance remains below 12 cm between pick and place |
-| `object-at-place` | object pose and place-workspace pose | pass when their linear distance is below 5 cm after placing |
+| `object-at-place` | object pose and bin pose | pass when the cube footprint is within the bin after placing |
 
 ## 2. Bind the behavior and scenario execution
 
@@ -129,7 +129,7 @@ selects the built-in
 [linear-distance evaluator](https://github.com/minhnh/bdd-dsl/blob/-/src/bdd_dsl/models/observation.py#L277).
 The evaluator retains the latest sample for each observation and evaluates
 them together only when their timestamps differ by no more than 0.1 seconds.
-A synchronized pair less than 5 cm apart produces **True**;
+A synchronized pair less than 30 cm apart produces **True**;
 a pair at or beyond the threshold produces **False**.
 Missing evidence produces **Unknown**, while a time-mismatched pair
 does not add a verdict and waits for compatible evidence.
@@ -157,7 +157,7 @@ Finally, select the policy in `Scenario Exec`:
 +{
 +    observations: { <object-pose>, <pick-workspace-pose> }
 +    evaluator: linear distance {
-+        less-than: 0.05 m
++        less-than: 0.3 m
 +        max time offset: 0.1 s
 +    }
 +}
@@ -174,7 +174,29 @@ Finally, select the policy in `Scenario Exec`:
 
 The remaining clauses reuse the ground-truth provider and object observation.
 Add observations for the place workspace and end effector, add their policies,
-then select both policies in the scenario execution:
+then select both policies in the scenario execution.
+
+The policies demonstrate the two different evaluators:
+
+- The built-in `linear distance` is supported in RobBDD textx grammar;
+  its thresholds and synchronization tolerance are declared in the BDDX model.
+  This is meant for evaluation of common point-to-point proximity.
+- `cube_inside_bin` is a configured `PlanarContainmentEvaluator`: it transforms
+  the cube center into the bin frame and checks the bin's XY bounds.
+
+The configured instance belongs to the tutorial package rather than to
+`bdd-dsl`, because its entity URIs and dimensions are model-specific:
+
+~~~python
+cube_inside_bin = PlanarContainmentEvaluator(
+    URIRef("https://secorolab.github.io/models/environments/pick-place-single/cube"),
+    URIRef("https://secorolab.github.io/models/environments/pick-place-single/bin-ws"),
+    boundary_size_xy=(0.23, 0.19),
+    margin_m=0.02,
+)
+~~~
+
+The corresponding BDDX additions are:
 
 ~~~diff
 +++ pick_place.bddx
@@ -210,7 +232,7 @@ then select both policies in the scenario execution:
  {
      observations: { <object-pose>, <pick-workspace-pose> }
      evaluator: linear distance {
-         less-than: 0.05 m
+         less-than: 0.3 m
          max time offset: 0.1 s
      }
  }
@@ -225,9 +247,9 @@ then select both policies in the scenario execution:
 +    horizon: 2.0 seconds
 +{
 +    observations: { <object-pose>, <place-workspace-pose> }
-+    evaluator: linear distance {
-+        less-than: 0.05 m
-+        max time offset: 0.1 s
++    evaluator: py {
++        module: robbdd_tutorials.observation_evaluators,
++        attr: cube_inside_bin
 +    }
 +}
 @@
@@ -284,10 +306,9 @@ The process starts the simulator and waits for a behavior goal. The BDD
 coordinator sends that goal; the motion-spec controller should not be embedded
 in the coordinator launch file.
 
-> The copied motion-spec model is valid, but its ROS behavior-server and
-> observation adapter are still being completed. The commands below describe
-> the intended process boundary and become end-to-end runnable with that
-> adapter.
+The tutorial motion-spec model implements this action server, publishes the
+boundary events, and maps its live scene poses into the observation message.
+The commands below therefore run the complete MuJoCo execution path.
 
 ### Run and visualize one pick-place test
 

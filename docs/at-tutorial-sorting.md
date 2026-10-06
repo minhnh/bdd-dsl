@@ -6,7 +6,7 @@
 
 This tutorial extends [Tutorial 1](at-tutorial-scenarios.md) from one object to a set of
 objects while reusing the same scene. The complete model is
-[sorting.bdd](https://github.com/minhnh/robbdd_tutorials/blob/main/robbdd_tutorials/models/pick_place/common/sorting.bdd).
+[sorting.bdd](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/common/sorting.bdd).
 
 ## Declare set-valued variables
 
