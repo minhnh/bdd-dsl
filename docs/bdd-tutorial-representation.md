@@ -337,7 +337,7 @@ Feature: var:us-pickplace
 
 The generated feature files can then be used with existing BDD frameworks, e.g. `behave`[^behave],
 for test automation, which we go over in
-[the tutorial about test execution](bdd-tutorial-execution.md)
+[the tutorial about test execution](at-tutorial-execution.md)
 
 ### Additional tools
 
