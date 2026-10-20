@@ -22,7 +22,7 @@ variables describe the objects and their allowed destinations.
 
 ## Quantify the criteria
 
-**for all** applies the nested Given–When–Then clauses to every selected
+**for all** applies the nested Given-When-Then clauses to every selected
 object:
 
 ~~~text
@@ -69,8 +69,12 @@ variation:
     set var <sorting-template.place-workspaces>: {
         { <pickplace_workspaces.bin-ws> }
     }
-    var <sorting-template.robot>: agn set <pickplace_agents>
+    var <sorting-template.robot>: { <mujoco_agents.kinova>, <panda_agents.panda> }
 ~~~
+
+The robot alternatives select an acting manipulator rather than treating the
+separately controlled Robotiq gripper as another pick/place robot. These are
+specification variations, not a runnable cross-backend sorting test.
 
 The one-object selection keeps this model valid against the small tutorial
 scene. Add more objects before selecting larger combinations.

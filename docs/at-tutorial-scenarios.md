@@ -147,7 +147,7 @@ E_PICK_START -> E_PICK_END -> E_PLACE_START -> E_PLACE_END
 ~~~
 
 See the
-[complete BDD model](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/common/pick_place.bdd).
+[complete BDD model](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/common/pick_place.bdd).
 
 ## 3. Describe the scene
 
@@ -156,6 +156,10 @@ e.g. in simulation or on a physical robot. Consider a scenario where the robot s
 such as those in the [YCB dataset](https://www.ycbbenchmarks.com/), from a table and put them in a bin.
 
 ~~~text
+ns pps_env = "https://secorolab.github.io/models/environments/pick-place-single/"
+ns pps_agn = "https://secorolab.github.io/models/agents/pick-place-single/"
+ns pps_scene = "https://secorolab.github.io/models/scenes/pick-place-single/"
+
 obj set (ns=pps_env) pickplace_objects {
     object cube,
     object can,
@@ -173,9 +177,13 @@ ws set (ns=pps_env) pickplace_workspaces {
     workspace bin-ws
 }
 
-agn set (ns=pps_agn) pickplace_agents {
-    agent arm1,
-    agent gripper1
+agn set (ns=pps_agn) mujoco_agents {
+    agent kinova,
+    agent robotiq
+}
+
+agn set (ns=pps_agn) panda_agents {
+    agent panda
 }
 
 comp (ns=pps_env) bin-composition
@@ -194,7 +202,6 @@ comp (ns=pps_env) table-composition
 scene (ns=pps_scene) pick_place_scene {
     obj set <pickplace_objects>
     ws comp <table-composition>
-    agn set <pickplace_agents>
 }
 ~~~
 
@@ -203,13 +210,27 @@ In the scene above, the bin workspace is associated with the table workspace
 to represent that the bin sits on the table.
 This association allows a robot behavior expressed relative to one workspace to be related to the other.
 For example, approaching the table can also be understood as approaching the bin, and vice versa.
+Concrete poses and simulator assets are supplied later by SceneX.
+
+The agent sets are available for robot bindings, but are not invariant members
+of the common scene. The robot variable selects the acting agent:
+
+| Backend | Robot binding | Scene agents |
+| --- | --- | --- |
+| Isaac | `panda_agents.panda` | Selected through the robot variable; Panda includes its gripper |
+| MuJoCo | `mujoco_agents.kinova` | The MuJoCo-specific scene includes Kinova and its separately controlled Robotiq gripper |
+
+Objects and workspaces share semantic identities across the backends. Their
+concrete assets can differ: `cereal-box` uses cereal geometry in MuJoCo and a
+cracker-box asset in Isaac.
 
 See the
-[complete Scene model](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/common/pick_place_single.scene).
+[complete Scene model](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/common/pick_place_single.scene).
 
 ## 4. Bind a scenario variant
 
-A table variation binds every template variable to an entity from the scene:
+A table variation binds each template variable to an object, workspace, or
+agent. This example is the Panda variant from the Isaac-specific scenario:
 
 ~~~text
 Scenario nominal-pick-place {
@@ -219,9 +240,16 @@ Scenario nominal-pick-place {
     variation:
     | <pick-place-template.target-object> | <pick-place-template.pick-workspace> | <pick-place-template.place-workspace> | <pick-place-template.robot> |
     |---|
-    | <pickplace_objects.cube> | <pickplace_workspaces.table-ws> | <pickplace_workspaces.bin-ws> | <pickplace_agents.arm1> |
+    | <pickplace_objects.cube> | <pickplace_workspaces.table-ws> | <pickplace_workspaces.bin-ws> | <panda_agents.panda> |
 }
 ~~~
+
+The common `pick_place.bdd` contains the template; each backend's local
+`pick_place.bdd` imports it and defines a user story with its concrete scenario variant(s).
+The [MuJoCo scenario](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/mujoco_motion_spec/pick_place.bdd)
+uses `pick_place_mujoco_scene` and `mujoco_agents.kinova`; the
+[Isaac scenario](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/isaacsim/pick_place.bdd)
+uses `pick_place_scene` and `panda_agents.panda`.
 
 The template describes what must hold. The variant chooses which robot, object,
 and workspaces participate in this run. For more expressive variation syntax,
@@ -238,7 +266,11 @@ textx check pick_place_single.scene
 textx check pick_place.bdd
 ~~~
 
-Both commands must report **OK**.
+Both commands must report **OK**. Check the backend stories from the same directory:
+
+~~~bash
+textx check ../mujoco_motion_spec/pick_place.bdd ../isaacsim/pick_place.bdd
+~~~
 
 Continue with:
 

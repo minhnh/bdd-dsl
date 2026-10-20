@@ -20,17 +20,24 @@ can be found on the [RobBDD](https://github.com/minhnh/robbdd) repository.
 1. Install [rdf-utils](https://github.com/secorolab/rdf-utils/)
 1. Install `bdd-dsl` with `pip install`
 
-### Gherkin generation & mockup execution with `behave`
+### Test Execution with ROS2
 
-A mockup test execution setup with [`behave`](https://behave.readthedocs.io/en/latest/) is available
-for trying out our models. To run this setup:
+The [`robbdd_tutorials` package](https://github.com/minhnh/robbdd_tutorials)
+provides two example ROS-based execution setups for acceptance testing:
+
+- [MuJoCo with motion-spec and an FSM](docs/at-tutorial-execution-mujoco.md).
+- [Isaac Sim with MoveIt and a behavior tree](docs/at-tutorial-execution-isaac.md).
+
+### DEPRECATED: Gherkin generation & mockup execution with `behave`
+
+Previously, a sample test execution setup with [`behave`](https://behave.readthedocs.io/en/latest/)
+is available for trying out our models. To run this setup:
 
 1. Generate the Gherkin feature using the [`generate_bdd_specs.py`](./examples/generate_bdd_specs.py)
    script. This should create a `*.feature` file under the `examples/generated` directory.
 2. Execute `behave` under `examples/generated` should run the mockup setup.
 
-An execution setup with [Nvidia Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html)
-is available at the [`minhnh/bdd-isaacsim-exec`](https://github.com/minhnh/bdd-isaacsim-exec) repository.
+This is now not actively deprecated in favour of the ROS-based approach above.
 
 ## Tutorials
 
@@ -38,7 +45,11 @@ is available at the [`minhnh/bdd-isaacsim-exec`](https://github.com/minhnh/bdd-i
 2. [RobBDD Specification Tutorial](docs/robbdd.md)
 3. **Acceptance Testing Tutorials**
    1. [Tutorial 1: Scenarios and Variations](docs/at-tutorial-scenarios.md)
-   2. [Tutorial 2: Observations and Execution](docs/at-tutorial-execution.md) (WIP)
+   2. [Tutorial 2: Observations and Execution](docs/at-tutorial-execution.md)
+
+      - [MuJoCo integration](docs/at-tutorial-execution-mujoco.md)
+      - [Isaac Sim / MoveIt integration](docs/at-tutorial-execution-isaac.md)
+
    3. [Tutorial 3: Set Quantifiers and Sorting](docs/at-tutorial-sorting.md) (execution WIP)
 4. [Modelling a pickup task as JSON-LD graphs](docs/bdd-tutorial-representation.md)
 
