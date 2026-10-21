@@ -30,17 +30,24 @@ This library is one of the tools developed for the
 1. Install [rdf-utils](https://github.com/secorolab/rdf-utils/)
 1. Install `bdd-dsl` with `pip install`
 
-### Gherkin generation & mockup execution with `behave`
+### Test Execution with ROS2
 
-A mockup test execution setup with [`behave`](https://behave.readthedocs.io/en/latest/) is available
-for trying out our models. To run this setup:
+The [`robbdd_tutorials` package](https://github.com/minhnh/robbdd_tutorials)
+provides two example ROS-based execution setups for acceptance testing:
 
-1. Generate the Gherkin feature using the [`generate_bdd_specs.py`](https://github.com/minhnh/bdd-dsl/blob/-/examples/generate_bdd_specs.py)
+- [MuJoCo with motion-spec and an FSM](docs/at-tutorial-execution-mujoco.md).
+- [Isaac Sim with MoveIt and a behavior tree](docs/at-tutorial-execution-isaac.md).
+
+### DEPRECATED: Gherkin generation & mockup execution with `behave`
+
+Previously, a sample test execution setup with [`behave`](https://behave.readthedocs.io/en/latest/)
+is available for trying out our models. To run this setup:
+
+1. Generate the Gherkin feature using the [`generate_bdd_specs.py`](./examples/generate_bdd_specs.py)
    script. This should create a `*.feature` file under the `examples/generated` directory.
-1. Execute `behave` under `examples/generated` should run the mockup setup.
+2. Execute `behave` under `examples/generated` should run the mockup setup.
 
-An execution setup with [Nvidia Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html)
-is available at the [`minhnh/bdd-isaacsim-exec`](https://github.com/minhnh/bdd-isaacsim-exec) repository.
+This is now not actively deprecated in favour of the ROS-based approach above.
 
 ## Tutorials
 
@@ -51,7 +58,11 @@ BDD models can be found on the following pages:
 1. [RobBDD Specification Tutorial](robbdd.md)
 1. **Acceptance Testing Tutorials**
    1. [Tutorial 1: Scenarios and Variations](at-tutorial-scenarios.md)
-   1. [Tutorial 2: Observations and Execution](at-tutorial-execution.md) (WIP)
+   1. [Tutorial 2: Observations and Execution](at-tutorial-execution.md)
+
+      - [MuJoCo integration](at-tutorial-execution-mujoco.md)
+      - [Isaac Sim / MoveIt integration](at-tutorial-execution-isaac.md)
+
    1. [Tutorial 3: Set Quantifiers and Sorting](at-tutorial-sorting.md) (execution WIP)
 1. [Modelling a pickup task as JSON-LD graphs](bdd-tutorial-representation.md)
 
@@ -76,6 +87,6 @@ under grant agreement No 101017258.
 
 [^nguyen2023rulebook]: M. Nguyen, N. Hochgeschwender, S. Wrede, "An analysis of behaviour-driven
     requirement specification for robotic competitions",
-    [_5th International Workshop on Robotics Software Engineering (RoSE’23)_](https://rose-workshops.github.io/rose2023/),
+    [_5th International Workshop on Robotics Software Engineering (RoSE'23)_](https://rose-workshops.github.io/rose2023/),
     May 2023,
     doi: [10.1109/RoSE59155.2023.00008](https://doi.org/10.1109/RoSE59155.2023.00008).

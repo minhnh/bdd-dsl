@@ -1,372 +1,136 @@
 # Acceptance Testing Tutorial 2: Observations and Execution
 
-This tutorial adds executable evidence rules to the single pick-and-place variant from
-[Tutorial 1](at-tutorial-scenarios.md). It deliberately executes one object and
-one destination. Set-valued sorting remains a specification-only extension in
-[Tutorial 3](at-tutorial-sorting.md).
+This tutorial connects the scenario from [Tutorial 1](at-tutorial-scenarios.md)
+to evidence and an executable behavior. Both execution backends test one cube and one
+destination; [set-valued sorting](at-tutorial-sorting.md) remains specification-only.
 
-The complete MuJoCo-specific model is
-[pick_place.bddx](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/mujoco_motion_spec/pick_place.bddx).
+In the [test workflow](at-tutorial-scenarios.md#the-end-to-end-test-workflow),
+this is the transition from **Scenario Specification** to **Scenario Execution Specification**,
+connecting the problem-side scenario models to a concrete System under Test (SuT).
+This includes scene configurations as well as evidence sources and evaluation policies
+used to determine whether the SuT meets the specified acceptance criteria.
 
-In the [end-to-end test workflow](at-tutorial-scenarios.md#the-end-to-end-test-workflow),
-this tutorial first binds the behavior and scenario execution, then continues
-with **Observation Policy Specification**. It connects the problem-side
-scenario models to the system-under-test implementation, test execution, and
-resulting evidence for analysis.
+## Contents
 
-## Shared specification and backend models
+<!-- mtoc-start -->
 
-The `.bdd` and `.scene` models from Tutorial 1 describe the test independently
-of a simulator or behavior implementation. Each execution backend supplies its
-own SceneX model, behavior binding, observation providers, and BDDX execution
-model. This keeps backend-specific assets and frame mappings out of the shared
-specification.
+1. [Connect the shared scenario specification to a SuT](#connect-the-shared-scenario-specification-to-a-sut)
+1. [Choose evidence for each criterion](#choose-evidence-for-each-criterion)
+1. [Connect provider, observation, and policy](#connect-provider-observation-and-policy)
+1. [Interpret event windows and results](#interpret-event-windows-and-results)
+1. [Continue with a backend](#continue-with-a-backend)
 
-## 1. Decide what evidence each fluent needs
+<!-- mtoc-end -->
 
-The scenario has three fluent clauses:
+## Connect the shared scenario specification to a SuT
+
+The [robbdd_tutorials](https://github.com/minhnh/robbdd_tutorials) package provides
+two example Systems under Test (SuTs) to demonstrate the acceptance-testing process:
+a Kinova manipulator controlled by [`motion-spec`](https://secoro.uni-bremen.de/motion-spec/)
+and a [`coord-dsl` finite-state machine (FSM)](https://secoro.uni-bremen.de/coord-dsl/)
+in MuJoCo, and a Panda manipulator controlled by [MoveIt](https://moveit.picknik.ai/main/index.html)
+and a [`BehaviourTree.CPP` tree](https://www.behaviortree.dev/docs/intro) in Isaac Sim.
+Both examples reuse the same scenario template, acceptance criteria,
+and abstract objects and workspaces.
+
+The common `.bdd` template defines the _fluent clauses_ that must hold, while the common `.scene`
+defines the environment and available agent sets. Each backend supplies:
+
+- A `.bdd` scenario variant selecting the acting robot. Both examples use the same object and
+  workspace bindings; the MuJoCo variant additionally selects a specialized scene to accommodate
+  `motion-spec`'s separate gripper agent.
+- A `.scenex` instance mapping abstract entities to assets and sampled poses.
+- A `.bddx `execution model binding the variant, scene instance, behavior server,
+  and observation policies.
+
+Normally, the acting robot is selected through the scenario variant's robot variable
+rather than included explicitly in the scene. The Isaac Panda variant follows this approach,
+representing the arm and gripper as one agent. The MuJoCo backend uses a specialized scene
+containing Kinova and Robotiq because `motion-spec` requires the gripper to be modeled
+as a separate agent.
+
+The coordinator's `graph-models.yaml` lists the common template, backend scenario variant,
+and BDDX execution model to load.
+
+| Aspect | MuJoCo / motion-spec | Isaac Sim / MoveIt |
+| --- | --- | --- |
+| Acting robot | `mujoco_agents.kinova` | `panda_agents.panda` |
+| Gripper | Separate Robotiq agent | Part of the Panda agent |
+| Concrete assets | MJCF models | USD models |
+| Behavior action | `/bdd/pickplace_bhv_server` | `/bdd/pick_place` |
+| Object/workspace evidence | URI-keyed detection topic | Simulation entity states and tabletop TF |
+| End-effector evidence | Same detection topic | `panda_hand` TF |
+| Timing | Simulation `/clock` | Simulation `/clock` |
+
+Both backends use simulation time for the coordinator and evidence timestamps.
+The MuJoCo runtime publishes `/clock`; `--rtf` controls playback speed without
+changing the time basis.
+
+## Choose evidence for each criterion
+
+The behavior's successful action result establishes completion. The three
+fluent clauses require additional evidence:
 
 | Fluent | Evidence | Evaluation |
 | --- | --- | --- |
-| `object-at-pick` | object pose and table-top pose | pass when their linear distance is below 30 cm before picking |
-| `object-held` | object and end-effector poses | pass while their linear distance remains below 12 cm between pick and place |
-| `object-at-place` | object pose and bin pose | pass when the cube footprint is within the bin after placing |
+| `object-at-pick` | Object and tabletop poses | Linear distance below 0.3 m before `E_PICK_START` |
+| `object-held` | Object and grasp poses | Linear distance below 0.12 m from `E_PICK_END` until `E_PLACE_START` |
+| `object-at-place` | Object and bin poses | Object center inside inset bin XY bounds after `E_PLACE_END` |
 
-## 2. Bind the behavior and scenario execution
+The distance checks are proxies for the stated requirements. The configured
+containment check transforms the object center into the bin frame and applies
+a cube-sized margin; it does not establish physical support or full 3D containment.
+The bin dimensions and margin are calibrated separately for each backend.
 
-The minimal BDDX model below uses `Scenario Exec` to bind a scenario variant,
-such as the one defined in Tutorial 1, to a behavior implementation and a
-concrete scene instance. It can also select observation policies for evaluating
-the variant's fluent clauses. ROS 2 execution of BDDX models is currently
-provided by [`bdd_exec_ros2`](https://github.com/minhnh/bdd_exec_ros2), which
-supports behaviors exposed as a
-[ROS 2 action server](https://github.com/minhnh/bdd_ros2_interfaces/blob/-/action/Behaviour.action).
+## Connect provider, observation, and policy
 
 ~~~text
-import "../common/pick_place.bdd"
-import "pick_place_single.scenex"
-
-ns tutorial_exec = "https://secorolab.github.io/robbdd/tutorials/pick-place/execution/"
-
-bhv impl (ns=tutorial_exec) pick-place-server {
-    bhv action: "/bdd/pickplace_bhv_server"
-}
-
-Scenario Exec (ns=tutorial_exec) mujoco-pick-place {
-    variant: <pick-place-story.nominal-pick-place>
-    scene inst: <pick_place_scene_mjc>
-    bhv: <pick-place-server>
-    policies: { }
-}
+Provider data -> Entity observations -> Policy evaluator -> Fluent verdict
 ~~~
 
-## 3. Add the first provider-observation-policy chain
+- A **provider** supplies raw evidence, such as ROS messages, simulation states,
+  or TF transforms.
+- An **observation** maps that evidence to scenario entities and extracts timestamps.
+  `observes var` follows the entity selected by a scenario variable.
+- A **policy** connects observations to a fluent and selects an evaluator,
+  synchronization tolerance, and any finite evidence horizon.
+- `Scenario Exec` selects the policies and binds the variant to its concrete scene
+  and Behaviour action server.
 
-Begin with the `object-at-pick` fluent and build its evidence path one part at a
-time.
+The linear-distance policies retain the latest observation samples. A pair whose
+timestamps differ by at most 0.1 seconds can produce a verdict: a distance below
+the threshold gives `TRUE`, otherwise `FALSE`. Missing usable evidence gives
+`UNKNOWN`; a mismatched pair waits for compatible evidence rather than adding
+a verdict.
 
-### Declare the provider
+Both backends use simulated ground truth. Their providers are different ways
+of observing simulator state, rather than perception pipelines.
 
-An observation provider defines the source and type of raw evidence. Here it is
-a ROS 2 topic carrying `vision_msgs/msg/Detection3DArray`. The message is
-published directly from the MuJoCo simulation state, so it represents simulated
-ground truth rather than the output of a perception system.
-
-~~~diff
-+++ pick_place.bddx
-@@
- bhv impl (ns=tutorial_exec) pick-place-server {
-     bhv action: "/bdd/pickplace_bhv_server"
- }
-+
-+obs provider (ns=tutorial_exec) ground-truth {
-+    ros topic: "/sim/ground_truth/recognized_objects"
-+    type: "vision_msgs/msg/Detection3DArray"
-+}
- Scenario Exec (ns=tutorial_exec) mujoco-pick-place {
-~~~
-
-### Map provider messages to observations
-
-An observation gives provider data meaning in the scenario. The two
-observations below map detections to the entities bound to `target-object` and
-`pick-workspace`. `map_detection3d_array_by_uri` matches each detection ID to
-the corresponding scene-entity URI. `header_stamp` reads the standard ROS
-message-header timestamp and falls back to the message receipt time when the
-header stamp is zero.
-
-~~~diff
-+++ pick_place.bddx
-@@
- obs provider (ns=tutorial_exec) ground-truth {
-     ros topic: "/sim/ground_truth/recognized_objects"
-     type: "vision_msgs/msg/Detection3DArray"
- }
-+
-+observation (ns=tutorial_exec) object-pose {
-+    provider: <ground-truth> observes var <pick-place-template.target-object>
-+    time extractor: py { module: bdd_exec_ros2.observation, attr: header_stamp }
-+    entity mapper: py {
-+        module: bdd_exec_ros2.observation,
-+        attr: map_detection3d_array_by_uri
-+    }
-+}
-+observation (ns=tutorial_exec) pick-workspace-pose {
-+    provider: <ground-truth> observes var <pick-place-template.pick-workspace>
-+    time extractor: py { module: bdd_exec_ros2.observation, attr: header_stamp }
-+    entity mapper: py {
-+        module: bdd_exec_ros2.observation,
-+        attr: map_detection3d_array_by_uri
-+    }
-+}
- Scenario Exec (ns=tutorial_exec) mujoco-pick-place {
-~~~
-
-### Evaluate the fluent with a policy
-
-The policy connects these observations to the `object-at-pick` fluent and
-selects the built-in
-[linear-distance evaluator](https://github.com/minhnh/bdd-dsl/blob/-/src/bdd_dsl/models/observation.py#L277).
-The evaluator retains the latest sample for each observation and evaluates
-them together only when their timestamps differ by no more than 0.1 seconds.
-A synchronized pair less than 30 cm apart produces **True**;
-a pair at or beyond the threshold produces **False**.
-Missing evidence produces **Unknown**, while a time-mismatched pair
-does not add a verdict and waits for compatible evidence.
-If no usable verdict is available when the fluent is evaluated, its result is therefore **Unknown**.
-The two-second horizon limits evidence for this `before` clause to
-the interval immediately preceding `E_PICK_START`.
-
-Finally, select the policy in `Scenario Exec`:
-
-~~~diff
-+++ pick_place.bddx
-@@
- observation (ns=tutorial_exec) pick-workspace-pose {
-     provider: <ground-truth> observes var <pick-place-template.pick-workspace>
-     time extractor: py { module: bdd_exec_ros2.observation, attr: header_stamp }
-     entity mapper: py {
-         module: bdd_exec_ros2.observation,
-         attr: map_detection3d_array_by_uri
-     }
- }
-+
-+obs policy (ns=tutorial_exec) object-at-pick-policy
-+    for <pick-place-template.object-at-pick>
-+    horizon: 2.0 seconds
-+{
-+    observations: { <object-pose>, <pick-workspace-pose> }
-+    evaluator: linear distance {
-+        less-than: 0.3 m
-+        max time offset: 0.1 s
-+    }
-+}
- Scenario Exec (ns=tutorial_exec) mujoco-pick-place {
-@@
--    policies: { }
-+    policies: {
-+        <object-at-pick-policy>
-+    }
- }
-~~~
-
-## 4. Add policies for the remaining clauses
-
-The remaining clauses reuse the ground-truth provider and object observation.
-Add observations for the place workspace and end effector, add their policies,
-then select both policies in the scenario execution.
-
-The policies demonstrate the two different evaluators:
-
-- The built-in `linear distance` is supported in RobBDD textx grammar;
-  its thresholds and synchronization tolerance are declared in the BDDX model.
-  This is meant for evaluation of common point-to-point proximity.
-- `cube_inside_bin` is a configured `PlanarContainmentEvaluator`: it transforms
-  the cube center into the bin frame and checks the bin's XY bounds.
-
-The configured instance belongs to the tutorial package rather than to
-`bdd-dsl`, because its entity URIs and dimensions are model-specific:
-
-~~~python
-cube_inside_bin = PlanarContainmentEvaluator(
-    URIRef("https://secorolab.github.io/models/environments/pick-place-single/cube"),
-    URIRef("https://secorolab.github.io/models/environments/pick-place-single/bin-ws"),
-    boundary_size_xy=(0.23, 0.19),
-    margin_m=0.02,
-)
-~~~
-
-The corresponding BDDX additions are:
-
-~~~diff
-+++ pick_place.bddx
-@@
- observation (ns=tutorial_exec) pick-workspace-pose {
-     provider: <ground-truth> observes var <pick-place-template.pick-workspace>
-     time extractor: py { module: bdd_exec_ros2.observation, attr: header_stamp }
-     entity mapper: py {
-         module: bdd_exec_ros2.observation,
-         attr: map_detection3d_array_by_uri
-     }
- }
-+observation (ns=tutorial_exec) place-workspace-pose {
-+    provider: <ground-truth> observes var <pick-place-template.place-workspace>
-+    time extractor: py { module: bdd_exec_ros2.observation, attr: header_stamp }
-+    entity mapper: py {
-+        module: bdd_exec_ros2.observation,
-+        attr: map_detection3d_array_by_uri
-+    }
-+}
-+observation (ns=tutorial_exec) end-effector-pose {
-+    provider: <ground-truth> observes var <pick-place-template.robot>
-+    time extractor: py { module: bdd_exec_ros2.observation, attr: header_stamp }
-+    entity mapper: py {
-+        module: bdd_exec_ros2.observation,
-+        attr: map_detection3d_array_by_uri
-+    }
-+}
-@@
- obs policy (ns=tutorial_exec) object-at-pick-policy
-     for <pick-place-template.object-at-pick>
-     horizon: 2.0 seconds
- {
-     observations: { <object-pose>, <pick-workspace-pose> }
-     evaluator: linear distance {
-         less-than: 0.3 m
-         max time offset: 0.1 s
-     }
- }
-+obs policy (ns=tutorial_exec) object-not-dropped-policy
-+    for <pick-place-template.object-held>
-+{
-+    observations: { <object-pose>, <end-effector-pose> }
-+    evaluator: linear distance { less-than: 0.12 m max time offset: 0.1 s }
-+}
-+obs policy (ns=tutorial_exec) object-at-place-policy
-+    for <pick-place-template.object-at-place>
-+    horizon: 2.0 seconds
-+{
-+    observations: { <object-pose>, <place-workspace-pose> }
-+    evaluator: py {
-+        module: robbdd_tutorials.observation_evaluators,
-+        attr: cube_inside_bin
-+    }
-+}
-@@
-     policies: {
--        <object-at-pick-policy>
-+        <object-at-pick-policy>,
-+        <object-not-dropped-policy>,
-+        <object-at-place-policy>
-     }
- }
-~~~
-
-## 5. MuJoCo execution with motion-spec
-
-### Concrete models and assets
-
-The MuJoCo-specific resources live under
-`models/pick_place/mujoco_motion_spec` in the `robbdd_tutorials` package. The
-table MJCF is copied from `bdd_collab_bhv_cpp` and represents the smaller table
-used in the physical lab. Additional can, cereal-box, and bottle assets are
-copied from the
-[robosuite object collection](https://github.com/ARISE-Initiative/robosuite/tree/master/robosuite/models/assets/objects).
-The current executable variant still selects only the cube. The `Scenario Exec`
-built above binds that variant to the MuJoCo SceneX instance.
-
-Only `pick_place.bdd` and `pick_place.bddx` belong in the executable graph
-manifest. Do not add `sorting.bdd` while quantified execution is unfinished.
-
-### Integrate the system under test
-
-The motion-spec/MuJoCo process owns the controller and simulator. Its ROS
-integration must provide:
-
-- a `bdd_ros2_interfaces/action/Behaviour` server at
-  `/bdd/pickplace_bhv_server`;
-- behavior-boundary events on `/bdd/events` for `E_PICK_START`, `E_PICK_END`,
-  `E_PLACE_START`, and `E_PLACE_END`;
-- one `vision_msgs/msg/Detection3DArray` on
-  `/sim/ground_truth/recognized_objects` containing URI-keyed poses for the
-  object, pick workspace, place workspace, and robot end effector.
-
-The motion-spec model publishes those poses directly from its MuJoCo state:
+## Interpret event windows and results
 
 ~~~text
-publish at 20.0 Hz to <ros.publishers.scene-poses> with {
-    <pickplace_objects.cube>: <shared.world.pose-cube-base>,
-    <pickplace_workspaces.table-ws>: <shared.world.pose-table-base>,
-    <pickplace_workspaces.bin-ws>: <shared.world.pose-bin-base>,
-    <pickplace_agents.arm1>: <shared.world.pose-ee-base>,
-}
+E_PICK_START -> E_PICK_END -> E_PLACE_START -> E_PLACE_END
 ~~~
 
-The process starts the simulator and waits for a behavior goal. The BDD
-coordinator sends that goal; the motion-spec controller should not be embedded
-in the coordinator launch file.
+- **Before pick:** a two-second horizon selects evidence immediately preceding
+  `E_PICK_START`. It is a lookback window, not a required two-second sleep.
+- **During transport:** the held policy evaluates between pick completion and
+  the start of placing.
+- **After place:** the coordinator collects the two-second at-place window after
+  `E_PLACE_END`, including evidence after the Behaviour result arrives.
 
-The tutorial motion-spec model implements this action server, publishes the
-boundary events, and maps its live scene poses into the observation message.
-The commands below therefore run the complete MuJoCo execution path.
+For a passing test, expect a successful Behaviour result and `TRUE` for all
+three policies. An action success alone is insufficient; inspect the policy
+verdicts and reasons when analyzing `/bdd/status` or the web visualizer.
 
-### Run and visualize one pick-place test
+## Continue with a backend
 
-Build and source the workspace first. Keep the long-lived processes separate
-so restarting a test does not restart the web UI or simulator.
+The integration guides explain the concrete models and evidence wiring. The
+package README maintains setup, launch, configuration, and debugging commands.
 
-Terminal 1 — start the web visualizer once, then open
-<http://127.0.0.1:8080>:
-
-~~~bash
-ros2 run bdd_exec_ros2 web_visualizer --ros-args -p use_sim_time:=true
-~~~
-
-Terminal 2 — start MuJoCo and leave it waiting for the behavior goal:
-
-~~~bash
-motion-spec run \
-  "$(ros2 pkg prefix --share robbdd_tutorials)/models/pick_place/mujoco_motion_spec/pick_place_single.robmot" \
-  --headless
-~~~
-
-Terminal 3 — start only the BDD coordinator:
-
-~~~bash
-ros2 launch robbdd_tutorials pick_place_coordinator.launch.yaml
-~~~
-
-Terminal 4 — trigger one execution:
-
-~~~bash
-ros2 topic pub --once /bdd/start std_msgs/msg/Empty '{}'
-~~~
-
-The coordinator selects `nominal-pick-place`, sends one behavior goal, gathers
-the configured evidence, and publishes scenario status for the web visualizer.
-
-### Validate the execution model
-
-From the MuJoCo model directory:
-
-~~~bash
-textx check pick_place_single.scenex
-textx check pick_place_single.fsm
-textx check pick_place_single.robmot
-textx check pick_place.bddx
-~~~
-
-Each command must report **OK**.
-
-## 6. Isaac Sim execution with MoveIt and a behavior tree
-
-The Isaac Sim backend will use separate concrete models rather than reuse the
-MuJoCo resources. Its SceneX model can map the shared scene entities to Isaac
-Sim USD assets, such as YCB objects and KLT bins, while MoveIt and a behavior
-tree implement the pick-and-place behavior.
-
-This backend should keep its SceneX and BDDX files in a separate model
-directory while importing the same common `.scene` and `.bdd` files. The
-`bdd_bt_executor_ros2` integration is still work in progress, so execution
-commands will be added once its behavior action server, boundary events, and
-observation providers are available.
+- [MuJoCo integration](at-tutorial-execution-mujoco.md): build a topic-based
+  provider-observation-policy chain step by step.
+- [Isaac Sim / MoveIt integration](at-tutorial-execution-isaac.md): connect the
+  Panda behavior tree, simulation poses, and TF observations.
+- [Tutorial 3: Set Quantifiers and Sorting](at-tutorial-sorting.md): extend the
+  specification without adding it to the executable graph manifest.
