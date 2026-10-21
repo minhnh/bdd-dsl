@@ -35,8 +35,8 @@ This library is one of the tools developed for the
 The [`robbdd_tutorials` package](https://github.com/minhnh/robbdd_tutorials)
 provides two example ROS-based execution setups for acceptance testing:
 
-- [MuJoCo with motion-spec and an FSM](docs/at-tutorial-execution-mujoco.md).
-- [Isaac Sim with MoveIt and a behavior tree](docs/at-tutorial-execution-isaac.md).
+- [MuJoCo with motion-spec and an FSM](at-tutorial-execution-mujoco.md).
+- [Isaac Sim with MoveIt and a behavior tree](at-tutorial-execution-isaac.md).
 
 ### DEPRECATED: Gherkin generation & mockup execution with `behave`
 
