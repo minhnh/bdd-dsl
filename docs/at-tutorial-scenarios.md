@@ -23,7 +23,7 @@ connects the models to a concrete system under test, and executes the test.
 **Test Analysis** can then refine the requirements, criteria, observations, or implementation instead of
 treating a test verdict as the end of the process.
 
-## 1. Requirements Elicitation
+## Requirements Elicitation
 
 We start with a typical robotic object-transport task. Its textual requirement might be:
 
@@ -46,7 +46,7 @@ across relevant variations of the setup. Typical object-transport variations inc
   bin back to the table; and
 - different manipulators.
 
-## 2. Scenario Specification with RobBDD
+## Scenario Specification with RobBDD
 
 Now translate the textual requirements into a RobBDD scenario template.
 
@@ -149,7 +149,7 @@ E_PICK_START -> E_PICK_END -> E_PLACE_START -> E_PLACE_END
 See the
 [complete BDD model](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/common/pick_place.bdd).
 
-## 3. Describe the scene
+## Describe the scene
 
 The scene defines the abstract entities that variations may bind, independent of an execution context,
 e.g. in simulation or on a physical robot. Consider a scenario where the robot should pick up household objects,
@@ -227,7 +227,7 @@ cracker-box asset in Isaac.
 See the
 [complete Scene model](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/common/pick_place_single.scene).
 
-## 4. Bind a scenario variant
+## Bind a scenario variant
 
 A table variation binds each template variable to an object, workspace, or
 agent. This example is the Panda variant from the Isaac-specific scenario:

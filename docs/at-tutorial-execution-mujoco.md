@@ -1,24 +1,67 @@
 # Acceptance Testing: MuJoCo Integration
 
-This guide realizes the shared contract from
-[Tutorial 2](at-tutorial-execution.md) with motion-spec and MuJoCo. For installation,
-launch commands, and result inspection, follow the package's
+This guide realizes the behavior implementation, evidence sources, and evaluation policies
+described in [Tutorial 2](at-tutorial-execution.md) for a Kinova manipulator running with
+[motion-spec](https://secoro.uni-bremen.de/motion-spec/) and an
+[FSM](https://secoro.uni-bremen.de/coord-dsl/) in MuJoCo.
+For installation, launch commands, and result inspection, follow the `robbdd_tutorials` package's
 [MuJoCo run instructions](https://github.com/minhnh/robbdd_tutorials#run-the-mujoco-acceptance-test).
 
-The complete backend models live in
-[models/pick_place/mujoco_motion_spec](https://github.com/minhnh/robbdd_tutorials/tree/main/models/pick_place/mujoco_motion_spec).
+All models used in this setup are under
+[`models/pick_place/mujoco_motion_spec`](https://github.com/minhnh/robbdd_tutorials/tree/-/models/pick_place/mujoco_motion_spec).
 They bind the cube variant to Kinova, with Robotiq as a separately controlled
 agent in the MuJoCo scene. The shared objects and workspaces retain their URIs.
 
-## 1. Bind the behavior and scenario execution
+## Contents
 
-The minimal BDDX model below uses `Scenario Exec` to bind a scenario variant,
-defined in the local `pick_place.bdd`, to a behavior implementation and a
-concrete scene instance. It can also select observation policies for evaluating
-the variant's fluent clauses. ROS 2 execution of BDDX models is currently
-provided by [`bdd_exec_ros2`](https://github.com/minhnh/bdd_exec_ros2), which
-supports behaviors exposed as a
-[ROS 2 action server](https://github.com/minhnh/bdd_ros2_interfaces/blob/main/action/Behaviour.action).
+<!-- mtoc-start -->
+
+1. [Instantiate the scene](#instantiate-the-scene)
+1. [Bind the behavior and scenario execution](#bind-the-behavior-and-scenario-execution)
+1. [Add the first provider-observation-policy chain](#add-the-first-provider-observation-policy-chain)
+    1. [Declare the provider](#declare-the-provider)
+    1. [Map provider messages to observations](#map-provider-messages-to-observations)
+    1. [Evaluate the fluent with a policy](#evaluate-the-fluent-with-a-policy)
+1. [Add policies for the remaining clauses](#add-policies-for-the-remaining-clauses)
+1. [Connect the runtime](#connect-the-runtime)
+1. [Validate the models](#validate-the-models)
+
+<!-- mtoc-end -->
+
+## Instantiate the scene
+
+`pick_place_single.scenex` declares the concrete instance `pick_place_scene_mjc`
+of `pick_place_mujoco_scene`. It connects the abstract scene elements to MJCF
+models and places them through a kinematic graph with sampled object positions.
+
+For example, this declaration inside the scene instance associates the abstract
+cube with its asset and maps the kinematic body to the model's MuJoCo body name:
+
+~~~text
+obj <pickplace_objects.cube> {
+    model cube-mjc as mjcf { sys path = 'src/mj_kdl_wrapper/assets/cube.xml'
+        map body <pick_place_graph.cube> to "cube"
+    }
+}
+~~~
+
+Other declarations link the table, bin, can, cereal box, and bottle to their
+assets. Agent declarations similarly associate Kinova and Robotiq with their
+robot models and kinematic trees. The executable variant selects the cube;
+the remaining objects provide scene context.
+
+See the [complete SceneX instance](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/mujoco_motion_spec/pick_place_single.scenex).
+The BDDX model imports this file. In the next section,
+`Scenario Exec` selects the concrete instance with `scene inst: <pick_place_scene_mjc>`.
+
+## Bind the behavior and scenario execution
+
+The minimal BDDX model below uses `Scenario Exec` to bind a scenario variant, defined in the
+local `pick_place.bdd`, to a behavior implementation and a concrete scene instance.
+It can also select observation policies for evaluating the variant's fluent clauses.
+ROS 2 execution of BDDX models is currently provided by [`bdd_exec_ros2`](https://github.com/minhnh/bdd_exec_ros2),
+which supports behaviors exposed as a
+[ROS 2 action server](https://github.com/minhnh/bdd_ros2_interfaces/blob/-/action/Behaviour.action).
 
 ~~~text
 import "pick_place.bdd"
@@ -39,10 +82,9 @@ Scenario Exec (ns=tutorial_exec) mujoco-pick-place {
 }
 ~~~
 
-## 2. Add the first provider-observation-policy chain
+## Add the first provider-observation-policy chain
 
-Begin with the `object-at-pick` fluent and build its evidence path one part at a
-time.
+Begin with the `object-at-pick` fluent and build its evidence path one part at a time.
 
 ### Declare the provider
 
@@ -103,9 +145,8 @@ header stamp is zero.
 
 ### Evaluate the fluent with a policy
 
-The policy connects these observations to the `object-at-pick` fluent and
-selects the built-in
-[linear-distance evaluator](https://github.com/minhnh/bdd-dsl/blob/main/src/bdd_dsl/models/observation.py).
+The policy connects these observations to the `object-at-pick` fluent and selects the built-in
+[linear-distance evaluator](https://github.com/minhnh/bdd-dsl/blob/-/src/bdd_dsl/models/observation.py).
 The evaluator retains the latest sample for each observation and evaluates
 them together only when their timestamps differ by no more than 0.1 seconds.
 A synchronized pair less than 30 cm apart produces **True**;
@@ -149,7 +190,7 @@ Finally, select the policy in `Scenario Exec`:
  }
 ~~~
 
-## 3. Add policies for the remaining clauses
+## Add policies for the remaining clauses
 
 The remaining clauses reuse the ground-truth provider and object observation.
 Add observations for the place workspace and end effector, add their policies,
@@ -241,7 +282,7 @@ The corresponding BDDX additions are:
  }
 ~~~
 
-## 4. Connect the runtime
+## Connect the runtime
 
 The motion-spec process owns the controller and simulator. Its ROS integration provides:
 
@@ -267,14 +308,10 @@ ROS event and observation timestamps. The coordinator and visualizer use
 `use_sim_time=true`. `--rtf 1` selects real-time playback; other speeds retain
 the same simulation-time basis for evaluation.
 
-The [graph manifest](https://github.com/minhnh/robbdd_tutorials/blob/main/models/pick_place/mujoco_motion_spec/graph-models.yaml)
+The [graph manifest](https://github.com/minhnh/robbdd_tutorials/blob/-/models/pick_place/mujoco_motion_spec/graph-models.yaml)
 loads three models: the common `pick_place.bdd` template, the local
 `pick_place.bdd` story, and the local `pick_place.bddx` execution binding.
 Sorting remains outside this executable manifest.
-
-The SceneX model maps the common environment to MuJoCo assets, including the
-lab table and robosuite can, cereal box, and bottle. The executable variant
-selects the cube; the other objects provide scene context.
 
 ## Validate the models
 

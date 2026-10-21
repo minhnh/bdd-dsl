@@ -57,7 +57,7 @@ and BDDX execution model to load.
 | Acting robot | `mujoco_agents.kinova` | `panda_agents.panda` |
 | Gripper | Separate Robotiq agent | Part of the Panda agent |
 | Concrete assets | MJCF models | USD models |
-| Behavior action | `/bdd/pickplace_bhv_server` | `/bdd/prepare` |
+| Behavior action | `/bdd/pickplace_bhv_server` | `/bdd/pick_place` |
 | Object/workspace evidence | URI-keyed detection topic | Simulation entity states and tabletop TF |
 | End-effector evidence | Same detection topic | `panda_hand` TF |
 | Timing | Simulation `/clock` | Simulation `/clock` |
