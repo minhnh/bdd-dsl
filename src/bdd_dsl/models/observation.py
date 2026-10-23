@@ -212,29 +212,38 @@ class ObservationModel(ModelBase):
 
 
 class ObservationPolicyEvaluator(ABC):
-    """Base evaluator with a result for an empty observation set."""
+    """Return fresh details per evaluation; consumers treat all nested values as read-only.
+
+    Empty-input defaults may be shared. Evaluation leaves details untouched; implementations
+    must not mutate details after returning them. Consumers default an absent reason to "".
+    """
 
     def __init__(
         self,
-        default_result: tuple[bool | Trinary | None, str] = (
+        default_result: tuple[bool | Trinary | None, Mapping[str, Any]] = (
             Unknown,
-            "no observations",
+            {"reason": "no observations"},
         ),
     ) -> None:
         self.default_result = default_result
 
-    def evaluate(self, observations: list[ObservationStamped]) -> tuple[bool | Trinary | None, str]:
-        if not observations:
-            return self.default_result
-        result = self._evaluate_samples(observations)
-        if not isinstance(result, tuple) or len(result) != 2 or not isinstance(result[1], str):
-            raise TypeError("observation evaluator must return (trinary, reason)")
-        return result
+    def evaluate(
+        self, observations: list[ObservationStamped]
+    ) -> tuple[bool | Trinary | None, Mapping[str, Any]]:
+        result = self.default_result if not observations else self._evaluate_samples(observations)
+        if not isinstance(result, tuple) or len(result) != 2:
+            raise TypeError("observation evaluator must return (trinary, details)")
+        trinary, details = result
+        if not isinstance(details, Mapping) or not all(isinstance(key, str) for key in details):
+            raise TypeError("observation evaluator details must be a string-keyed mapping")
+        if not isinstance(details.get("reason", ""), str):
+            raise TypeError("observation evaluator details reason must be a string")
+        return trinary, details
 
     @abstractmethod
     def _evaluate_samples(
         self, observations: list[ObservationStamped]
-    ) -> tuple[bool | Trinary | None, str]: ...
+    ) -> tuple[bool | Trinary | None, Mapping[str, Any]]: ...
 
 
 def _distance_value(graph: Graph, constraint: URIRef, predicate: URIRef) -> float:
@@ -297,7 +306,7 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
             self,
             (
                 Unknown if report_missing else None,
-                "linear distance expected 2 inputs, received 0",
+                {"reason": "linear distance expected 2 inputs, received 0"},
             ),
         )
         if URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR not in self.types:
@@ -371,7 +380,7 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
 
     def _evaluate_samples(
         self, observations: list[ObservationStamped]
-    ) -> tuple[bool | Trinary | None, str]:
+    ) -> tuple[bool | Trinary | None, dict[str, Any]]:
         time_offset = None
         if self.max_time_offset is not None:
             for observation in observations:
@@ -385,17 +394,22 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
                 time_offset = max(observation.stamp for observation in observations) - min(
                     observation.stamp for observation in observations
                 )
-            if time_offset is not None and time_offset > self.max_time_offset:
-                return (
-                    Unknown if self.report_mismatched_time else None,
-                    f"linear distance input time offset {time_offset:g} s is more than {self.max_time_offset:g} s",
+
+        details: dict[str, Any] = {
+            "observation_uris": [str(sample.observation_uri) for sample in observations],
+            "sample_stamps": [sample.stamp for sample in observations],
+        }
+        if time_offset is not None:
+            details["input_time_offset_s"] = time_offset
+            if time_offset > self.max_time_offset:
+                details["reason"] = (
+                    f"linear distance input time offset {time_offset:g} s is more than {self.max_time_offset:g} s"
                 )
+                return Unknown if self.report_mismatched_time else None, details
 
         if len(observations) != 2:
-            return (
-                Unknown if self.report_missing or len(observations) > 2 else None,
-                f"linear distance expected 2 inputs, received {len(observations)}",
-            )
+            details["reason"] = f"linear distance expected 2 inputs, received {len(observations)}"
+            return Unknown if self.report_missing or len(observations) > 2 else None, details
         positions = []
         for i in range(2):
             position_obs = observations[i].value
@@ -433,7 +447,10 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
         reason = f"linear distance {measured:g} m {comparison} {expectation}"
         if time_offset is not None:
             reason += f"; input time offset {time_offset:g} s"
-        return result, reason
+        details["reason"] = reason
+        details["measured_distance_m"] = measured
+        details["positions_m"] = [list(position) for position in positions]
+        return result, details
 
 
 @dataclass(frozen=True, slots=True)
@@ -702,9 +719,9 @@ class ObsPolicyModel(ModelBase):
             accepted, reason = self._check_time_constraint(sample.stamp)
             if not accepted:
                 return accepted, reason
-        trinary, reason = self.evaluator.evaluate(samples)
+        trinary, details = self.evaluator.evaluate(samples)
         if trinary is None:
-            return True, reason
+            return True, details.get("reason", "")
         return self.add_trinary(
             TrinaryStamped(
                 stamp=(
@@ -713,7 +730,7 @@ class ObsPolicyModel(ModelBase):
                     else max(sample.stamp for sample in samples)
                 ),
                 trinary=trinary,
-                reason=reason,
+                reason=details.get("reason", ""),
             )
         )
 
@@ -730,7 +747,8 @@ class ObsPolicyModel(ModelBase):
         elif self.evaluator is None:
             trinary, reason = Unknown, "no evaluator"
         else:
-            trinary, reason = self.evaluator.evaluate([])
+            trinary, details = self.evaluator.evaluate([])
+            reason = details.get("reason", "")
             trinary = Unknown if trinary is None else trinary
         return TrinaryStamped(stamp=stamp, trinary=trinary, reason=reason)
 

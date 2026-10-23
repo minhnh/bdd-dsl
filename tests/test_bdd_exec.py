@@ -1,9 +1,10 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import unittest
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 from unittest.mock import patch
 from urllib.request import HTTPError
 
+import pytest
 from rdf_utils.constraints import check_shacl_constraints
 from rdf_utils.models.common import ModelBase
 from rdf_utils.models.python import (
@@ -136,13 +137,38 @@ def test_pending_end_deadline_waits_for_every_horizon_and_scenario_end():
 def test_default_observation_evaluator_handles_empty_and_non_empty_samples():
     class Evaluator(ObservationPolicyEvaluator):
         def _evaluate_samples(self, observations):
-            return False, f"{len(observations)} samples"
+            return False, {"reason": f"{len(observations)} samples"}
 
-    evaluator = Evaluator((True, "no collision recorded"))
-    assert evaluator.evaluate([]) == (True, "no collision recorded")
+    evaluator = Evaluator((True, {"reason": "no collision recorded"}))
+    assert evaluator.evaluate([]) == (True, {"reason": "no collision recorded"})
     assert evaluator.evaluate(
         [ObservationStamped(URIRef("urn:test:obs"), URIRef("urn:test:provider"), 1.0, True)]
-    ) == (False, "1 samples")
+    ) == (False, {"reason": "1 samples"})
+
+
+def test_evaluator_details_optional_reason_and_mapping_validation():
+    class Evaluator(ObservationPolicyEvaluator):
+        def __init__(self, details):
+            super().__init__()
+            self.details = details
+
+        def _evaluate_samples(self, observations):
+            return True, self.details
+
+    sample = ObservationStamped(URIRef("urn:test:obs"), URIRef("urn:test:provider"), 1.0, True)
+    details = {"measurement": 3}
+    result, returned_details = Evaluator(details).evaluate([sample])
+    assert result is True
+    assert returned_details is details
+    assert details == {"measurement": 3}
+    readonly_details = MappingProxyType(details)
+    assert Evaluator(readonly_details).evaluate([sample])[1] is readonly_details
+    assert readonly_details.get("reason", "") == ""
+    value = object()
+    assert Evaluator({"value": value}).evaluate([sample])[1]["value"] is value
+    for invalid in ("legacy reason", {1: "non-string key"}, {"reason": 1}):
+        with pytest.raises(TypeError, match="details"):
+            Evaluator(invalid).evaluate([sample])
 
 
 def test_policy_rejects_out_of_interval_samples_before_evaluation():
@@ -170,7 +196,7 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
     class StatefulEvaluator(ObservationPolicyEvaluator):
         def _evaluate_samples(self, observations):
             calls.append(observations)
-            return True, "evaluated"
+            return True, {"reason": "evaluated"}
 
     policy.evaluator = StatefulEvaluator()
     current = [
@@ -254,9 +280,9 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
 
     class Evaluator(ObservationPolicyEvaluator):
         def _evaluate_samples(self, observations):
-            return observations[0].value, "observation value"
+            return observations[0].value, {"reason": "observation value"}
 
-    policy.evaluator = Evaluator((True, "no collision recorded"))
+    policy.evaluator = Evaluator((True, {"reason": "no collision recorded"}))
     assert policy.get_result(1.0, trin_policy_and).trinary is True
 
     accepted, reason = policy.add_samples(
@@ -264,11 +290,11 @@ def test_policy_result_uses_default_until_an_accepted_sample_exists():
     )
     assert accepted and reason == "observation value"
     assert policy.trinary_timeline == []
-    policy.evaluator.default_result = (None, "waiting for evaluator")
+    policy.evaluator.default_result = (None, {"reason": "waiting for evaluator"})
     result = policy.get_result(1.5, trin_policy_and)
     assert result.trinary is Unknown
     assert result.reason == "waiting for evaluator"
-    policy.evaluator.default_result = (True, "no collision recorded")
+    policy.evaluator.default_result = (True, {"reason": "no collision recorded"})
 
     accepted, _ = policy.add_samples(
         [ObservationStamped(observation_uri, provider_uri, 2.0, False)]
@@ -287,7 +313,7 @@ def test_linear_distance_can_suppress_missing_observations():
     evaluator = LinearDistanceEvaluator.__new__(LinearDistanceEvaluator)
     ObservationPolicyEvaluator.__init__(
         evaluator,
-        (Unknown, "linear distance expected 2 inputs, received 0"),
+        (Unknown, {"reason": "linear distance expected 2 inputs, received 0"}),
     )
     evaluator.max_time_offset = None
     evaluator.report_missing = True
@@ -304,10 +330,10 @@ def test_linear_distance_can_suppress_missing_observations():
         result, reason = evaluator.evaluate(observations)
 
         assert result is Unknown
-        assert reason == f"linear distance expected 2 inputs, received {count}"
+        assert reason["reason"] == f"linear distance expected 2 inputs, received {count}"
 
     evaluator.report_missing = False
-    evaluator.default_result = (None, "linear distance expected 2 inputs, received 0")
+    evaluator.default_result = (None, {"reason": "linear distance expected 2 inputs, received 0"})
     for count in (0, 1):
         observations = [
             ObservationStamped(
@@ -321,7 +347,7 @@ def test_linear_distance_can_suppress_missing_observations():
         result, reason = evaluator.evaluate(observations)
 
         assert result is None
-        assert reason == f"linear distance expected 2 inputs, received {count}"
+        assert reason["reason"] == f"linear distance expected 2 inputs, received {count}"
 
 
 def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
@@ -334,6 +360,7 @@ def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
     evaluator.observation_uris = frozenset((first_uri, second_uri))
     evaluator._latest_samples = {}
     evaluator.position_extractor = lambda value: value
+    evaluator.constraint_id = URIRef("urn:test:constraint")
     evaluator.constraint_types = {URI_CSTR_TYPE_LESS_THAN}
     evaluator.constraint_values = (0.12,)
 
@@ -346,29 +373,30 @@ def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
         [ObservationStamped(second_uri, provider_uri, 1.01, (0.06, 0.0, 0.0))]
     )
     assert result is True
-    assert "0.06 m" in reason
-    assert "input time offset 0.01 s" in reason
+    assert "0.06 m" in reason["reason"]
+    assert "input time offset 0.01 s" in reason["reason"]
+    assert reason["measured_distance_m"] == 0.06
 
     result, reason = evaluator.evaluate(
         [ObservationStamped(second_uri, provider_uri, 1.08, (0.17, 0.0, 0.0))]
     )
     assert result is False
-    assert "0.17 m" in reason
-    assert "input time offset 0.08 s" in reason
+    assert "0.17 m" in reason["reason"]
+    assert "input time offset 0.08 s" in reason["reason"]
 
     result, reason = evaluator.evaluate(
         [ObservationStamped(second_uri, provider_uri, 1.11, (0.17, 0.0, 0.0))]
     )
     assert result is None
-    assert "input time offset 0.11 s" in reason
-    assert "more than 0.1 s" in reason
+    assert "input time offset 0.11 s" in reason["reason"]
+    assert "more than 0.1 s" in reason["reason"]
 
     evaluator.report_mismatched_time = True
     result, reason = evaluator.evaluate(
         [ObservationStamped(second_uri, provider_uri, 1.11, (0.17, 0.0, 0.0))]
     )
     assert result is Unknown
-    assert "more than 0.1 s" in reason
+    assert "more than 0.1 s" in reason["reason"]
 
 
 def test_provider_snapshot_evaluates_only_current_mapped_observations():
@@ -486,7 +514,7 @@ def test_before_policy_closes_on_the_final_event_relative_window():
 
     class Evaluator(ObservationPolicyEvaluator):
         def _evaluate_samples(self, observations):
-            return observations[0].value, "observation value"
+            return observations[0].value, {"reason": "observation value"}
 
     policy.evaluator = Evaluator()
     assert policy.add_samples([ObservationStamped(observation_uri, provider_uri, 9.0, False)])[0]
@@ -560,7 +588,7 @@ def add_before_policy_time(graph, policy_uri, end_uri):
 
 class FixtureEvaluator(ObservationPolicyEvaluator):
     def _evaluate_samples(self, observations):
-        return bool(observations), "fixture"
+        return bool(observations), {"reason": "fixture"}
 
 
 def fixture_timestamp(_, receipt_stamp):
@@ -652,8 +680,8 @@ class BDDExecTest(unittest.TestCase):
         )
 
         class TruthEvaluator(ObservationPolicyEvaluator):
-            def _evaluate_samples(self, observations: list[ObservationStamped]) -> tuple[bool, str]:
-                return bool(observations), "sample exists"
+            def _evaluate_samples(self, observations: list[ObservationStamped]):
+                return bool(observations), {"reason": "sample exists"}
 
         manager = ObservationManager(
             scr_exec=SimpleNamespace(
@@ -745,7 +773,7 @@ class BDDExecTest(unittest.TestCase):
         class BatchEvaluator(ObservationPolicyEvaluator):
             def _evaluate_samples(self, observations):
                 calls.append(observations)
-                return len(observations) == 2, f"received {len(observations)}"
+                return len(observations) == 2, {"reason": f"received {len(observations)}"}
 
         policy.evaluator = BatchEvaluator()
         manager = ObservationManager(scr_exec=SimpleNamespace())
@@ -793,7 +821,7 @@ class BDDExecTest(unittest.TestCase):
 
             def _evaluate_samples(self, observations):
                 self.calls += 1
-                return bool(observations), "stateful sample exists"
+                return bool(observations), {"reason": "stateful sample exists"}
 
         graph = Graph()
         policy_uri = URIRef("urn:test:policy")
