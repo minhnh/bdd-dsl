@@ -245,6 +245,14 @@ class ObservationPolicyEvaluator(ABC):
         self, observations: list[ObservationStamped]
     ) -> tuple[bool | Trinary | None, Mapping[str, Any]]: ...
 
+    def get_config(self) -> Mapping[str, Any]:
+        """Effective settings for recording once; exclude mutable evaluation state.
+
+        Consumers treat the mapping and nested values as read-only. Settings already captured
+        in the model graph need not be repeated here.
+        """
+        return {}
+
 
 def _distance_value(graph: Graph, constraint: URIRef, predicate: URIRef) -> float:
     quantity = graph.value(constraint, predicate, any=False)
