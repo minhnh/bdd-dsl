@@ -3,8 +3,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from inspect import isclass
+from itertools import count
 from math import dist, isclose
 from numbers import Real
 from typing import Any, Protocol
@@ -74,12 +75,33 @@ from bdd_dsl.models.user_story import ScenarioVariantModel
 
 @dataclass(frozen=True, slots=True)
 class ObservationStamped:
-    """A normalized value for one policy-local observation input."""
+    """A normalized input with an integer sample ID allocated on construction.
+
+    The process-local counter provides uniqueness within each scenario context.
+    """
 
     observation_uri: URIRef
     provider_uri: URIRef
     stamp: float
     value: Any
+    # create 0, 1, 2 ... ids per process
+    sample_id: int = field(default_factory=count().__next__)
+
+
+class ProvenanceCallback(Protocol):
+    """Record relevant policy evidence; treat arguments and nested values as read-only.
+
+    Handle recording exceptions and logging inside the callback so provenance errors do not
+    interrupt test execution. Exceptions escaping the callback propagate to the caller.
+    """
+
+    def __call__(
+        self,
+        policy: ObsPolicyModel,
+        stamp: float,
+        trinary: bool | Trinary | None,
+        details: Mapping[str, Any],
+    ) -> None: ...
 
 
 class TimestampedObservationProtocol(Protocol):
@@ -216,6 +238,7 @@ class ObservationPolicyEvaluator(ABC):
 
     Empty-input defaults may be shared. Evaluation leaves details untouched; implementations
     must not mutate details after returning them. Consumers default an absent reason to "".
+    Evaluation details dict returns timestamp, sample ids & URIs of observation samples used.
     """
 
     def __init__(
@@ -404,11 +427,14 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
                 )
 
         details: dict[str, Any] = {
+            "sample_ids": [sample.sample_id for sample in observations],
             "observation_uris": [str(sample.observation_uri) for sample in observations],
             "sample_stamps": [sample.stamp for sample in observations],
         }
         if time_offset is not None:
             details["input_time_offset_s"] = time_offset
+            # From above, time_offset is not None only when max_time_offset is not None
+            assert self.max_time_offset is not None
             if time_offset > self.max_time_offset:
                 details["reason"] = (
                     f"linear distance input time offset {time_offset:g} s is more than {self.max_time_offset:g} s"
@@ -526,6 +552,7 @@ class ObsPolicyModel(ModelBase):
     end_event: URIRef | None
     horizon: float | None
     evaluator_id: URIRef | None
+    prov_cb: ProvenanceCallback | None
 
     def __init__(
         self,
@@ -533,6 +560,7 @@ class ObsPolicyModel(ModelBase):
         graph: Graph,
         fluent_id: URIRef,
         fluent_types: set[URIRef],
+        prov_cb: ProvenanceCallback | None = None,
     ) -> None:
         super().__init__(node_id=node_id, graph=graph)
         if URI_OBS_TYPE_POLICY not in self.types:
@@ -541,6 +569,7 @@ class ObsPolicyModel(ModelBase):
             )
         self.fluent_id = fluent_id
         self.fluent_types = fluent_types
+        self.prov_cb = prov_cb
         process_time_constraint_model(constraint=self, graph=graph)
 
         if URI_TIME_TYPE_DURING in self.types:
@@ -717,28 +746,38 @@ class ObsPolicyModel(ModelBase):
     def add_samples(
         self,
         samples: list[ObservationStamped],
+        *,
         evaluation_stamp: float | None = None,
     ) -> tuple[bool, str]:
+        """Evaluate time-filtered samples and notify the configured provenance callback."""
         if self.evaluator is None:
             return False, "no evaluator"
         if not samples and evaluation_stamp is None:
             return False, "no samples"
+
         for sample in samples:
             accepted, reason = self._check_time_constraint(sample.stamp)
             if not accepted:
                 return accepted, reason
+
         trinary, details = self.evaluator.evaluate(samples)
+        evaluated_at = (
+            evaluation_stamp
+            if evaluation_stamp is not None
+            else max(sample.stamp for sample in samples)
+        )
+        if self.prov_cb is not None:
+            self.prov_cb(self, evaluated_at, trinary, details)
+
+        reason = details.get("reason", "")
         if trinary is None:
-            return True, details.get("reason", "")
+            return True, reason
+
         return self.add_trinary(
             TrinaryStamped(
-                stamp=(
-                    evaluation_stamp
-                    if evaluation_stamp is not None
-                    else max(sample.stamp for sample in samples)
-                ),
+                stamp=evaluated_at,
                 trinary=trinary,
-                reason=details.get("reason", ""),
+                reason=reason,
             )
         )
 
@@ -815,13 +854,12 @@ class ObsPolicyModel(ModelBase):
 
 
 class ObservationManager:
-    """Route each provider snapshot into policy evaluators and fluent timelines.
+    """Normalize provider snapshots and route samples or direct assertions to policy timelines.
 
-    Observation adapters are loaded from observation RDF when building a scenario context. Feed
-    raw provider messages through :meth:`update_provider_observation`; it extracts a
-    timestamp, maps target-specific values, and evaluates each affected policy once.
-    :meth:`update_fpolicy_assertion` remains the compatibility ingress for direct
-    ``TrinaryStamped`` topic policies.
+    Each snapshot evaluates affected policies once. Callers serialize updates and status reads.
+    Configure ``prov_cb`` before registration, which copies it to each policy; later changes to
+    the manager callback do not affect registered policies. See :class:`ProvenanceCallback` for
+    callback ownership and error handling.
     """
 
     scenario_exec: ScenarioExecutionModel
@@ -839,9 +877,16 @@ class ObservationManager:
 
     event_timelines: dict[URIRef, list[float]]
     _fluent_event_registry: dict[URIRef, set[URIRef]]  # fluent ID -> event IDs
+    prov_cb: ProvenanceCallback | None
 
-    def __init__(self, scr_exec: ScenarioExecutionModel) -> None:
+    def __init__(
+        self,
+        scr_exec: ScenarioExecutionModel,
+        *,
+        prov_cb: ProvenanceCallback | None = None,
+    ) -> None:
         self.scenario_exec = scr_exec
+        self.prov_cb = prov_cb
         self.scr_start_time = None
         self.scr_end_time = None
 
@@ -900,6 +945,9 @@ class ObservationManager:
 
             for loader in obs_loaders:
                 loader(graph=graph, model=obs_pol)
+
+            if self.prov_cb is not None:
+                obs_pol.prov_cb = self.prov_cb
 
             self._fluent_policy_registry[fc.id].add(obs_pol.id)
             for obs_uri in obs_pol.observation_uris:
@@ -1020,7 +1068,16 @@ class ObservationManager:
         if policy_uri not in self.obs_policies:
             raise ValueError(f"ObservationPolicy not registered: '{policy_uri}'")
 
-        return self.obs_policies[policy_uri].add_trinary(trin_st)
+        policy = self.obs_policies[policy_uri]
+        result = policy.add_trinary(trin_st)
+        if result[0] and policy.prov_cb is not None:
+            policy.prov_cb(
+                policy,
+                trin_st.stamp,
+                trin_st.trinary,
+                {"reason": trin_st.reason},
+            )
+        return result
 
     def update_observations(
         self,
@@ -1055,9 +1112,9 @@ class ObservationManager:
 
         for policy_uri, policy_observations in obs_by_policy.items():
             policy = self.obs_policies[policy_uri]
+            policy_evaluation_stamp = evaluation_stamp if not policy_observations else None
             results[policy_uri] = policy.add_samples(
-                policy_observations,
-                evaluation_stamp=evaluation_stamp if not policy_observations else None,
+                policy_observations, evaluation_stamp=policy_evaluation_stamp
             )
         return results
 
@@ -1089,6 +1146,8 @@ class ObservationManager:
         scr_var: ScenarioVariantModel,
         bhv_loaders: list[AttrLoaderProtocol],
         obs_loaders: list[AttrLoaderProtocol],
+        *,
+        prov_cb: ProvenanceCallback | None = None,
     ) -> ObservationManager:
         """Build a manager for a scenario variant and register its fluent policies."""
         scr_exec = ScenarioExecutionModel(
@@ -1096,7 +1155,10 @@ class ObservationManager:
             scr_var=scr_var,
             bhv_loaders=bhv_loaders,
         )
-        obs_manager = ObservationManager(scr_exec=scr_exec)
+        obs_manager = ObservationManager(
+            scr_exec=scr_exec,
+            prov_cb=prov_cb,
+        )
         for fc in scr_var.fluent_clauses():
             obs_manager.register_fluent_obs(
                 graph=graph,
