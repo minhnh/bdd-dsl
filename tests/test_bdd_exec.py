@@ -171,6 +171,27 @@ def test_evaluator_details_optional_reason_and_mapping_validation():
             Evaluator(invalid).evaluate([sample])
 
 
+def test_evaluator_details_identify_only_reported_samples():
+    class StatefulEvaluator(ObservationPolicyEvaluator):
+        def __init__(self):
+            super().__init__()
+            self.history = []
+
+        def _evaluate_samples(self, observations):
+            self.history.extend(observations)
+            return True, {"sample_ids": [sample.sample_id for sample in observations]}
+
+    provider_uri = URIRef("urn:test:history-provider")
+    first = ObservationStamped(URIRef("urn:test:first"), provider_uri, 1.0, 1, sample_id=1)
+    second = ObservationStamped(URIRef("urn:test:second"), provider_uri, 2.0, 2, sample_id=2)
+    evaluator = StatefulEvaluator()
+    evaluator.evaluate([first])
+    _, details = evaluator.evaluate([second])
+
+    assert evaluator.history == [first, second]
+    assert details["sample_ids"] == [second.sample_id]
+
+
 def test_policy_rejects_out_of_interval_samples_before_evaluation():
     start = URIRef("urn:test:start")
     end = URIRef("urn:test:end")
@@ -199,6 +220,8 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
             return True, {"reason": "evaluated"}
 
     policy.evaluator = StatefulEvaluator()
+    evaluations = []
+    policy.prov_cb = lambda *args: evaluations.append(args)
     current = [
         ObservationStamped(observation_uri, provider, 2.0, True)
         for observation_uri in observation_uris
@@ -206,6 +229,7 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
 
     assert not policy.add_samples(current)[0]
     assert calls == []
+    assert evaluations == []
 
     policy.on_event(start, 2.0)
     stale_batch = [
@@ -214,9 +238,11 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
     ]
     assert not policy.add_samples(stale_batch)[0]
     assert calls == []
+    assert evaluations == []
 
     assert policy.add_samples(current)[0]
     assert len(calls) == 1
+    assert len(evaluations) == 1
 
     policy.on_event(end, 4.0)
     boundary = [
@@ -225,6 +251,7 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
     ]
     assert policy.add_samples(boundary)[0]
     assert len(calls) == 2
+    assert len(evaluations) == 2
     after = [
         ObservationStamped(observation_uri, provider, 4.1, True)
         for observation_uri in observation_uris
@@ -364,23 +391,28 @@ def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
     evaluator.constraint_types = {URI_CSTR_TYPE_LESS_THAN}
     evaluator.constraint_values = (0.12,)
 
-    result, _ = evaluator.evaluate(
-        [ObservationStamped(first_uri, provider_uri, 1.0, (0.0, 0.0, 0.0))]
-    )
+    first_sample = ObservationStamped(first_uri, provider_uri, 1.0, (0.0, 0.0, 0.0), sample_id=11)
+    result, details = evaluator.evaluate([first_sample])
     assert result is Unknown
+    assert details["sample_ids"] == [first_sample.sample_id]
+    assert details["observation_uris"] == [str(first_uri)]
 
-    result, reason = evaluator.evaluate(
-        [ObservationStamped(second_uri, provider_uri, 1.01, (0.06, 0.0, 0.0))]
+    second_sample = ObservationStamped(
+        second_uri, provider_uri, 1.01, (0.06, 0.0, 0.0), sample_id=12
     )
+    result, reason = evaluator.evaluate([second_sample])
     assert result is True
+    assert reason["sample_ids"] == [first_sample.sample_id, second_sample.sample_id]
+    assert reason["observation_uris"] == [str(first_uri), str(second_uri)]
     assert "0.06 m" in reason["reason"]
     assert "input time offset 0.01 s" in reason["reason"]
     assert reason["measured_distance_m"] == 0.06
 
-    result, reason = evaluator.evaluate(
-        [ObservationStamped(second_uri, provider_uri, 1.08, (0.17, 0.0, 0.0))]
-    )
+    replacement = ObservationStamped(second_uri, provider_uri, 1.08, (0.17, 0.0, 0.0), sample_id=13)
+    result, reason = evaluator.evaluate([replacement])
     assert result is False
+    assert reason["sample_stamps"] == [first_sample.stamp, replacement.stamp]
+    assert reason["sample_ids"] == [first_sample.sample_id, replacement.sample_id]
     assert "0.17 m" in reason["reason"]
     assert "input time offset 0.08 s" in reason["reason"]
 
@@ -397,6 +429,7 @@ def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
     )
     assert result is Unknown
     assert "more than 0.1 s" in reason["reason"]
+    assert evaluator.evaluate([])[1].get("sample_ids", []) == []
 
 
 def test_provider_snapshot_evaluates_only_current_mapped_observations():
@@ -416,8 +449,7 @@ def test_provider_snapshot_evaluates_only_current_mapped_observations():
             if target_by_name[name] in targets
         ]
 
-    manager = ObservationManager.__new__(ObservationManager)
-    manager.scenario_exec = SimpleNamespace(scene_instance=None)
+    manager = ObservationManager(scr_exec=SimpleNamespace(scene_instance=None))
     manager._provider_observation_registry = {provider_uri: {first_uri, second_uri}}
     manager._observation_policy_registry = {
         first_uri: {policy_uri},
@@ -437,7 +469,7 @@ def test_provider_snapshot_evaluates_only_current_mapped_observations():
             provider_id=provider_uri,
         ),
     }
-    policy = unittest.mock.Mock(observation_uris={first_uri, second_uri})
+    policy = unittest.mock.Mock(observation_uris={first_uri, second_uri}, prov_cb=None)
     manager.obs_policies = {policy_uri: policy}
 
     manager.update_provider_observation(
@@ -468,8 +500,7 @@ def test_string_mapped_observations_keep_individual_source_stamps():
     def extract_stamp(value, _):
         return value.stamp
 
-    manager = ObservationManager.__new__(ObservationManager)
-    manager.scenario_exec = SimpleNamespace(scene_instance=None)
+    manager = ObservationManager(scr_exec=SimpleNamespace(scene_instance=None))
     manager._provider_observation_registry = {provider_uri: {observation_uri}}
     manager._observation_policy_registry = {observation_uri: {policy_uri}}
     manager.observations = {
@@ -480,7 +511,7 @@ def test_string_mapped_observations_keep_individual_source_stamps():
             provider_id=provider_uri,
         )
     }
-    policy = unittest.mock.Mock(observation_uris={observation_uri})
+    policy = unittest.mock.Mock(observation_uris={observation_uri}, prov_cb=None)
     manager.obs_policies = {policy_uri: policy}
 
     manager.update_provider_observation(
@@ -683,10 +714,12 @@ class BDDExecTest(unittest.TestCase):
             def _evaluate_samples(self, observations: list[ObservationStamped]):
                 return bool(observations), {"reason": "sample exists"}
 
+        callback_events = []
         manager = ObservationManager(
             scr_exec=SimpleNamespace(
                 obs_policy_fluents={policy_uri: policy.fluent_id}, scene_instance=None
-            )
+            ),
+            prov_cb=lambda *args: callback_events.append(args),
         )
         manager.register_fluent_obs(
             graph,
@@ -695,6 +728,7 @@ class BDDExecTest(unittest.TestCase):
         )
         self.assertEqual(manager.providers[provider_uri].id, provider_uri)
         policy = manager.obs_policies[policy_uri]
+        self.assertIs(policy.prov_cb, manager.prov_cb)
         policy.evaluator = TruthEvaluator()
 
         manager.bind_observation_targets({target_uri: bound_target_uri})
@@ -707,6 +741,8 @@ class BDDExecTest(unittest.TestCase):
         self.assertEqual(results, {policy_uri: (True, "")})
         self.assertEqual(policy.trinary_timeline[0].stamp, 2.0)
         self.assertTrue(policy.trinary_timeline[0].trinary)
+        self.assertEqual(len(callback_events), 1)
+        self.assertIs(callback_events[0][0], policy)
 
         accepted, detail = manager.update_observations(
             [ObservationStamped(observation_uri, provider_uri, 1.0, object())]
@@ -748,6 +784,174 @@ class BDDExecTest(unittest.TestCase):
             manager.observation_targets_for_provider(provider_uri),
             {first: None, second: None},
         )
+
+    def _provenance_manager(self, callback=None, policy_count=1):
+        observation_uri = URIRef("urn:test:observation")
+        provider_uri = URIRef("urn:test:provider")
+        manager = ObservationManager(
+            scr_exec=SimpleNamespace(scene_instance=None), prov_cb=callback
+        )
+
+        class ValueEvaluator(ObservationPolicyEvaluator):
+            def _evaluate_samples(self, observations):
+                return observations[0].value, {
+                    "reason": "observed value",
+                    "sample_ids": [sample.sample_id for sample in observations],
+                    "observation_uris": [str(sample.observation_uri) for sample in observations],
+                    "sample_stamps": [sample.stamp for sample in observations],
+                }
+
+        manager.observations[observation_uri] = SimpleNamespace(
+            provider_id=provider_uri,
+            target_id=None,
+            time_extractor=lambda _, stamp: stamp,
+            entity_mapper=None,
+        )
+        manager._provider_observation_registry[provider_uri] = {observation_uri}
+        manager._observation_policy_registry[observation_uri] = set()
+        for index in range(policy_count):
+            policy = ObsPolicyModel.__new__(ObsPolicyModel)
+            policy.id = URIRef(f"urn:test:policy:{index}")
+            policy.evaluator = ValueEvaluator((None, {}))
+            policy.evaluator_id = URIRef("urn:test:evaluator")
+            policy.types = {URI_OBS_TYPE_EVALUATED_POLICY}
+            policy.prov_cb = callback
+            policy.trinary_timeline = []
+            policy.duration_type = URI_TIME_TYPE_DURING
+            policy.start_time = 0.0
+            policy.end_time = 10.0
+            manager.obs_policies[policy.id] = policy
+            manager._observation_policy_registry[observation_uri].add(policy.id)
+        return manager, observation_uri, provider_uri
+
+    def test_provenance_callback_preserves_sample_identity_across_fanout(self):
+        events = []
+        manager, observation_uri, provider_uri = self._provenance_manager(
+            lambda *args: events.append(args), policy_count=2
+        )
+        outcomes = manager.update_provider_observation(provider_uri, True, 1.0)
+        self.assertTrue(all(accepted for accepted, _ in outcomes.values()))
+        self.assertEqual(len(events), len(manager.obs_policies))
+        self.assertEqual({event[0].id for event in events}, set(manager.obs_policies))
+        sample_ids = events[0][3]["sample_ids"]
+        self.assertEqual(len(sample_ids), 1)
+        self.assertIsInstance(sample_ids[0], int)
+        for policy, stamp, trinary, details in events:
+            self.assertIs(policy, manager.obs_policies[policy.id])
+            self.assertIsNotNone(policy.evaluator_id)
+            self.assertEqual(details["sample_ids"], sample_ids)
+            self.assertEqual(details["observation_uris"], [str(observation_uri)])
+            self.assertEqual(details["sample_stamps"], [stamp])
+            self.assertIs(trinary, True)
+            self.assertEqual(details["reason"], "observed value")
+        for policy in manager.obs_policies.values():
+            self.assertIs(policy.trinary_timeline[0].trinary, True)
+
+    def test_provenance_callback_records_empty_and_none_results_but_not_status_reads(self):
+        events = []
+        manager, observation_uri, provider_uri = self._provenance_manager(
+            lambda *args: events.append(args)
+        )
+        policy = next(iter(manager.obs_policies.values()))
+        manager.update_observations([], affected_policy_uris={policy.id}, evaluation_stamp=1.0)
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0][3].get("sample_ids", []), [])
+        self.assertEqual(events[0][1], 1.0)
+        self.assertIsNone(events[0][2])
+        manager.update_observations([ObservationStamped(observation_uri, provider_uri, 2.0, None)])
+        self.assertEqual(len(events), 2)
+        self.assertEqual(len(events[1][3]["sample_ids"]), 1)
+        self.assertIsNone(events[1][2])
+        self.assertEqual(policy.trinary_timeline, [])
+        for stamp in (3.0, 4.0):
+            policy.get_result(stamp, trin_policy_and)
+        self.assertEqual(len(events), 2)
+
+    def test_callback_owned_error_handling_preserves_results_and_accepted_assertions(self):
+        events = []
+        errors = []
+
+        def fail_callback(*args):
+            events.append(args)
+            try:
+                raise RuntimeError("sink unavailable")
+            except RuntimeError as exc:
+                errors.append(exc)
+
+        manager, _, provider_uri = self._provenance_manager(fail_callback)
+        policy = next(iter(manager.obs_policies.values()))
+        outcomes = manager.update_provider_observation(provider_uri, False, 1.0)
+        self.assertTrue(outcomes[policy.id][0])
+        self.assertIs(policy.trinary_timeline[0].trinary, False)
+        self.assertIs(events[0][0], policy)
+        self.assertIn(URI_OBS_TYPE_EVALUATED_POLICY, events[0][0].types)
+
+        direct_manager, _, _ = self._provenance_manager(fail_callback)
+        direct_policy = next(iter(direct_manager.obs_policies.values()))
+        direct_policy.evaluator = None
+        direct_policy.evaluator_id = None
+        direct_policy.types = {URI_OBS_TYPE_DIRECT_TRINARY_POLICY}
+
+        assertion = TrinaryStamped(2.0, True, "direct assertion")
+        self.assertTrue(direct_manager.update_fpolicy_assertion(direct_policy.id, assertion)[0])
+        recorded_policy, stamp, trinary, details = events[-1]
+        self.assertIs(recorded_policy, direct_policy)
+        self.assertIsNone(recorded_policy.evaluator_id)
+        self.assertIn(URI_OBS_TYPE_DIRECT_TRINARY_POLICY, recorded_policy.types)
+        self.assertEqual(details.get("sample_ids", []), [])
+        self.assertEqual(stamp, assertion.stamp)
+        self.assertIs(trinary, assertion.trinary)
+        self.assertEqual(details["reason"], assertion.reason)
+        self.assertIn(assertion, direct_policy.trinary_timeline)
+        self.assertEqual(len(errors), len(events))
+
+        rejected = TrinaryStamped(direct_policy.end_time + 1, False)
+        self.assertFalse(direct_manager.update_fpolicy_assertion(direct_policy.id, rejected)[0])
+        self.assertEqual(len(events), 2)
+        manager.update_provider_observation(provider_uri, True, policy.end_time + 1)
+        self.assertEqual(len(events), 2)
+
+    def test_unhandled_provenance_callback_errors_propagate(self):
+        def fail_callback(*_):
+            raise RuntimeError("unhandled callback error")
+
+        manager, _, provider_uri = self._provenance_manager(fail_callback)
+        with self.assertRaises(RuntimeError):
+            manager.update_provider_observation(provider_uri, True, 1.0)
+
+    def test_sample_ids_are_always_allocated_unique_and_preserved(self):
+        manager, observation_uri, provider_uri = self._provenance_manager()
+        original = ObservationStamped(observation_uri, provider_uri, 1.0, True)
+        manager.update_observations([original])
+        self.assertIsInstance(original.sample_id, int)
+
+        events = []
+        policy = next(iter(manager.obs_policies.values()))
+        policy.prov_cb = lambda *args: events.append(args)
+        for _ in range(10):
+            manager.update_observations(
+                [ObservationStamped(observation_uri, provider_uri, original.stamp, original.value)]
+            )
+        identifiers = [event[3]["sample_ids"][0] for event in events]
+        self.assertEqual(len(set(identifiers)), len(events))
+        self.assertEqual(identifiers, sorted(identifiers))
+        self.assertNotIn(original.sample_id, identifiers)
+        manager.update_observations([original])
+        self.assertEqual(events[-1][3]["sample_ids"], [original.sample_id])
+
+    def test_existing_policy_callback_is_not_overridden_during_dispatch(self):
+        events = []
+        manager, _, provider_uri = self._provenance_manager()
+        policy = next(iter(manager.obs_policies.values()))
+        policy.prov_cb = lambda *args: events.append(args)
+        manager.update_provider_observation(provider_uri, True, 1.0)
+        self.assertEqual(len(events), 1)
+        self.assertIsInstance(events[0][3]["sample_ids"][0], int)
+        manager_events = []
+        manager.prov_cb = lambda *args: manager_events.append(args)
+        manager.update_provider_observation(provider_uri, True, 2.0)
+        self.assertEqual(len(events), 2)
+        self.assertEqual(manager_events, [])
 
     def test_each_observation_batch_evaluates_without_cross_batch_caching(self):
         graph = Graph()
