@@ -48,6 +48,7 @@ from bdd_dsl.models.observation import (
     ObsPolicyModel,
     StringEntityMapper,
     TrinaryStamped,
+    init_sample_details,
     trin_policy_and,
 )
 from bdd_dsl.models.time_constraint import process_time_constraint_model
@@ -77,6 +78,27 @@ SPEC_MODEL_URLS = {
     f"{URL_SECORO_M}/acceptance-criteria/bdd/templates/pickplace.tmpl.json": "json-ld",
     f"{URL_SECORO_M}/acceptance-criteria/bdd/variations/pickplace-secorolab-isaac.var.json": "json-ld",
 }
+
+
+@pytest.mark.parametrize("sample_count", [0, 2])
+def test_init_sample_details_preserves_sample_order(sample_count):
+    samples = [
+        ObservationStamped(
+            URIRef(f"urn:test:observation:{index}"),
+            URIRef("urn:test:provider"),
+            float(sample_count - index),
+            object(),
+        )
+        for index in range(sample_count)
+    ]
+    details = init_sample_details(samples)
+    assert details == {
+        "sample_ids": [sample.sample_id for sample in samples],
+        "sample_stamps": [sample.stamp for sample in samples],
+        "observation_uris": [str(sample.observation_uri) for sample in samples],
+    }
+    details["sample_ids"].clear()
+    assert init_sample_details(samples)["sample_ids"] == [sample.sample_id for sample in samples]
 
 
 def test_string_entity_mapper_only_maps_identifiers():
