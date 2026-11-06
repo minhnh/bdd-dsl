@@ -88,6 +88,19 @@ class ObservationStamped:
     sample_id: int = field(default_factory=count().__next__)
 
 
+def init_sample_details(observations: list[ObservationStamped]) -> dict[str, Any]:
+    """Initialize evaluator details with aligned sample references.
+
+    Parameters:
+        observations: samples used by the evaluation, in their evaluation order
+    """
+    return {
+        "sample_ids": [sample.sample_id for sample in observations],
+        "sample_stamps": [sample.stamp for sample in observations],
+        "observation_uris": [str(sample.observation_uri) for sample in observations],
+    }
+
+
 class ProvenanceCallback(Protocol):
     """Record relevant policy evidence; treat arguments and nested values as read-only.
 
@@ -426,11 +439,7 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
                     observation.stamp for observation in observations
                 )
 
-        details: dict[str, Any] = {
-            "sample_ids": [sample.sample_id for sample in observations],
-            "observation_uris": [str(sample.observation_uri) for sample in observations],
-            "sample_stamps": [sample.stamp for sample in observations],
-        }
+        details = init_sample_details(observations)
         if time_offset is not None:
             details["input_time_offset_s"] = time_offset
             # From above, time_offset is not None only when max_time_offset is not None
