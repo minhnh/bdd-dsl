@@ -1,18 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
 """Scenario-scoped RDF provenance and synchronous JSONL evidence without ROS."""
 
+from __future__ import annotations
+
 import json
+import os
 from collections.abc import Iterator
 from math import isfinite
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from rdf_utils.models.prov import create_bundle
+from rdf_utils import DatasetFormat
+from rdf_utils.models.prov import add_entity, create_bundle
 from rdf_utils.models.time import add_trs
-from rdflib import RDF, Dataset, URIRef
+from rdflib import RDF, Dataset, Graph, Literal, URIRef
 from rdflib.namespace import PROV
-from trinary import Unknown
+from trinary import Trinary, Unknown
+
+from bdd_dsl.models.observation import ObsDetailKey, ObsPolicyModel
 
 SCHEMA_VERSION = 2
 TRINARY_REPS = {True: True, False: False, Unknown: "unknown", None: None}
@@ -27,46 +33,160 @@ def _validate_timestamp(stamp: float) -> None:
         raise ValueError("A timestamp must be finite seconds")
 
 
-class ProvenanceJournal:
+class RecordingSession:
+    """Own the shared recording dataset and persist it atomically.
+
+    Parameters:
+        output_dir: Directory receiving the execution dataset.
+        agent_id: Software agent recording the executions.
+        use_sim_time: True for simulation seconds, False for wall-clock Unix seconds.
+        dataset_format: Dataset serialization format.
+    """
+
+    def __init__(
+        self,
+        output_dir: Path,
+        agent_id: URIRef,
+        *,
+        use_sim_time: bool,
+        dataset_format: DatasetFormat = DatasetFormat.TRIG,
+    ):
+        # Setup provenance output directory
+        self.output_dir = output_dir
+        self.dataset_format = DatasetFormat(dataset_format)
+        self.path = output_dir / f"execution.{self.dataset_format.extension}"
+        for fmt in DatasetFormat:
+            existing = output_dir / f"execution.{fmt.extension}"
+            if existing.exists():
+                raise FileExistsError(f"Provenance dataset already exists: {existing}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Setup provenance dataset
+        self.dataset = Dataset()
+        self.agent_id = agent_id
+        self.model_id = URIRef(uuid4().urn)
+        self.prov_id = create_bundle(self.dataset, agent_id)
+        self.dataset.graph(self.model_id)
+
+        self.use_sim_time = use_sim_time
+
+    @property
+    def model_graph(self) -> Graph:
+        """Shared model graph in this session's dataset."""
+        return self.dataset.graph(self.model_id)
+
+    @property
+    def prov_bundle(self) -> Graph:
+        """Shared provenance bundle in this session's dataset."""
+        return self.dataset.graph(self.prov_id)
+
+    def save(self):
+        temporary = self.path.with_name(self.path.name + ".tmp")
+        self.dataset.serialize(temporary, format=self.dataset_format)
+        os.replace(temporary, self.path)
+
+
+class ScenarioExecRecorder:
     """Own an execution bundle and record JSONL evidence in its clock domain.
 
-    Callers coordinate access and handle recording errors.
+    Callers coordinate access, handle recording errors, and persist RDF updates with session.save().
 
     Parameters:
         path: new JSONL file; existing files are never overwritten
         context_id: scenario context UUID
-        use_sim_time: True for simulation seconds, False for wall-clock Unix seconds
-        dataset: Shared dataset receiving the execution bundle.
-        agent_id: Software agent associated with the execution and its bundle.
+        session: Shared dataset, software agent, model and clock settings.
     """
 
     def __init__(
         self,
         path: str | Path,
         context_id: UUID,
-        use_sim_time: bool,
-        *,
-        dataset: Dataset,
-        agent_id: URIRef,
+        session: RecordingSession,
     ) -> None:
+        self.session = session
         self.path = Path(path)
+        self.policy_configs: dict[URIRef, URIRef] = {}
         self._samples: dict[int, tuple[URIRef, float]] = {}
+
         self._closed = False
         self._failed = False
         self._stream = self.path.open("xb")
 
-        self.dataset = dataset
+        self.dataset = session.dataset
         self.execution_id = URIRef(context_id.urn)
-        self.bundle_id = create_bundle(dataset, agent_id)
-        self.graph = dataset.graph(self.bundle_id)
+        self.bundle_id = create_bundle(self.dataset, session.agent_id)
+        self.graph = self.dataset.graph(self.bundle_id)
         self.graph.add((self.execution_id, RDF.type, PROV.Activity))
-        self.graph.add((self.execution_id, PROV.wasAssociatedWith, agent_id))
-        dataset.default_graph.add((self.bundle_id, PROV.wasGeneratedBy, self.execution_id))
+        self.graph.add((self.execution_id, PROV.used, session.model_id))
+        self.graph.add((self.execution_id, PROV.wasAssociatedWith, session.agent_id))
+        self.dataset.default_graph.add((self.bundle_id, PROV.wasGeneratedBy, self.execution_id))
 
         self.trs_id = None
-        if use_sim_time:
+        if session.use_sim_time:
             self.trs_id = add_trs(self.graph)
             self.graph.add((self.execution_id, PROV.used, self.trs_id))
+
+    def record_policy_eval(
+        self,
+        policy: ObsPolicyModel,
+        stamp: float,
+        trinary: bool | Trinary | None,
+        details: dict[str, Any],
+    ) -> None:
+        sample_ids = details.get(ObsDetailKey.SAMPLE_IDS, [])
+        stamps = details.get(ObsDetailKey.SAMPLE_STAMPS, [])
+        uris = details.get(ObsDetailKey.OBS_IDS, [])
+        for sample_id, sample_stamp, uri in zip(sample_ids, stamps, uris, strict=True):
+            if not isinstance(uri, URIRef) or not uri:
+                raise ValueError("Sample observation URI must be a nonempty URIRef")
+            self.record_observation(sample_id, uri, sample_stamp)
+        evidence = details
+        if policy.id in self.policy_configs:
+            evidence = {
+                **details,
+                ObsDetailKey.CONFIG_ID: self.policy_configs[policy.id],
+            }
+        result = TRINARY_REPS[trinary]
+        self.record_evaluation(policy.id, stamp, result, evidence)
+
+    def record_policy_config(self, policy: ObsPolicyModel) -> URIRef | None:
+        """Snapshot evaluator settings and track the policy's current configuration.
+
+        Parameters:
+            policy: Observation policy whose effective evaluator settings are captured.
+
+        Returns:
+            Configuration URI, or None for a policy without an evaluator.
+        """
+        evaluator, evaluator_id = policy.evaluator, policy.evaluator_id
+        if evaluator is None and evaluator_id is None:
+            return None
+        if evaluator is None or evaluator_id is None:
+            missing = "evaluator" if evaluator is None else "evaluator_id"
+            raise ValueError(f"Policy '{policy.id}' is missing {missing}")
+
+        config_id = self.record_metadata(policy.id, evaluator.get_config())
+        self.graph.add((config_id, PROV.wasDerivedFrom, evaluator_id))
+        self.policy_configs[policy.id] = config_id
+        return config_id
+
+    def record_metadata(self, model_uri: URIRef, data: dict[str, Any]) -> URIRef:
+        """Add an immutable JSON snapshot to the execution bundle without writing JSONL.
+
+        Parameters:
+            model_uri: Model entity the metadata describes.
+            data: JSON-compatible metadata dictionary.
+
+        Returns:
+            Metadata entity URI. The caller persists the dataset.
+        """
+        encoded = json.dumps(data, allow_nan=False)
+        entity = URIRef(uuid4().urn)
+        add_entity(self.graph, entity)
+        self.graph.add((self.execution_id, PROV.used, entity))
+        self.graph.add((entity, PROV.wasDerivedFrom, model_uri))
+        self.graph.add((entity, PROV.value, Literal(encoded, datatype=RDF.JSON)))
+        return entity
 
     @property
     def failed(self) -> bool:
@@ -170,7 +290,7 @@ class ProvenanceJournal:
         ):
             raise ValueError("An evaluation needs a policy URI and a supported trinary result")
         _validate_timestamp(stamp)
-        references = details.get("sample_ids", ())
+        references = details.get(ObsDetailKey.SAMPLE_IDS, ())
         if not isinstance(references, (list, tuple)) or any(
             type(sample_id) is not int or sample_id not in self._samples for sample_id in references
         ):

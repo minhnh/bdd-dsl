@@ -4,11 +4,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Generator, Mapping
 from dataclasses import dataclass, field
+from enum import StrEnum
 from inspect import isclass
 from itertools import count
 from math import dist, isclose
 from numbers import Real
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from bdd_dsl.prov import ScenarioExecRecorder
 
 from rdf_utils.models.common import AttrLoaderProtocol, ModelBase, get_node_types
 from rdf_utils.models.geom_coord import to_metres
@@ -88,6 +92,16 @@ class ObservationStamped:
     sample_id: int = field(default_factory=count().__next__)
 
 
+class ObsDetailKey(StrEnum):
+    """Shared keys in observation-policy evaluation details."""
+
+    SAMPLE_IDS = "sample_ids"
+    SAMPLE_STAMPS = "sample_stamps"
+    OBS_IDS = "obs_ids"
+    CONFIG_ID = "config_id"
+    REASON = "reason"
+
+
 def init_sample_details(observations: list[ObservationStamped]) -> dict[str, Any]:
     """Initialize evaluator details with aligned sample references.
 
@@ -95,26 +109,10 @@ def init_sample_details(observations: list[ObservationStamped]) -> dict[str, Any
         observations: samples used by the evaluation, in their evaluation order
     """
     return {
-        "sample_ids": [sample.sample_id for sample in observations],
-        "sample_stamps": [sample.stamp for sample in observations],
-        "observation_uris": [str(sample.observation_uri) for sample in observations],
+        ObsDetailKey.SAMPLE_IDS: [sample.sample_id for sample in observations],
+        ObsDetailKey.SAMPLE_STAMPS: [sample.stamp for sample in observations],
+        ObsDetailKey.OBS_IDS: [sample.observation_uri for sample in observations],
     }
-
-
-class ProvenanceCallback(Protocol):
-    """Record relevant policy evidence; treat arguments and nested values as read-only.
-
-    Handle recording exceptions and logging inside the callback so provenance errors do not
-    interrupt test execution. Exceptions escaping the callback propagate to the caller.
-    """
-
-    def __call__(
-        self,
-        policy: ObsPolicyModel,
-        stamp: float,
-        trinary: bool | Trinary | None,
-        details: dict[str, Any],
-    ) -> None: ...
 
 
 class TimestampedObservationProtocol(Protocol):
@@ -258,7 +256,7 @@ class ObservationPolicyEvaluator(ABC):
         self,
         default_result: tuple[bool | Trinary | None, dict[str, Any]] = (
             Unknown,
-            {"reason": "no observations"},
+            {ObsDetailKey.REASON: "no observations"},
         ),
     ) -> None:
         self.default_result = default_result
@@ -272,7 +270,7 @@ class ObservationPolicyEvaluator(ABC):
         trinary, details = result
         if not isinstance(details, dict) or not all(isinstance(key, str) for key in details):
             raise TypeError("observation evaluator details must be a string-keyed dictionary")
-        if not isinstance(details.get("reason", ""), str):
+        if not isinstance(details.get(ObsDetailKey.REASON, ""), str):
             raise TypeError("observation evaluator details reason must be a string")
         return trinary, details
 
@@ -350,7 +348,7 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
             self,
             (
                 Unknown if report_missing else None,
-                {"reason": "linear distance expected 2 inputs, received 0"},
+                {ObsDetailKey.REASON: "linear distance expected 2 inputs, received 0"},
             ),
         )
         if URI_OBS_TYPE_LINEAR_DISTANCE_EVALUATOR not in self.types:
@@ -445,13 +443,15 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
             # From above, time_offset is not None only when max_time_offset is not None
             assert self.max_time_offset is not None
             if time_offset > self.max_time_offset:
-                details["reason"] = (
+                details[ObsDetailKey.REASON] = (
                     f"linear distance input time offset {time_offset:g} s is more than {self.max_time_offset:g} s"
                 )
                 return Unknown if self.report_mismatched_time else None, details
 
         if len(observations) != 2:
-            details["reason"] = f"linear distance expected 2 inputs, received {len(observations)}"
+            details[ObsDetailKey.REASON] = (
+                f"linear distance expected 2 inputs, received {len(observations)}"
+            )
             return Unknown if self.report_missing or len(observations) > 2 else None, details
         positions = []
         for i in range(2):
@@ -490,7 +490,7 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
         reason = f"linear distance {measured:g} m {comparison} {expectation}"
         if time_offset is not None:
             reason += f"; input time offset {time_offset:g} s"
-        details["reason"] = reason
+        details[ObsDetailKey.REASON] = reason
         details["measured_distance_m"] = measured
         details["positions_m"] = [list(position) for position in positions]
         return result, details
@@ -561,7 +561,7 @@ class ObsPolicyModel(ModelBase):
     end_event: URIRef | None
     horizon: float | None
     evaluator_id: URIRef | None
-    prov_cb: ProvenanceCallback | None
+    prov_recorder: ScenarioExecRecorder | None
 
     def __init__(
         self,
@@ -569,7 +569,7 @@ class ObsPolicyModel(ModelBase):
         graph: Graph,
         fluent_id: URIRef,
         fluent_types: set[URIRef],
-        prov_cb: ProvenanceCallback | None = None,
+        prov_recorder: ScenarioExecRecorder | None = None,
     ) -> None:
         super().__init__(node_id=node_id, graph=graph)
         if URI_OBS_TYPE_POLICY not in self.types:
@@ -578,7 +578,7 @@ class ObsPolicyModel(ModelBase):
             )
         self.fluent_id = fluent_id
         self.fluent_types = fluent_types
-        self.prov_cb = prov_cb
+        self.prov_recorder = prov_recorder
         process_time_constraint_model(constraint=self, graph=graph)
 
         if URI_TIME_TYPE_DURING in self.types:
@@ -758,7 +758,7 @@ class ObsPolicyModel(ModelBase):
         *,
         evaluation_stamp: float | None = None,
     ) -> tuple[bool, str]:
-        """Evaluate time-filtered samples and notify the configured provenance callback."""
+        """Evaluate time-filtered samples and notify the configured provenance recorder."""
         if self.evaluator is None:
             return False, "no evaluator"
         if not samples and evaluation_stamp is None:
@@ -775,10 +775,10 @@ class ObsPolicyModel(ModelBase):
             if evaluation_stamp is not None
             else max(sample.stamp for sample in samples)
         )
-        if self.prov_cb is not None:
-            self.prov_cb(self, evaluated_at, trinary, details)
+        if self.prov_recorder is not None:
+            self.prov_recorder.record_policy_eval(self, evaluated_at, trinary, details)
 
-        reason = details.get("reason", "")
+        reason = details.get(ObsDetailKey.REASON, "")
         if trinary is None:
             return True, reason
 
@@ -804,7 +804,7 @@ class ObsPolicyModel(ModelBase):
             trinary, reason = Unknown, "no evaluator"
         else:
             trinary, details = self.evaluator.evaluate([])
-            reason = details.get("reason", "")
+            reason = details.get(ObsDetailKey.REASON, "")
             trinary = Unknown if trinary is None else trinary
         return TrinaryStamped(stamp=stamp, trinary=trinary, reason=reason)
 
@@ -866,9 +866,9 @@ class ObservationManager:
     """Normalize provider snapshots and route samples or direct assertions to policy timelines.
 
     Each snapshot evaluates affected policies once. Callers serialize updates and status reads.
-    Configure ``prov_cb`` before registration, which copies it to each policy; later changes to
-    the manager callback do not affect registered policies. See :class:`ProvenanceCallback` for
-    callback ownership and error handling.
+    Configure ``prov_recorder`` before registration, which copies it to each policy; later changes to
+    the manager recorder do not affect registered policies. See :class:`ScenarioExecRecorder` for
+    recorder ownership and error handling.
     """
 
     scenario_exec: ScenarioExecutionModel
@@ -886,16 +886,16 @@ class ObservationManager:
 
     event_timelines: dict[URIRef, list[float]]
     _fluent_event_registry: dict[URIRef, set[URIRef]]  # fluent ID -> event IDs
-    prov_cb: ProvenanceCallback | None
+    prov_recorder: ScenarioExecRecorder | None
 
     def __init__(
         self,
         scr_exec: ScenarioExecutionModel,
         *,
-        prov_cb: ProvenanceCallback | None = None,
+        prov_recorder: ScenarioExecRecorder | None = None,
     ) -> None:
         self.scenario_exec = scr_exec
-        self.prov_cb = prov_cb
+        self.prov_recorder = prov_recorder
         self.scr_start_time = None
         self.scr_end_time = None
 
@@ -955,8 +955,8 @@ class ObservationManager:
             for loader in obs_loaders:
                 loader(graph=graph, model=obs_pol)
 
-            if self.prov_cb is not None:
-                obs_pol.prov_cb = self.prov_cb
+            if self.prov_recorder is not None:
+                obs_pol.prov_recorder = self.prov_recorder
 
             self._fluent_policy_registry[fc.id].add(obs_pol.id)
             for obs_uri in obs_pol.observation_uris:
@@ -1079,12 +1079,12 @@ class ObservationManager:
 
         policy = self.obs_policies[policy_uri]
         result = policy.add_trinary(trin_st)
-        if result[0] and policy.prov_cb is not None:
-            policy.prov_cb(
+        if result[0] and policy.prov_recorder is not None:
+            policy.prov_recorder.record_policy_eval(
                 policy,
                 trin_st.stamp,
                 trin_st.trinary,
-                {"reason": trin_st.reason},
+                {ObsDetailKey.REASON: trin_st.reason},
             )
         return result
 
@@ -1156,7 +1156,7 @@ class ObservationManager:
         bhv_loaders: list[AttrLoaderProtocol],
         obs_loaders: list[AttrLoaderProtocol],
         *,
-        prov_cb: ProvenanceCallback | None = None,
+        prov_recorder: ScenarioExecRecorder | None = None,
     ) -> ObservationManager:
         """Build a manager for a scenario variant and register its fluent policies."""
         scr_exec = ScenarioExecutionModel(
@@ -1166,7 +1166,7 @@ class ObservationManager:
         )
         obs_manager = ObservationManager(
             scr_exec=scr_exec,
-            prov_cb=prov_cb,
+            prov_recorder=prov_recorder,
         )
         for fc in scr_var.fluent_clauses():
             obs_manager.register_fluent_obs(
