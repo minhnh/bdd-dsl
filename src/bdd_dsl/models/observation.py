@@ -113,7 +113,7 @@ class ProvenanceCallback(Protocol):
         policy: ObsPolicyModel,
         stamp: float,
         trinary: bool | Trinary | None,
-        details: Mapping[str, Any],
+        details: dict[str, Any],
     ) -> None: ...
 
 
@@ -190,7 +190,7 @@ class StringEntityMapper(ModelBase, EntityObservationMapperProtocol):
     ) -> list[EntityObservation]:
         del scene_instance
         if not isinstance(observation, Mapping):
-            raise TypeError("StringEntityMapper requires a string-keyed mapping")
+            raise TypeError("StringEntityMapper requires a string-keyed dictionary")
         target_set = set(targets)
         mapped = []
         for identifier, value in observation.items():
@@ -256,7 +256,7 @@ class ObservationPolicyEvaluator(ABC):
 
     def __init__(
         self,
-        default_result: tuple[bool | Trinary | None, Mapping[str, Any]] = (
+        default_result: tuple[bool | Trinary | None, dict[str, Any]] = (
             Unknown,
             {"reason": "no observations"},
         ),
@@ -265,13 +265,13 @@ class ObservationPolicyEvaluator(ABC):
 
     def evaluate(
         self, observations: list[ObservationStamped]
-    ) -> tuple[bool | Trinary | None, Mapping[str, Any]]:
+    ) -> tuple[bool | Trinary | None, dict[str, Any]]:
         result = self.default_result if not observations else self._evaluate_samples(observations)
         if not isinstance(result, tuple) or len(result) != 2:
             raise TypeError("observation evaluator must return (trinary, details)")
         trinary, details = result
-        if not isinstance(details, Mapping) or not all(isinstance(key, str) for key in details):
-            raise TypeError("observation evaluator details must be a string-keyed mapping")
+        if not isinstance(details, dict) or not all(isinstance(key, str) for key in details):
+            raise TypeError("observation evaluator details must be a string-keyed dictionary")
         if not isinstance(details.get("reason", ""), str):
             raise TypeError("observation evaluator details reason must be a string")
         return trinary, details
@@ -279,12 +279,12 @@ class ObservationPolicyEvaluator(ABC):
     @abstractmethod
     def _evaluate_samples(
         self, observations: list[ObservationStamped]
-    ) -> tuple[bool | Trinary | None, Mapping[str, Any]]: ...
+    ) -> tuple[bool | Trinary | None, dict[str, Any]]: ...
 
-    def get_config(self) -> Mapping[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Effective settings for recording once; exclude mutable evaluation state.
 
-        Consumers treat the mapping and nested values as read-only. Settings already captured
+        Consumers treat the dictionary and nested values as read-only. Settings already captured
         in the model graph need not be repeated here.
         """
         return {}

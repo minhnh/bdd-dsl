@@ -1,21 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Synchronous, scenario-scoped JSONL evidence without ROS or live RDF graphs."""
+"""Scenario-scoped RDF provenance and synchronous JSONL evidence without ROS."""
 
 import json
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from math import isfinite
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from rdflib import URIRef
+from rdf_utils.models.prov import create_bundle
+from rdf_utils.models.time import add_trs
+from rdflib import RDF, Dataset, URIRef
+from rdflib.namespace import PROV
+from trinary import Unknown
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+TRINARY_REPS = {True: True, False: False, Unknown: "unknown", None: None}
 
 
-def _validate_timestamp(stamp: float | None) -> None:
-    if stamp is None:
-        return
+def _validate_timestamp(stamp: float) -> None:
     try:
         finite = not isinstance(stamp, bool) and isfinite(stamp)
     except OverflowError:
@@ -25,7 +28,7 @@ def _validate_timestamp(stamp: float | None) -> None:
 
 
 class ProvenanceJournal:
-    """Record scenario evidence linked to its RDF model in one clock domain.
+    """Own an execution bundle and record JSONL evidence in its clock domain.
 
     Callers coordinate access and handle recording errors.
 
@@ -33,6 +36,8 @@ class ProvenanceJournal:
         path: new JSONL file; existing files are never overwritten
         context_id: scenario context UUID
         use_sim_time: True for simulation seconds, False for wall-clock Unix seconds
+        dataset: Shared dataset receiving the execution bundle.
+        agent_id: Software agent associated with the execution and its bundle.
     """
 
     def __init__(
@@ -40,22 +45,28 @@ class ProvenanceJournal:
         path: str | Path,
         context_id: UUID,
         use_sim_time: bool,
+        *,
+        dataset: Dataset,
+        agent_id: URIRef,
     ) -> None:
-        self.context_id = str(context_id)
-        self.trs_id = URIRef(f"{context_id.urn}#clock") if use_sim_time else None
+        self.path = Path(path)
         self._samples: dict[int, tuple[URIRef, float]] = {}
         self._closed = False
         self._failed = False
-        self._stream = Path(path).open("xb")  # noqa: SIM115 - owned until close()/__exit__
-        try:
-            self.create_record(
-                URIRef(context_id.urn),
-                None,
-                data={"use_sim_time": use_sim_time, "trs_id": self.trs_id},
-            )
-        except BaseException:
-            self._stream.close()
-            raise
+        self._stream = self.path.open("xb")
+
+        self.dataset = dataset
+        self.execution_id = URIRef(context_id.urn)
+        self.bundle_id = create_bundle(dataset, agent_id)
+        self.graph = dataset.graph(self.bundle_id)
+        self.graph.add((self.execution_id, RDF.type, PROV.Activity))
+        self.graph.add((self.execution_id, PROV.wasAssociatedWith, agent_id))
+        dataset.default_graph.add((self.bundle_id, PROV.wasGeneratedBy, self.execution_id))
+
+        self.trs_id = None
+        if use_sim_time:
+            self.trs_id = add_trs(self.graph)
+            self.graph.add((self.execution_id, PROV.used, self.trs_id))
 
     @property
     def failed(self) -> bool:
@@ -65,8 +76,8 @@ class ProvenanceJournal:
     def create_record(
         self,
         model_uri: URIRef,
-        stamp: float | None,
-        data: Mapping[str, Any] | None = None,
+        stamp: float,
+        data: dict[str, Any] | None = None,
     ) -> UUID:
         """Create and append a record with a fresh UUID, returning that UUID.
 
@@ -74,8 +85,8 @@ class ProvenanceJournal:
 
         Parameters:
             model_uri: observation, policy, event or configuration URI in the captured RDF model
-            stamp: effective seconds; None omits the timestamp from the record
-            data: record-specific JSON-compatible mapping; None omits the field
+            stamp: effective seconds in the scenario clock domain
+            data: record-specific JSON-compatible dictionary; None omits the field
         """
         if self._closed or self._failed:
             raise OSError("Provenance journal is closed or failed")
@@ -87,22 +98,13 @@ class ProvenanceJournal:
             "schema_version": SCHEMA_VERSION,
             "model_uri": model_uri,
             "record_id": str(record_id),
-            "scenario_context_id": self.context_id,
+            "execution_id": self.execution_id,
         }
         if data is not None:
             record["data"] = data
-        if stamp is not None:
-            record["stamp"] = stamp
+        record["stamp"] = stamp
 
-        def map_as_dict(value):
-            """Convert non-dict mappings to dict for json serialization."""
-            if isinstance(value, Mapping):
-                return dict(value)
-            raise TypeError("Data must contain JSON-compatible values")
-
-        line = (
-            json.dumps(record, default=map_as_dict, allow_nan=False, separators=(",", ":")) + "\n"
-        ).encode("utf-8")
+        line = (json.dumps(record, allow_nan=False, separators=(",", ":")) + "\n").encode("utf-8")
 
         try:
             if self._stream.write(line) != len(line):
@@ -149,7 +151,7 @@ class ProvenanceJournal:
         policy_uri: URIRef,
         stamp: float,
         result: bool | str | None,
-        details: Mapping[str, Any],
+        details: dict[str, Any],
     ) -> UUID:
         """Write an evaluation referencing recorded samples and return its record UUID.
 
@@ -163,7 +165,9 @@ class ProvenanceJournal:
         Details are passed directly to the writer without mutation. Invalid references,
         unsupported details and write failures raise to the recording callback.
         """
-        if not policy_uri or not (result is None or type(result) is bool or result == "unknown"):
+        if not policy_uri or not (
+            result is None or type(result) is bool or result == TRINARY_REPS[Unknown]
+        ):
             raise ValueError("An evaluation needs a policy URI and a supported trinary result")
         _validate_timestamp(stamp)
         references = details.get("sample_ids", ())
@@ -202,56 +206,47 @@ def read_journal(path: str | Path) -> Iterator[dict[str, Any]]:
     def reject_constant(value):
         raise ValueError(f"Nonfinite JSON constant: {value}")
 
-    context_id = None
+    execution_id = None
     record_ids = set()
     with Path(path).open("rb") as stream:
         for index, line in enumerate(stream):
             if not line.endswith(b"\n"):
                 return
             record = json.loads(line, parse_constant=reject_constant)
+            if not isinstance(record, dict):
+                raise ValueError(f"Invalid journal record at line {index + 1}")  # noqa: TRY004 - malformed JSON record
+            schema_version = record.get("schema_version")
+            record_id_text = record.get("record_id")
+            model_uri_text = record.get("model_uri")
+            stamp = record.get("stamp")
+            data = record.get("data")
+            execution_uri_text = record.get("execution_id")
             if (
-                not isinstance(record, dict)
-                or type(record.get("schema_version")) is not int
-                or record["schema_version"] != SCHEMA_VERSION
-                or not isinstance(record.get("record_id"), str)
-                or not isinstance(record.get("model_uri"), str)
-                or record.get("stamp") is not None
-                and not isinstance(record["stamp"], (int, float))
-                or record.get("data") is not None
-                and not isinstance(record["data"], dict)
+                type(schema_version) is not int
+                or schema_version != SCHEMA_VERSION
+                or not isinstance(record_id_text, str)
+                or not isinstance(model_uri_text, str)
+                or not isinstance(execution_uri_text, str)
+                or not isinstance(stamp, (int, float))
+                or data is not None
+                and not isinstance(data, dict)
             ):
                 raise ValueError(f"Invalid journal record at line {index + 1}")
-            record_id = UUID(record["record_id"])
-            if str(record_id) != record["record_id"] or record_id in record_ids:
+            record_id = UUID(record_id_text)
+            if str(record_id) != record_id_text or record_id in record_ids:
                 raise ValueError("Invalid or duplicate record UUID")
             record_ids.add(record_id)
-            record["record_id"] = record_id
-            record["model_uri"] = URIRef(record["model_uri"])
-            if not record["model_uri"]:
+            model_uri = URIRef(model_uri_text)
+            if not model_uri:
                 raise ValueError("A record must reference a model URI")
-            current = record.get("scenario_context_id")
-            if not isinstance(current, str) or str(UUID(current)) != current:
-                raise ValueError("Invalid scenario context UUID")
-            if context_id is not None and current != context_id:
-                raise ValueError("A journal cannot contain multiple scenario contexts")
-            context_id = current
-            if index == 0:
-                metadata = record.get("data")
-                if (
-                    record["model_uri"] != URIRef(UUID(current).urn)
-                    or not isinstance(metadata, dict)
-                    or type(metadata.get("use_sim_time")) is not bool
-                    or "trs_id" not in metadata
-                ):
-                    raise ValueError(
-                        "The first record must declare the scenario clock mode and TRS"
-                    )
-                trs_id = metadata["trs_id"]
-                if metadata["use_sim_time"]:
-                    if not isinstance(trs_id, str) or not trs_id:
-                        raise ValueError("A simulation clock needs a nonempty TRS URI")
-                    metadata["trs_id"] = URIRef(trs_id)
-                elif trs_id is not None:
-                    raise ValueError("Wall-clock metadata must not declare a custom TRS")
-            _validate_timestamp(record.get("stamp"))
+            current_execution = URIRef(execution_uri_text)
+            if not current_execution:
+                raise ValueError("A record must reference an execution URI")
+            if execution_id is not None and current_execution != execution_id:
+                raise ValueError("A journal cannot contain multiple executions")
+            execution_id = current_execution
+            _validate_timestamp(stamp)
+            record["record_id"] = record_id
+            record["model_uri"] = model_uri
+            record["execution_id"] = current_execution
             yield record

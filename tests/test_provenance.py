@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 import io
 import json
-from types import MappingProxyType
 from uuid import UUID, uuid4
 
 import pytest
-from rdflib import URIRef
+from rdflib import RDF, Dataset, URIRef
+from rdflib.namespace import PROV, TIME
 
 from bdd_dsl.provenance import ProvenanceJournal, read_journal
 
@@ -15,9 +15,22 @@ START_EVENT = URIRef("urn:scenario-start")
 END_EVENT = URIRef("urn:scenario-end")
 
 
+AGENT = URIRef("urn:test:agent")
+
+
+def _journal(path, context_id, use_sim_time, *, dataset=None):
+    return ProvenanceJournal(
+        path,
+        context_id,
+        use_sim_time,
+        dataset=dataset if dataset is not None else Dataset(),
+        agent_id=AGENT,
+    )
+
+
 @pytest.fixture
 def journal(tmp_path):
-    with ProvenanceJournal(
+    with _journal(
         tmp_path / "evidence.jsonl",
         uuid4(),
         use_sim_time=True,
@@ -32,6 +45,41 @@ def details(sample_id=0):
     }
 
 
+@pytest.mark.parametrize("use_sim_time", [False, True])
+def test_journals_create_execution_bundles_and_distinct_simulation_trs_ids(tmp_path, use_sim_time):
+    context_id = uuid4()
+    dataset = Dataset()
+    with (
+        _journal(tmp_path / "first.jsonl", context_id, use_sim_time, dataset=dataset) as first,
+        _journal(tmp_path / "second.jsonl", context_id, use_sim_time, dataset=dataset) as second,
+    ):
+        assert first.bundle_id != second.bundle_id
+        for writer in (first, second):
+            assert writer.execution_id == URIRef(context_id.urn)
+            assert writer.graph.store is writer.dataset.store
+            assert writer.graph.identifier == writer.bundle_id
+            assert (writer.bundle_id, RDF.type, PROV.Bundle) in writer.graph
+            assert (writer.bundle_id, PROV.wasAttributedTo, AGENT) in writer.graph
+            assert (writer.execution_id, RDF.type, PROV.Activity) in writer.graph
+            assert (writer.execution_id, PROV.wasAssociatedWith, AGENT) in writer.graph
+            assert (
+                writer.bundle_id,
+                PROV.wasGeneratedBy,
+                writer.execution_id,
+            ) in writer.dataset.default_graph
+            systems = set(writer.graph.subjects(RDF.type, TIME.TRS))
+            assert systems == ({writer.trs_id} if use_sim_time else set())
+            for trs_id in systems:
+                assert (trs_id, RDF.type, PROV.Entity) in writer.graph
+                assert (writer.execution_id, PROV.used, trs_id) in writer.graph
+        if use_sim_time:
+            assert isinstance(first.trs_id, URIRef)
+            assert UUID(str(first.trs_id).removeprefix("urn:uuid:"))
+            assert first.trs_id != second.trs_id
+        else:
+            assert first.trs_id is None and second.trs_id is None
+
+
 def test_records_share_one_trs_and_preserve_order_and_sample_references(journal):
     writer, path = journal
     evidence = details()
@@ -40,20 +88,17 @@ def test_records_share_one_trs_and_preserve_order_and_sample_references(journal)
         (URIRef("urn:first"), 2.0, True),
         (URIRef("urn:second"), 1.0, False),
     ):
-        writer.record_evaluation(policy, stamp, result, MappingProxyType(evidence))
+        writer.record_evaluation(policy, stamp, result, evidence)
     evidence["measurement"]["distance"] = 99
     records = list(read_journal(path))  # Complete records are readable before close.
-    header, sample, first, second = records
-    assert "stamp" not in header
+    sample, first, second = records
     record_ids = [record["record_id"] for record in records]
     assert all(isinstance(record_id, UUID) for record_id in record_ids)
     assert len(set(record_ids)) == len(records)
-    assert all("sequence" not in record for record in records)
-    assert {record["scenario_context_id"] for record in records} == {writer.context_id}
-    assert isinstance(writer.trs_id, URIRef)
-    assert isinstance(header["model_uri"], URIRef)
-    assert isinstance(header["data"]["trs_id"], URIRef)
-    assert header["data"] == {"use_sim_time": True, "trs_id": writer.trs_id}
+    assert all(
+        "sequence" not in record and "scenario_context_id" not in record for record in records
+    )
+    assert {record["execution_id"] for record in records} == {writer.execution_id}
     assert sample["model_uri"] == OBSERVATION
     assert all(
         "kind" not in record and "clock_id" not in record and "trs_id" not in record
@@ -149,16 +194,16 @@ def test_sample_is_written_once_and_its_identity_cannot_be_reassigned(journal):
 
 def test_lifecycle_records_reference_model_events_without_a_kind(journal):
     writer, path = journal
-    data = {"record_id": "user data", "scenario_context_id": "user data"}
+    data = {"record_id": "user data", "execution_id": "user data"}
     writer.create_record(START_EVENT, 1.0, data)
     writer.create_record(END_EVENT, 1.0)
-    start, end = list(read_journal(path))[1:]
+    start, end = list(read_journal(path))
     assert start["model_uri"] == START_EVENT
     assert end["model_uri"] == END_EVENT
     assert start["stamp"] == end["stamp"]
     assert start["record_id"] != end["record_id"]
     assert isinstance(start["record_id"], UUID)
-    assert start["scenario_context_id"] == writer.context_id
+    assert start["execution_id"] == writer.execution_id
     assert "data" not in end
     assert start["data"] == data
     assert "kind" not in start and "kind" not in end
@@ -168,35 +213,16 @@ def test_new_journals_do_not_overwrite_or_share_contexts(tmp_path):
     paths = [tmp_path / name for name in ("first.jsonl", "second.jsonl")]
     contexts = [uuid4(), uuid4()]
     for path, context, simulated in zip(paths, contexts, (True, False)):
-        with ProvenanceJournal(path, context, use_sim_time=simulated) as writer:
+        with _journal(path, context, use_sim_time=simulated) as writer:
             writer.create_record(START_EVENT, 0.0)
-        assert {r["scenario_context_id"] for r in read_journal(path)} == {str(context)}
-        clock = next(read_journal(path))["data"]
-        assert clock["use_sim_time"] is simulated
-        assert clock["trs_id"] == (URIRef(f"urn:uuid:{context}#clock") if simulated else None)
+        assert {r["execution_id"] for r in read_journal(path)} == {URIRef(context.urn)}
     before = paths[0].read_bytes()
+    dataset = writer.dataset
+    before_quads = set(dataset.quads())
     with pytest.raises(FileExistsError):
-        ProvenanceJournal(paths[0], uuid4(), use_sim_time=True)
+        _journal(paths[0], uuid4(), use_sim_time=True, dataset=dataset)
     assert paths[0].read_bytes() == before
-
-
-def test_recovery_validates_clock_metadata(tmp_path):
-    path = tmp_path / "evidence.jsonl"
-    with ProvenanceJournal(path, uuid4(), use_sim_time=True):
-        pass
-    header = next(read_journal(path))
-    for data in (
-        {},
-        {"use_sim_time": True, "trs_id": None},
-        {"use_sim_time": True, "trs_id": ""},
-        {"use_sim_time": True, "trs_id": []},
-        {"use_sim_time": True, "trs_id": {}},
-        {"use_sim_time": False, "trs_id": "urn:test:clock"},
-        {"use_sim_time": "true", "trs_id": "urn:test:clock"},
-    ):
-        path.write_text(json.dumps({**header, "data": data}, default=str) + "\n")
-        with pytest.raises(ValueError):
-            list(read_journal(path))
+    assert set(dataset.quads()) == before_quads
 
 
 def test_create_record_always_appends_with_a_fresh_uuid(journal):
@@ -209,7 +235,7 @@ def test_create_record_always_appends_with_a_fresh_uuid(journal):
     second = writer.create_record(START_EVENT, 0.0)
     assert isinstance(first, UUID) and isinstance(second, UUID)
     assert first != second
-    assert [r["record_id"] for r in read_journal(path)][1:] == [first, second]
+    assert [r["record_id"] for r in read_journal(path)] == [first, second]
     assert path.read_bytes().startswith(before)
 
 
@@ -220,9 +246,9 @@ def test_invalid_records_are_not_written(journal):
             writer.create_record(START_EVENT, stamp)
     with pytest.raises(ValueError):
         writer.create_record(URIRef(""), 0.0)
-    assert len(list(read_journal(path))) == 1
+    assert len(list(read_journal(path))) == 0
     assert isinstance(writer.create_record(START_EVENT, -1.0), UUID)
-    assert len(list(read_journal(path))) == 2
+    assert len(list(read_journal(path))) == 1
 
 
 class FailingStream(io.BytesIO):
@@ -302,6 +328,7 @@ def test_recovery_rejects_complete_malformed_interior_records(journal, bad_line)
 
 def test_recovery_rejects_invalid_records(journal):
     writer, path = journal
+    writer.create_record(START_EVENT, 0.0)
     writer.create_record(END_EVENT, 1.0)
     writer.close()
     records = list(read_journal(path))
@@ -310,11 +337,18 @@ def test_recovery_rejects_invalid_records(journal):
         ("record_id", None),
         ("record_id", 42),
         ("record_id", str(records[0]["record_id"])),
-        ("scenario_context_id", str(uuid4())),
+        ("execution_id", uuid4().urn),
+        ("execution_id", ""),
+        ("execution_id", None),
+        ("execution_id", 42),
+        ("execution_id", True),
+        ("execution_id", []),
+        ("execution_id", {}),
         ("schema_version", 99),
         ("stamp", float("inf")),
         ("stamp", "not-a-timestamp"),
         ("stamp", []),
+        ("stamp", None),
         ("model_uri", ""),
         ("model_uri", 42),
         ("model_uri", True),

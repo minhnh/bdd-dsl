@@ -1,6 +1,6 @@
 # SPDX-License-Identifier:  GPL-3.0-or-later
 import unittest
-from types import MappingProxyType, SimpleNamespace
+from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.request import HTTPError
 
@@ -168,7 +168,7 @@ def test_default_observation_evaluator_handles_empty_and_non_empty_samples():
     ) == (False, {"reason": "1 samples"})
 
 
-def test_evaluator_details_optional_reason_and_mapping_validation():
+def test_evaluator_details_optional_reason_and_dict_validation():
     class Evaluator(ObservationPolicyEvaluator):
         def __init__(self, details):
             super().__init__()
@@ -183,9 +183,6 @@ def test_evaluator_details_optional_reason_and_mapping_validation():
     assert result is True
     assert returned_details is details
     assert details == {"measurement": 3}
-    readonly_details = MappingProxyType(details)
-    assert Evaluator(readonly_details).evaluate([sample])[1] is readonly_details
-    assert readonly_details.get("reason", "") == ""
     value = object()
     assert Evaluator({"value": value}).evaluate([sample])[1]["value"] is value
     for invalid in ("legacy reason", {1: "non-string key"}, {"reason": 1}):
