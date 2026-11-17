@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from rdf_utils import DatasetFormat
+from rdf_utils.collection import value_to_node
 from rdf_utils.models.prov import add_entity, create_bundle
 from rdf_utils.models.time import add_trs
 from rdflib import RDF, Dataset, Graph, Literal, URIRef
@@ -19,6 +20,7 @@ from rdflib.namespace import PROV
 from trinary import Trinary, Unknown
 
 from bdd_dsl.models.observation import ObsDetailKey, ObsPolicyModel
+from bdd_dsl.models.urirefs import URI_BDD_PRED_REF_VAR, URI_BDD_TYPE_VAR_ASSIGNMENT
 
 SCHEMA_VERSION = 2
 TRINARY_REPS = {True: True, False: False, Unknown: "unknown", None: None}
@@ -179,6 +181,23 @@ class ScenarioExecRecorder:
         self.graph.add((config_id, PROV.wasDerivedFrom, evaluator_id))
         self.policy_configs[policy.id] = config_id
         return config_id
+
+    def record_var_assignments(self, bindings: dict[URIRef, Any]) -> None:
+        """Record resolved bindings as entities used by this execution.
+
+        Parameters:
+            bindings: Modeled variable URIs mapped to scalar, resource or ordered values.
+        """
+
+        for variable, value in bindings.items():
+            if not isinstance(variable, URIRef):
+                raise TypeError("Assignment variables must be URIRefs")
+            encoded = value_to_node(self.graph, value)
+            assignment = add_entity(self.graph)
+            self.graph.add((assignment, RDF.type, URI_BDD_TYPE_VAR_ASSIGNMENT))
+            self.graph.add((assignment, URI_BDD_PRED_REF_VAR, variable))
+            self.graph.add((assignment, RDF.value, encoded))
+            self.graph.add((self.execution_id, PROV.used, assignment))
 
     def record_metadata(self, model_uri: URIRef, data: dict[str, Any]) -> URIRef:
         """Add an immutable JSON snapshot to the execution bundle without writing JSONL.

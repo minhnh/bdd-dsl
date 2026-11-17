@@ -8,7 +8,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from rdf_utils import DatasetFormat
-from rdflib import RDF, Dataset, Graph, URIRef
+from rdflib import RDF, BNode, Dataset, Graph, URIRef
 from rdflib.namespace import PROV, TIME
 from trinary import Unknown
 
@@ -556,7 +556,7 @@ def test_callback_links_configuration_samples_and_direct_results(journal):
     recorder.record_policy_eval(direct, sample.stamp, True, {})
     records = list(read_journal(path))
     sample_record, first, second, assertion = records
-    dataset = Dataset().parse(recorder.session.path, format="trig")
+    dataset = Dataset().parse(recorder.session.path, format=recorder.session.dataset_format)
     configuration_id = URIRef(first["data"]["details"][ObsDetailKey.CONFIG_ID])
     graph = dataset.graph(recorder.bundle_id)
     assert (configuration_id, RDF.type, PROV.Entity) in graph
@@ -590,7 +590,11 @@ def test_configuration_changes_get_new_references(journal):
     first_id = URIRef(first_eval["data"]["details"][ObsDetailKey.CONFIG_ID])
     second_id = URIRef(second_eval["data"]["details"][ObsDetailKey.CONFIG_ID])
     assert first_id != second_id
-    graph = Dataset().parse(recorder.session.path, format="trig").graph(recorder.bundle_id)
+    graph = (
+        Dataset()
+        .parse(recorder.session.path, format=recorder.session.dataset_format)
+        .graph(recorder.bundle_id)
+    )
     assert graph.value(first_id, PROV.value) != graph.value(second_id, PROV.value)
 
 
@@ -608,3 +612,39 @@ def test_session_configuration_is_an_optional_shared_snapshot(tmp_path, config):
     assert json.loads(str(value)) == config
     config["later"] = True
     assert json.loads(str(value)) != config
+
+
+def test_variable_assignments_preserve_values_and_execution_links(journal):
+    from rdflib import Literal
+
+    from bdd_dsl.models.namespace import NS_MM_BDD
+
+    recorder, path = journal
+    variable = URIRef("urn:variable")
+    resource = URIRef("urn:resource")
+    values = [resource, Literal(3), [], [resource, resource], (True, "label")]
+    for value in values:
+        recorder.record_var_assignments({variable: value})
+    assignments = list(recorder.graph.subjects(RDF.type, NS_MM_BDD.VariableAssignment))
+    assert len(assignments) == len(values)
+    encoded = []
+    for assignment in assignments:
+        assert (assignment, RDF.type, PROV.Entity) in recorder.graph
+        assert (recorder.execution_id, PROV.used, assignment) in recorder.graph
+        assert list(recorder.graph.objects(assignment, NS_MM_BDD["ref-variable"])) == [variable]
+        (value,) = recorder.graph.objects(assignment, RDF.value)
+        encoded.append(value)
+    assert resource in encoded and Literal(3) in encoded and RDF.nil in encoded
+    collections = [
+        list(recorder.graph.items(value)) for value in encoded if isinstance(value, BNode)
+    ]
+    assert [resource, resource] in collections
+    assert [Literal(True), Literal("label")] in collections
+    assert not path.read_bytes()
+
+
+@pytest.mark.parametrize("value", [None, {}, {1}, object()])
+def test_variable_assignments_reject_unsupported_values(journal, value):
+    recorder, _ = journal
+    with pytest.raises(TypeError):
+        recorder.record_var_assignments({URIRef("urn:variable"): value})
