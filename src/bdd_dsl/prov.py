@@ -41,6 +41,7 @@ class RecordingSession:
         agent_id: Software agent recording the executions.
         use_sim_time: True for simulation seconds, False for wall-clock Unix seconds.
         dataset_format: Dataset serialization format.
+        config: Optional shared configuration snapshot; None omits it.
     """
 
     def __init__(
@@ -49,7 +50,8 @@ class RecordingSession:
         agent_id: URIRef,
         *,
         use_sim_time: bool,
-        dataset_format: DatasetFormat = DatasetFormat.TRIG,
+        dataset_format: DatasetFormat = DatasetFormat.JSON_LD,
+        config: dict[str, Any] | None = None,
     ):
         # Setup provenance output directory
         self.output_dir = output_dir
@@ -69,6 +71,12 @@ class RecordingSession:
         self.dataset.graph(self.model_id)
 
         self.use_sim_time = use_sim_time
+        self.config_id: URIRef | None = None
+        if config is not None:
+            encoded = json.dumps(config, allow_nan=False)
+            self.config_id = add_entity(self.prov_bundle)
+            self.prov_bundle.add((self.config_id, PROV.wasAttributedTo, agent_id))
+            self.prov_bundle.add((self.config_id, PROV.value, Literal(encoded, datatype=RDF.JSON)))
 
     @property
     def model_graph(self) -> Graph:
@@ -118,6 +126,8 @@ class ScenarioExecRecorder:
         self.graph = self.dataset.graph(self.bundle_id)
         self.graph.add((self.execution_id, RDF.type, PROV.Activity))
         self.graph.add((self.execution_id, PROV.used, session.model_id))
+        if session.config_id is not None:
+            self.graph.add((self.execution_id, PROV.used, session.config_id))
         self.graph.add((self.execution_id, PROV.wasAssociatedWith, session.agent_id))
         self.dataset.default_graph.add((self.bundle_id, PROV.wasGeneratedBy, self.execution_id))
 
@@ -181,12 +191,11 @@ class ScenarioExecRecorder:
             Metadata entity URI. The caller persists the dataset.
         """
         encoded = json.dumps(data, allow_nan=False)
-        entity = URIRef(uuid4().urn)
-        add_entity(self.graph, entity)
-        self.graph.add((self.execution_id, PROV.used, entity))
-        self.graph.add((entity, PROV.wasDerivedFrom, model_uri))
-        self.graph.add((entity, PROV.value, Literal(encoded, datatype=RDF.JSON)))
-        return entity
+        entity_id = add_entity(self.graph)
+        self.graph.add((self.execution_id, PROV.used, entity_id))
+        self.graph.add((entity_id, PROV.wasDerivedFrom, model_uri))
+        self.graph.add((entity_id, PROV.value, Literal(encoded, datatype=RDF.JSON)))
+        return entity_id
 
     @property
     def failed(self) -> bool:

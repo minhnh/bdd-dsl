@@ -487,7 +487,11 @@ def test_recording_session_refuses_existing_dataset(tmp_path):
 def test_dataset_formats_preserve_shared_model_and_execution_bundles(tmp_path, dataset_format):
     model = Graph()
     model.add((URIRef("urn:model"), RDF.type, URIRef("urn:Model")))
-    session = _session(tmp_path, model, dataset_format=dataset_format)
+    config = {"parameters": {"use_sim_time": False}}
+    session = RecordingSession(
+        tmp_path, AGENT, use_sim_time=False, dataset_format=dataset_format, config=config
+    )
+    session.model_graph.__iadd__(model)
     assert session.model_graph.identifier == session.model_id
     assert session.prov_bundle.identifier == session.prov_id
     assert session.model_graph.store is session.dataset.store
@@ -496,6 +500,10 @@ def test_dataset_formats_preserve_shared_model_and_execution_bundles(tmp_path, d
     restored = Dataset().parse(session.path, format=dataset_format)
     assert session.path.name == f"execution.{dataset_format.extension}"
     assert set(restored.graph(session.model_id)) == set(model)
+    bundle = restored.graph(session.prov_id)
+    (snapshot,) = bundle.objects(session.config_id, PROV.value)
+    assert json.loads(str(snapshot)) == config
+    assert set(bundle.subjects(PROV.value, None)) == {session.config_id}
     for recorder in recorders:
         assert (
             recorder.bundle_id,
@@ -505,6 +513,7 @@ def test_dataset_formats_preserve_shared_model_and_execution_bundles(tmp_path, d
         graph = restored.graph(recorder.bundle_id)
         assert (recorder.bundle_id, RDF.type, PROV.Bundle) in graph
         assert (recorder.execution_id, RDF.type, PROV.Activity) in graph
+        assert (recorder.execution_id, PROV.used, session.config_id) in graph
         recorder.close()
     with pytest.raises(FileExistsError):
         _session(tmp_path, model, dataset_format=DatasetFormat.JSON_LD)
@@ -583,3 +592,19 @@ def test_configuration_changes_get_new_references(journal):
     assert first_id != second_id
     graph = Dataset().parse(recorder.session.path, format="trig").graph(recorder.bundle_id)
     assert graph.value(first_id, PROV.value) != graph.value(second_id, PROV.value)
+
+
+@pytest.mark.parametrize("config", [None, {}, {"nested": {"limit": 1.0}}])
+def test_session_configuration_is_an_optional_shared_snapshot(tmp_path, config):
+    session = RecordingSession(tmp_path, AGENT, use_sim_time=False, config=config)
+    if config is None:
+        assert session.config_id is None
+        assert not list(session.prov_bundle.subjects(PROV.value, None))
+        return
+    assert (session.config_id, RDF.type, PROV.Entity) in session.prov_bundle
+    assert (session.config_id, PROV.wasAttributedTo, AGENT) in session.prov_bundle
+    value = session.prov_bundle.value(session.config_id, PROV.value)
+    assert value.datatype == RDF.JSON
+    assert json.loads(str(value)) == config
+    config["later"] = True
+    assert json.loads(str(value)) != config
