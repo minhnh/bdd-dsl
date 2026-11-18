@@ -1,10 +1,13 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
 
 [project]
 name = "bdd_dsl"
-version = "0.0.1"
+dynamic = ["version"]
 authors = [
     { name="Minh Nguyen", email="minh@mail.minhnh.com" }
 ]
