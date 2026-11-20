@@ -89,7 +89,7 @@ class ObservationStamped:
     stamp: float
     value: Any
     # create 0, 1, 2 ... ids per process
-    sample_id: int = field(default_factory=count().__next__)
+    sample_id: int = field(default_factory=count().__next__, init=False)
 
 
 class ObsDetailKey(StrEnum):
@@ -419,6 +419,13 @@ class LinearDistanceEvaluator(ModelBase, ObservationPolicyEvaluator):
             raise ValueError(
                 f"unsupported linear distance constraint types: {self.constraint_types}"
             )
+
+    def get_config(self) -> dict[str, Any]:
+        """Return runtime flags not captured in the model graph."""
+        return {
+            "report_missing": self.report_missing,
+            "report_mismatched_time": self.report_mismatched_time,
+        }
 
     def _evaluate_samples(
         self, observations: list[ObservationStamped]
@@ -769,12 +776,16 @@ class ObsPolicyModel(ModelBase):
             if not accepted:
                 return accepted, reason
 
-        trinary, details = self.evaluator.evaluate(samples)
         evaluated_at = (
             evaluation_stamp
             if evaluation_stamp is not None
             else max(sample.stamp for sample in samples)
         )
+        accepted, reason = self._check_time_constraint(evaluated_at)
+        if not accepted:
+            return accepted, reason
+
+        trinary, details = self.evaluator.evaluate(samples)
         if self.prov_recorder is not None:
             self.prov_recorder.record_policy_eval(self, evaluated_at, trinary, details)
 

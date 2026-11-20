@@ -12,7 +12,12 @@ from rdflib import RDF, BNode, Dataset, Graph, URIRef
 from rdflib.namespace import PROV, TIME
 from trinary import Unknown
 
-from bdd_dsl.models.observation import ObsDetailKey, ObservationStamped, init_sample_details
+from bdd_dsl.models.observation import (
+    LinearDistanceEvaluator,
+    ObsDetailKey,
+    ObservationStamped,
+    init_sample_details,
+)
 from bdd_dsl.prov import RecordingSession, ScenarioExecRecorder, read_journal
 
 POLICY = URIRef("urn:policy")
@@ -579,10 +584,12 @@ def test_callback_links_configuration_samples_and_direct_results(journal):
 def test_configuration_changes_get_new_references(journal):
     recorder, path = journal
     policy = _policy()
+    policy.evaluator = LinearDistanceEvaluator.__new__(LinearDistanceEvaluator)
     recorder.record_policy_config(policy)
     recorder.session.save()
     recorder.record_policy_eval(policy, 1.0, True, {})
-    policy.evaluator.get_config.return_value = {"limit": 2.0}
+    policy.evaluator.report_missing = False
+    policy.evaluator.report_mismatched_time = True
     recorder.record_policy_config(policy)
     recorder.session.save()
     recorder.record_policy_eval(policy, 2.0, False, {})
@@ -595,7 +602,14 @@ def test_configuration_changes_get_new_references(journal):
         .parse(recorder.session.path, format=recorder.session.dataset_format)
         .graph(recorder.bundle_id)
     )
-    assert graph.value(first_id, PROV.value) != graph.value(second_id, PROV.value)
+    assert json.loads(graph.value(first_id, PROV.value)) == {
+        "report_missing": True,
+        "report_mismatched_time": False,
+    }
+    assert json.loads(graph.value(second_id, PROV.value)) == {
+        "report_missing": False,
+        "report_mismatched_time": True,
+    }
 
 
 @pytest.mark.parametrize("config", [None, {}, {"nested": {"limit": 1.0}}])

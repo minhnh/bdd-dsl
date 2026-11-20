@@ -194,28 +194,17 @@ def test_evaluator_details_optional_reason_and_dict_validation():
             Evaluator(invalid).evaluate([sample])
 
 
-def test_evaluator_details_identify_only_reported_samples():
-    class StatefulEvaluator(ObservationPolicyEvaluator):
-        def __init__(self):
-            super().__init__()
-            self.history = []
-
-        def _evaluate_samples(self, observations):
-            self.history.extend(observations)
-            return True, {ObsDetailKey.SAMPLE_IDS: [sample.sample_id for sample in observations]}
-
-    provider_uri = URIRef("urn:test:history-provider")
-    first = ObservationStamped(URIRef("urn:test:first"), provider_uri, 1.0, 1, sample_id=1)
-    second = ObservationStamped(URIRef("urn:test:second"), provider_uri, 2.0, 2, sample_id=2)
-    evaluator = StatefulEvaluator()
-    evaluator.evaluate([first])
-    _, details = evaluator.evaluate([second])
-
-    assert evaluator.history == [first, second]
-    assert details[ObsDetailKey.SAMPLE_IDS] == [second.sample_id]
+def test_observation_sample_ids_are_allocator_owned():
+    args = (URIRef("urn:test:obs"), URIRef("urn:test:provider"), 1.0, True)
+    first = ObservationStamped(*args)
+    with pytest.raises(TypeError, match="sample_id"):
+        ObservationStamped(*args, sample_id=first.sample_id)
+    second = ObservationStamped(*args)
+    assert first.sample_id != second.sample_id
 
 
-def test_policy_rejects_out_of_interval_samples_before_evaluation():
+@pytest.mark.parametrize("empty_result", [Unknown, None])
+def test_policy_rejects_out_of_interval_samples_and_evaluations(empty_result):
     start = URIRef("urn:test:start")
     end = URIRef("urn:test:end")
     policy_uri = URIRef("urn:test:policy")
@@ -235,26 +224,20 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
         fluent_id=URIRef("urn:test:fluent"),
         fluent_types={URI_TIME_TYPE_DURING},
     )
-    calls = []
-
-    class StatefulEvaluator(ObservationPolicyEvaluator):
-        def _evaluate_samples(self, observations):
-            calls.append(observations)
-            return True, {ObsDetailKey.REASON: "evaluated"}
-
-    policy.evaluator = StatefulEvaluator()
-    evaluations = []
-    policy.prov_recorder = unittest.mock.Mock(
-        record_policy_eval=lambda *args: evaluations.append(args)
-    )
+    policy.evaluator = unittest.mock.Mock(spec=ObservationPolicyEvaluator)
+    policy.evaluator.evaluate.side_effect = lambda samples: (True if samples else empty_result, {})
+    policy.prov_recorder = unittest.mock.Mock()
+    evaluate = policy.evaluator.evaluate
+    record = policy.prov_recorder.record_policy_eval
     current = [
         ObservationStamped(observation_uri, provider, 2.0, True)
         for observation_uri in observation_uris
     ]
 
     assert not policy.add_samples(current)[0]
-    assert calls == []
-    assert evaluations == []
+    assert not policy.add_samples([], evaluation_stamp=2.0)[0]
+    evaluate.assert_not_called()
+    record.assert_not_called()
 
     policy.on_event(start, 2.0)
     stale_batch = [
@@ -262,12 +245,12 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
         ObservationStamped(observation_uris[1], provider, 3.0, True),
     ]
     assert not policy.add_samples(stale_batch)[0]
-    assert calls == []
-    assert evaluations == []
+    assert not policy.add_samples(current, evaluation_stamp=1.0)[0]
+    evaluate.assert_not_called()
+    record.assert_not_called()
 
     assert policy.add_samples(current)[0]
-    assert len(calls) == 1
-    assert len(evaluations) == 1
+    assert evaluate.call_count == record.call_count == 1
 
     policy.on_event(end, 4.0)
     boundary = [
@@ -275,14 +258,20 @@ def test_policy_rejects_out_of_interval_samples_before_evaluation():
         for observation_uri in observation_uris
     ]
     assert policy.add_samples(boundary)[0]
-    assert len(calls) == 2
-    assert len(evaluations) == 2
+    assert evaluate.call_count == record.call_count == 2
     after = [
         ObservationStamped(observation_uri, provider, 4.1, True)
         for observation_uri in observation_uris
     ]
     assert not policy.add_samples(after)[0]
-    assert len(calls) == 2
+    assert evaluate.call_count == record.call_count == 2
+
+    for stamp in (1.0, 4.1):
+        assert not policy.add_samples([], evaluation_stamp=stamp)[0]
+    assert evaluate.call_count == record.call_count == 2
+    assert policy.add_samples([], evaluation_stamp=4.0)[0]
+    evaluate.assert_called_with([])
+    assert evaluate.call_count == record.call_count == 3
 
 
 def test_direct_trinary_policy_keeps_temporal_rejection():
@@ -419,15 +408,13 @@ def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
     evaluator.constraint_types = {URI_CSTR_TYPE_LESS_THAN}
     evaluator.constraint_values = (0.12,)
 
-    first_sample = ObservationStamped(first_uri, provider_uri, 1.0, (0.0, 0.0, 0.0), sample_id=11)
+    first_sample = ObservationStamped(first_uri, provider_uri, 1.0, (0.0, 0.0, 0.0))
     result, details = evaluator.evaluate([first_sample])
     assert result is Unknown
     assert details[ObsDetailKey.SAMPLE_IDS] == [first_sample.sample_id]
     assert details[ObsDetailKey.OBS_IDS] == [first_uri]
 
-    second_sample = ObservationStamped(
-        second_uri, provider_uri, 1.01, (0.06, 0.0, 0.0), sample_id=12
-    )
+    second_sample = ObservationStamped(second_uri, provider_uri, 1.01, (0.06, 0.0, 0.0))
     result, reason = evaluator.evaluate([second_sample])
     assert result is True
     assert reason[ObsDetailKey.SAMPLE_IDS] == [first_sample.sample_id, second_sample.sample_id]
@@ -436,7 +423,7 @@ def test_linear_distance_can_report_mismatched_sample_times_as_unknown():
     assert "input time offset 0.01 s" in reason[ObsDetailKey.REASON]
     assert reason["measured_distance_m"] == 0.06
 
-    replacement = ObservationStamped(second_uri, provider_uri, 1.08, (0.17, 0.0, 0.0), sample_id=13)
+    replacement = ObservationStamped(second_uri, provider_uri, 1.08, (0.17, 0.0, 0.0))
     result, reason = evaluator.evaluate([replacement])
     assert result is False
     assert reason[ObsDetailKey.SAMPLE_STAMPS] == [first_sample.stamp, replacement.stamp]
