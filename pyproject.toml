@@ -16,7 +16,7 @@ A Domain-Specific Language (DSL) to showcase the Behaviour-Driven Development (B
 realized using the JSON-LD format. Developed in context of the SESAME project.
 """
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Development Status :: 2 - Pre-Alpha",
